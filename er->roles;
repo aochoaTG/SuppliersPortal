@@ -1,0 +1,19 @@
+[90m= [39m[34;4mApp\Models\User[39;24m {#6118
+    [34mid[39m: "[32m1[39m",
+    [34mname[39m: "[32mSuper Administrador[39m",
+    [34memail[39m: "[32mtgsuperadmin@yopmail.com[39m",
+    [34memail_verified_at[39m: "[32m2025-08-22 19:45:50.203[39m",
+    #[33mpassword[39m: "[32m$2y$12$5hY8OJ9Mu3PLplt7jcRMm.r8HgiCUQNZ5XBsHDdo91pK1/.oxVL1G[39m",
+    #[33mremember_token[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2025-08-22 19:45:50.210[39m",
+    [34mupdated_at[39m: "[32m2025-08-29 23:01:51.770[39m",
+    [34mfirst_name[39m: "[32mJosé Aldo[39m",
+    [34mlast_name[39m: "[32mOchoa Hinojos[39m",
+    [34mis_active[39m: "[32m1[39m",
+    [34mavatar[39m: [36mnull[39m,
+    [34mphone[39m: "[32m6563112378[39m",
+    [34mjob_title[39m: "[32mDesarrollador de Software[39m",
+    [34mlast_login[39m: [36mnull[39m,
+    [34mdeleted_at[39m: [36mnull[39m,
+  }
+
