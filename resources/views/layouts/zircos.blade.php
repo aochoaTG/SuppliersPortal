@@ -115,6 +115,7 @@
                 border: 1px solid transparent;
             }
         </style>
+        
         <style>
             div.dataTables_processing {
                 position: fixed !important;
