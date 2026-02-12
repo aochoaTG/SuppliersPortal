@@ -1,0 +1,1497 @@
+@php
+    // Verificamos si TODAS las partidas están ya en un estado que no sea DRAFT
+    $allLocked = $items->every(function($item) use ($responses) {
+        $resp = $responses->get($item->id);
+        return $resp && $resp->status !== 'DRAFT';
+    });
+@endphp
+
+@extends('layouts.zircos')
+
+@section('title', 'Cotizar RFQ - ' . $rfq->folio)
+
+{{-- Breadcrumbs personalizados --}}
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item">
+        <a href="{{ route('supplier.dashboard') }}">Dashboard</a>
+    </li>
+    <li class="breadcrumb-item active">RFQ {{ $rfq->folio }}</li>
+@endsection
+
+@section('content')
+<div class="container-fluid py-4">
+
+    <div class="row">
+        {{-- COLUMNA IZQUIERDA: Información del RFQ (Sticky) --}}
+        <div class="col-lg-4 col-xl-3 mb-4">
+            <div class="sticky-top" style="top: 20px;">
+                
+                {{-- Card: Información General --}}
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header bg-primary text-white py-2">
+                        <h6 class="mb-0">
+                            <i class="ti ti-file-invoice me-2"></i>
+                            Información del RFQ
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Folio RFQ</small>
+                            <strong class="d-block">{{ $rfq->folio }}</strong>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Requisición</small>
+                            <strong class="d-block">{{ $rfq->requisition->folio ?? 'N/A' }}</strong>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Grupo</small>
+                            <span class="badge bg-info">{{ $rfq->quotationGroup->name }}</span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Estado</small>
+                            @switch($rfq->status)
+                                @case('SENT')
+                                    <span class="badge bg-warning">
+                                        <i class="ti ti-send me-1"></i>Recibida
+                                    </span>
+                                    @break
+                                @case('RECEIVED')
+                                    <span class="badge bg-info">
+                                        <i class="ti ti-inbox me-1"></i>Respuestas Recibidas
+                                    </span>
+                                    @break
+                                @case('EVALUATED')
+                                    <span class="badge bg-primary">
+                                        <i class="ti ti-chart-bar me-1"></i>Evaluada
+                                    </span>
+                                    @break
+                                @case('COMPLETED')
+                                    <span class="badge bg-success">
+                                        <i class="ti ti-check me-1"></i>Completada
+                                    </span>
+                                    @break
+                                @default
+                                    <span class="badge bg-secondary">{{ $rfq->status }}</span>
+                            @endswitch
+                        </div>
+                        
+                        <div class="mb-0">
+                            <small class="text-muted d-block">Fecha Límite</small>
+                            @if($rfq->response_deadline)
+                                @php
+                                    $daysRemaining = now()->diffInDays($rfq->response_deadline, false);
+                                @endphp
+                                <strong class="d-block">{{ $rfq->response_deadline->format('d/m/Y H:i') }}</strong>
+                                @if($daysRemaining < 0)
+                                    <span class="badge bg-danger mt-1">
+                                        <i class="ti ti-alert-triangle me-1"></i>Vencida
+                                    </span>
+                                @elseif($daysRemaining === 0)
+                                    <span class="badge bg-warning mt-1">
+                                        <i class="ti ti-clock me-1"></i>Vence hoy
+                                    </span>
+                                @elseif($daysRemaining <= 3)
+                                    <span class="badge bg-warning mt-1">
+                                        <i class="ti ti-clock me-1"></i>{{ $daysRemaining }} días
+                                    </span>
+                                @else
+                                    <span class="badge bg-success mt-1">
+                                        <i class="ti ti-calendar me-1"></i>{{ $daysRemaining }} días
+                                    </span>
+                                @endif
+                            @else
+                                <span class="text-muted">No especificada</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Card: Mensaje/Notas --}}
+                @if($rfq->message)
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header bg-light py-2">
+                        <h6 class="mb-0">
+                            <i class="ti ti-message-circle me-2"></i>
+                            Mensaje
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <p class="mb-0 small">{{ $rfq->message }}</p>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Card: Resumen --}}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light py-2">
+                        <h6 class="mb-0">
+                            <i class="ti ti-calculator me-2"></i>
+                            Resumen de Cotización
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-2 fw-bold">Partidas cotizadas:</small>
+                            <div id="summary-items" class="small">
+                                {{-- Se llena dinámicamente con JavaScript --}}
+                            </div>
+                        </div>
+                        
+                        <hr class="my-2">
+                        
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="text-muted">Subtotal (sin IVA):</small>
+                            <strong class="small">$<span id="summary-subtotal">0.00</span></strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <small class="text-muted">IVA total:</small>
+                            <strong class="small text-info">$<span id="summary-iva">0.00</span></strong>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <strong class="text-primary">Total con IVA:</strong>
+                            <h5 class="mb-0 text-primary">$<span id="grand-total">0.00</span></h5>
+                        </div>
+                        
+                        <div class="mt-2 text-center">
+                            <span class="badge bg-light text-dark">
+                                <i class="ti ti-package me-1"></i>
+                                {{ $items->count() }} partida(s)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Botón Volver --}}
+                <a href="{{ route('supplier.dashboard') }}" class="btn btn-outline-secondary w-100 mt-3">
+                    <i class="ti ti-arrow-left me-2"></i>Volver al Dashboard
+                </a>
+
+            </div>
+        </div>
+
+        {{-- COLUMNA DERECHA: Formulario de Cotización --}}
+        <div class="col-lg-8 col-xl-9">
+            
+            <form action="{{ route('supplier.rfq.quotation.save', $rfq) }}" 
+                  method="POST" 
+                  enctype="multipart/form-data"
+                  id="quotation-form">
+                @csrf
+
+                {{-- Datos Generales de la Cotización --}}
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header bg-light py-2">
+                        <h6 class="mb-0">
+                            <i class="ti ti-file-text me-2"></i>
+                            Datos Generales de tu Cotización
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="row g-3">
+                            <div class="col">
+                                <label for="supplier_quotation_number" class="form-label form-label-sm">
+                                    Número de tu Cotización
+                                </label>
+                                <input type="text" 
+                                    class="form-control form-control-sm @error('supplier_quotation_number') is-invalid @enderror" 
+                                    id="supplier_quotation_number" 
+                                    name="supplier_quotation_number"
+                                    value="{{ old('supplier_quotation_number') }}"
+                                    placeholder="Ej: COT-2025-001"
+                                    {{ $allLocked ? 'disabled' : '' }}>
+                                @error('supplier_quotation_number')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col">
+                                <label for="validity_days" class="form-label form-label-sm">
+                                    Vigencia (días)
+                                </label>
+                                <input type="number" 
+                                    class="form-control form-control-sm @error('validity_days') is-invalid @enderror" 
+                                    id="validity_days" 
+                                    name="validity_days"
+                                    value="{{ old('validity_days', 30) }}"
+                                    min="1"
+                                    max="365"
+                                    placeholder="30"
+                                    {{ $allLocked ? 'disabled' : '' }}>
+                                @error('validity_days')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- CAMPO GLOBAL PARCHADO --}}
+                            <div class="col">
+                                <label for="global_payment_terms" class="form-label form-label-sm fw-bold text-primary">
+                                    <i class="ti ti-credit-card me-1"></i>Condiciones de Pago Globales
+                                </label>
+                                <input type="text" 
+                                    id="global_payment_terms" 
+                                    class="form-control form-control-sm border-primary" 
+                                    placeholder="Ej: Crédito 30 días, Contado, etc."
+                                    value="{{ old('global_payment_terms', $responses->first()?->payment_terms ?? '') }}"
+                                    {{ $allLocked ? 'disabled' : '' }}>
+                            </div>
+
+                            {{-- ========================================================== --}}
+                            {{-- SECCIÓN DE CARGA DE PDF CON LÓGICA CONDICIONAL --}}
+                            {{-- ========================================================== --}}
+                            @php
+                                // Obtener datos del pivote para verificar si hay PDF cargado
+                                $pivotData = $rfq->suppliers->find($supplier->id)?->pivot;
+                                $hasPdf = $pivotData && $pivotData->quotation_pdf_path && Storage::disk('public')->exists($pivotData->quotation_pdf_path);
+                                $pdfUrl = $hasPdf ? Storage::disk('public')->url($pivotData->quotation_pdf_path) : null;
+                                $pdfFileName = $hasPdf ? basename($pivotData->quotation_pdf_path) : null;
+                            @endphp
+
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <label class="form-label form-label-sm">
+                                    <i class="ti ti-file-upload me-1"></i>Cotización en PDF 
+                                    <span class="text-muted">(Opcional)</span>
+                                </label>
+
+                                {{-- SI HAY PDF CARGADO --}}
+                                @if($hasPdf)
+                                <div class="border border-success rounded-3 p-2 bg-success bg-opacity-10">
+                                    {{-- Información del archivo --}}
+                                    <div class="d-flex align-items-center mb-2 gap-2">
+                                        <i class="ti ti-file-type-pdf text-danger fs-3"></i>
+                                        <div class="flex-grow-1 overflow-hidden">
+                                            <div class="text-truncate fw-semibold text-dark" 
+                                                style="font-size: 0.8rem;" 
+                                                title="{{ $pdfFileName }}">
+                                                {{ $pdfFileName }}
+                                            </div>
+                                            <div class="text-success" style="font-size: 0.7rem;">
+                                                <i class="ti ti-check"></i> Archivo cargado
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {{-- Botones --}}
+                                    <div class="d-grid gap-1">
+                                        <a href="{{ $pdfUrl }}" 
+                                        target="_blank" 
+                                        class="btn btn-sm btn-primary w-100">
+                                            <i class="ti ti-eye me-1"></i> Ver PDF
+                                        </a>
+                                        
+                                        @if(!$allLocked)
+                                            <div class="btn-group w-100">
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-warning" 
+                                                        id="btnChangePDF">
+                                                    <i class="ti ti-edit me-1"></i> Cambiar
+                                                </button>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger" 
+                                                        id="btnDeletePDF">
+                                                    <i class="ti ti-trash"></i>
+                                                </button>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                                @else
+                                    <div class="d-grid gap-2">
+                                        <button type="button" 
+                                                class="btn btn-outline-primary btn-sm" 
+                                                id="btnUploadPDF"
+                                                {{ $allLocked ? 'disabled' : '' }}>
+                                            <i class="ti ti-upload me-2"></i>
+                                            <span id="btnUploadText">Cargar PDF de Cotización</span>
+                                        </button>
+                                    </div>
+                                @endif
+
+                                {{-- Input file oculto (siempre presente) --}}
+                                <input type="file" 
+                                    id="quotation_pdf_file" 
+                                    name="quotation_pdf_file" 
+                                    accept=".pdf,application/pdf" 
+                                    style="display: none;">
+
+                                {{-- Campo hidden para indicar eliminación --}}
+                                <input type="hidden" id="delete_pdf_flag" name="delete_pdf_flag" value="0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Partidas a Cotizar --}}
+                @if($items->isEmpty())
+                    <div class="alert alert-warning">
+                        <i class="ti ti-alert-triangle me-2"></i>
+                        No hay partidas para cotizar en esta RFQ.
+                    </div>
+                @else
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="mb-0">
+                                <i class="ti ti-list-details me-2"></i>
+                                Partidas a Cotizar ({{ $items->count() }})
+                            </h6>
+                        </div>
+                        <div class="card-body p-2">
+                            
+                            @foreach($items as $index => $item)
+                                @php
+                                    $existingResponse = $responses->get($item->id);
+                                    $isLocked = $existingResponse && $existingResponse->status !== 'DRAFT';
+                                    $itemPrefix = "items[{$index}]";
+                                @endphp
+                                
+                                <div class="quotation-item border rounded-3 p-3 mb-2 {{ $isLocked ? 'bg-light border-warning' : 'bg-white' }}" data-item-index="{{ $index }}">
+    
+                                    {{-- Header de la Partida --}}
+                                    <div class="d-flex align-items-start justify-content-between mb-3">
+                                        <div class="d-flex align-items-start flex-grow-1">
+                                            <span class="badge bg-dark me-2 mt-1">{{ $index + 1 }}</span>
+                                            <div>
+                                                <h6 class="mb-1 fw-bold">
+                                                    {{ $item->description }}
+                                                    {{-- 3. INDICADOR VISUAL DE BLOQUEO --}}
+                                                    @if($isLocked)
+                                                        <i class="ti ti-lock text-warning ms-1" title="Partida bloqueada (ya enviada)"></i>
+                                                    @endif
+                                                </h6>
+                                                <small class="text-muted">
+                                                    <i class="ti ti-package"></i> {{ $item->quantity }} {{ $item->unit }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        
+                                        @if($existingResponse)
+                                            @php
+                                                $statusClasses = [
+                                                    'DRAFT' => 'bg-secondary',
+                                                    'SUBMITTED' => 'bg-info',
+                                                    'APPROVED' => 'bg-success',
+                                                    'REJECTED' => 'bg-danger'
+                                                ];
+                                                $statusLabels = [
+                                                    'DRAFT' => 'Borrador',
+                                                    'SUBMITTED' => 'Enviada',
+                                                    'APPROVED' => 'Aprobada',
+                                                    'REJECTED' => 'Rechazada'
+                                                ];
+                                            @endphp
+                                            <span class="badge {{ $statusClasses[$existingResponse->status] ?? 'bg-secondary' }}">
+                                                {{ $statusLabels[$existingResponse->status] ?? $existingResponse->status }}
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    {{-- El item_id lo dejamos habilitado para que el controlador sepa de qué partida hablamos --}}
+                                    <input type="hidden" name="{{ $itemPrefix }}[item_id]" value="{{ $item->id }}" {{ $isLocked ? 'disabled' : '' }}>
+
+                                    {{-- Campos del Formulario --}}
+                                    <div class="row g-2">
+                                        
+                                        {{-- FILA 1: Precios y Cálculos --}}
+                                        <div class="col-md-2">
+                                            <label class="form-label-sm mb-1">Precio Unit. * <small class="text-muted">(sin IVA)</small></label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">$</span>
+                                                <input type="number" 
+                                                    step="0.01"
+                                                    min="0.01"
+                                                    class="form-control unit-price" 
+                                                    name="{{ $itemPrefix }}[unit_price]"
+                                                    value="{{ old("{$itemPrefix}[unit_price]", $existingResponse->unit_price ?? '') }}" 
+                                                    required
+                                                    {{ $isLocked ? 'disabled' : '' }}> {{-- DISABLED SI ESTÁ BLOQUEADO --}}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-1">
+                                            <label class="form-label-sm mb-1">Cant. *</label>
+                                            <input type="number" 
+                                                step="0.001"
+                                                min="0.001"
+                                                class="form-control form-control-sm quantity" 
+                                                name="{{ $itemPrefix }}[quantity]"
+                                                value="{{ old("{$itemPrefix}[quantity]", $existingResponse->quantity ?? $item->quantity) }}" 
+                                                required
+                                                {{ $isLocked ? 'disabled' : '' }}> {{-- DISABLED --}}
+                                        </div>
+                                        
+                                        <div class="col-md-2">
+                                            <label class="form-label-sm mb-1">Subtotal <small class="text-muted">(sin IVA)</small></label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">$</span>
+                                                <input type="text" 
+                                                    class="form-control bg-light subtotal" 
+                                                    readonly 
+                                                    value="{{ old("{$itemPrefix}[subtotal]", $existingResponse ? number_format($existingResponse->subtotal, 2) : '0.00') }}">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-2">
+                                            <label class="form-label-sm mb-1">IVA *</label>
+                                            <select class="form-select form-select-sm iva-rate" 
+                                                    name="{{ $itemPrefix }}[iva_rate]"
+                                                    {{ $isLocked ? 'disabled' : '' }}> {{-- DISABLED --}}
+                                                <option value="16.00" {{ old("{$itemPrefix}[iva_rate]", $existingResponse->iva_rate ?? 16.00) == 16.00 ? 'selected' : '' }}>16%</option>
+                                                <option value="8.00" {{ old("{$itemPrefix}[iva_rate]", $existingResponse->iva_rate ?? 16.00) == 8.00 ? 'selected' : '' }}>8%</option>
+                                                <option value="0.00" {{ old("{$itemPrefix}[iva_rate]", $existingResponse->iva_rate ?? 16.00) == 0.00 ? 'selected' : '' }}>0%</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-md-2">
+                                            <label class="form-label-sm mb-1">Monto IVA</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">$</span>
+                                                <input type="text" 
+                                                    class="form-control bg-light iva-amount" 
+                                                    readonly 
+                                                    value="{{ old("{$itemPrefix}[iva_amount]", $existingResponse ? number_format($existingResponse->iva_amount, 2) : '0.00') }}">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-3">
+                                            <label class="form-label-sm mb-1 fw-bold">Total <small class="text-muted">(con IVA)</small></label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text fw-bold">$</span>
+                                                <input type="text" 
+                                                    class="form-control bg-success bg-opacity-10 fw-bold item-total" 
+                                                    readonly 
+                                                    value="{{ old("{$itemPrefix}[total]", $existingResponse ? number_format($existingResponse->total, 2) : '0.00') }}">
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-3 d-none"> {{-- Lo ocultamos visualmente --}}
+                                            <input type="hidden" 
+                                                   class="item-payment-terms" 
+                                                   name="{{ $itemPrefix }}[payment_terms]" 
+                                                   value="{{ old("{$itemPrefix}[payment_terms]", $existingResponse->payment_terms ?? '') }}">
+                                        </div>
+                                        
+                                        <div class="col-md-2">
+                                            <label class="form-label-sm mb-1">Días Entrega</label>
+                                            <input type="number" 
+                                                step="1"
+                                                min="0"
+                                                class="form-control form-control-sm" 
+                                                name="{{ $itemPrefix }}[delivery_days]" 
+                                                placeholder="Días"
+                                                value="{{ old("{$itemPrefix}[delivery_days]", $existingResponse->delivery_days ?? '') }}"
+                                                {{ $isLocked ? 'disabled' : '' }}> {{-- DISABLED --}}
+                                        </div>
+                                        
+                                        <div class="col-md-2">
+                                            <label class="form-label-sm mb-1">Moneda</label>
+                                            <select class="form-select form-select-sm" name="{{ $itemPrefix }}[currency]" {{ $isLocked ? 'disabled' : '' }}>
+                                                <option value="MXN" {{ old("{$itemPrefix}[currency]", $existingResponse->currency ?? 'MXN') == 'MXN' ? 'selected' : '' }}>MXN ($)</option>
+                                                <option value="USD" {{ old("{$itemPrefix}[currency]", $existingResponse->currency ?? 'MXN') == 'USD' ? 'selected' : '' }}>USD (US$)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-md-2">
+                                            <label class="form-label-sm mb-1">Marca</label>
+                                            <input type="text" 
+                                                class="form-control form-control-sm" 
+                                                name="{{ $itemPrefix }}[brand]" 
+                                                placeholder="Marca"
+                                                value="{{ old("{$itemPrefix}[brand]", $existingResponse->brand ?? '') }}"
+                                                {{ $isLocked ? 'disabled' : '' }}> {{-- DISABLED --}}
+                                        </div>
+                                        
+                                        <div class="col-md-3">
+                                            <label class="form-label-sm mb-1">Modelo</label>
+                                            <input type="text" 
+                                                class="form-control form-control-sm" 
+                                                name="{{ $itemPrefix }}[model]" 
+                                                placeholder="Modelo"
+                                                value="{{ old("{$itemPrefix}[model]", $existingResponse->model ?? '') }}"
+                                                {{ $isLocked ? 'disabled' : '' }}> {{-- DISABLED --}}
+                                        </div>
+
+                                        {{-- FILA 3: Adjuntos --}}
+                                        <div class="col-md-3">
+                                            <label class="form-label-sm mb-1">
+                                                <i class="ti ti-paperclip me-1"></i>Adjunto PDF
+                                                @if($existingResponse && $existingResponse->attachment_path)
+                                                    <a href="{{ route('supplier.quotation.download', $existingResponse) }}" 
+                                                    class="text-primary ms-2" 
+                                                    target="_blank" 
+                                                    title="Ver adjunto actual">
+                                                        <i class="ti ti-eye"></i> Ver actual
+                                                    </a>
+                                                @endif
+                                            </label>
+                                            <input type="file" 
+                                                class="form-control form-control-sm" 
+                                                name="{{ $itemPrefix }}[attachment]" 
+                                                accept=".pdf"
+                                                {{ $isLocked ? 'disabled' : '' }}> {{-- DISABLED --}}
+                                        </div>
+
+                                        {{-- FILA 4: Áreas de Texto --}}
+                                        <div class="col-md-4">
+                                            <label class="form-label-sm mb-1">Especificaciones Técnicas</label>
+                                            <textarea class="form-control form-control-sm" 
+                                                    name="{{ $itemPrefix }}[specifications]" 
+                                                    rows="2" 
+                                                    placeholder="Detalles técnicos del producto/servicio"
+                                                    {{ $isLocked ? 'disabled' : '' }}>{{ old("{$itemPrefix}[specifications]", $existingResponse->specifications ?? '') }}</textarea>
+                                        </div>
+                                        
+                                        <div class="col-md-4">
+                                            <label class="form-label-sm mb-1">Garantía</label>
+                                            <textarea class="form-control form-control-sm" 
+                                                    name="{{ $itemPrefix }}[warranty_terms]" 
+                                                    rows="2" 
+                                                    placeholder="Términos de garantía"
+                                                    {{ $isLocked ? 'disabled' : '' }}>{{ old("{$itemPrefix}[warranty_terms]", $existingResponse->warranty_terms ?? '') }}</textarea>
+                                        </div>
+                                        
+                                        <div class="col-md-4">
+                                            <label class="form-label-sm mb-1">Notas Adicionales</label>
+                                            <textarea class="form-control form-control-sm" 
+                                                    name="{{ $itemPrefix }}[notes]" 
+                                                    rows="2" 
+                                                    placeholder="Cualquier información adicional"
+                                                    {{ $isLocked ? 'disabled' : '' }}>{{ old("{$itemPrefix}[notes]", $existingResponse->notes ?? '') }}</textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Botones de Acción --}}
+                    @if(in_array($rfq->status, ['SENT', 'RECEIVED']))
+                        <div class="card mt-3 shadow-sm border-top border-3 {{ $allLocked ? 'border-info' : 'border-primary' }}">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                    
+                                    {{-- LADO IZQUIERDO: Información de estado --}}
+                                    <div class="d-flex align-items-center">
+                                        @if($allLocked)
+                                            <div class="alert alert-info mb-0 py-2 px-3 border-0 shadow-none">
+                                                <i class="ti ti-circle-check-filled me-2 fs-5"></i>
+                                                <strong>Cotización Completada:</strong> Ya has enviado todas las partidas de esta solicitud.
+                                            </div>
+                                        @else
+                                            <small class="text-muted">
+                                                <i class="ti ti-info-circle-filled me-1 text-primary"></i>
+                                                Puedes guardar tus avances como <strong>borrador</strong> y finalizar el envío después.
+                                            </small>
+                                        @endif
+                                    </div>
+
+                                    {{-- LADO DERECHO: Acciones --}}
+                                    <div class="text-end">
+                                        @if(!$allLocked)
+                                            <button type="submit" 
+                                                    name="action" 
+                                                    value="save_draft" 
+                                                    class="btn btn-sm btn-outline-secondary me-2 px-3">
+                                                <i class="ti ti-device-floppy me-1"></i>
+                                                Guardar Borrador
+                                            </button>
+
+                                            <button type="submit" 
+                                                    id="submit-quotation-btn" 
+                                                    name="action" 
+                                                    value="submit" 
+                                                    class="btn btn-sm btn-primary px-4">
+                                                <i class="ti ti-send me-1"></i>
+                                                Enviar Cotización Final
+                                            </button>
+                                        @else
+                                            {{-- Botón de solo lectura o retorno --}}
+                                            <a href="{{ route('supplier.dashboard') }}" class="btn btn-sm btn-secondary px-4">
+                                                <i class="ti ti-arrow-left me-1"></i>
+                                                Volver al Listado
+                                            </a>
+                                        @endif
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{{-- Modal para Cargar/Cambiar PDF --}}
+<div class="modal fade" id="uploadPDFModal" tabindex="-1" aria-labelledby="uploadPDFModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="uploadPDFModalLabel">
+                    <i class="ti ti-file-upload me-2"></i>
+                    <span id="modalTitle">Cargar Cotización en PDF</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info alert-sm mb-3">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <small>Puedes adjuntar tu cotización interna en formato PDF como respaldo. Este archivo complementa la información que ingreses en el formulario.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="pdf_file_input" class="form-label">
+                        Selecciona tu archivo PDF
+                    </label>
+                    <div class="file-drop-area" id="fileDropArea">
+                        <div class="file-drop-icon">
+                            <i class="ti ti-cloud-upload" style="font-size: 3rem; color: #6c757d;"></i>
+                        </div>
+                        <p class="file-drop-message mb-2">
+                            Arrastra tu archivo aquí o haz clic para seleccionar
+                        </p>
+                        <input type="file" 
+                               id="pdf_file_input" 
+                               accept=".pdf,application/pdf" 
+                               class="file-input"
+                               style="display: none;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="selectFileBtn">
+                            <i class="ti ti-folder-open me-1"></i>Seleccionar archivo
+                        </button>
+                    </div>
+                    
+                    <div id="filePreview" class="mt-3" style="display: none;">
+                        <div class="card">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="ti ti-file-type-pdf text-danger me-3" style="font-size: 2.5rem;"></i>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1" id="previewFileName">archivo.pdf</h6>
+                                        <small class="text-muted" id="previewFileSize">0 KB</small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="removePreviewFile">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-text">
+                    <i class="ti ti-alert-circle me-1"></i>
+                    Tamaño máximo: 5 MB | Solo archivos PDF
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="confirmUploadPDF" disabled>
+                    <i class="ti ti-check me-1"></i>Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@push('styles')
+<style>
+    .form-label-sm {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #6c757d;
+    }
+    
+    .quotation-item {
+        background-color: #f8f9fa;
+        transition: all 0.2s ease;
+    }
+    
+    .quotation-item:hover {
+        background-color: #fff;
+        box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.1);
+    }
+
+    @media (min-width: 992px) {
+        .sticky-top {
+            position: sticky;
+            z-index: 10;
+        }
+    }
+
+    .file-drop-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .file-drop-area:hover {
+        border-color: #0d6efd;
+        background-color: #f8f9fa;
+    }
+
+    .file-drop-area.dragover {
+        border-color: #0d6efd;
+        background-color: #e7f3ff;
+    }
+
+    .file-drop-message {
+        color: #6c757d;
+        font-size: 0.95rem;
+    }
+</style>
+@endpush
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$(document).ready(function() {
+    
+    // =========================================================================
+    // Cálculo automático de subtotales, IVA y totales
+    // =========================================================================
+    function calculateItemTotals(index) {
+        const $item = $(`.quotation-item[data-item-index="${index}"]`);
+        const unitPrice = parseFloat($item.find('.unit-price').val()) || 0;
+        const quantity = parseFloat($item.find('.quantity').val()) || 0;
+        const ivaRate = parseFloat($item.find('.iva-rate').val()) || 0;
+        
+        // Calcular subtotal (sin IVA)
+        const subtotal = unitPrice * quantity;
+        
+        // Calcular IVA
+        const ivaAmount = subtotal * (ivaRate / 100);
+        
+        // Calcular total (con IVA)
+        const total = subtotal + ivaAmount;
+        
+        // Actualizar campos
+        $item.find('.subtotal').val(subtotal.toFixed(2));
+        $item.find('.iva-amount').val(ivaAmount.toFixed(2));
+        $item.find('.item-total').val(total.toFixed(2));
+        
+        // Actualizar el gran total y resumen
+        calculateGrandTotal();
+        updateSummaryPanel();
+    }
+
+    function updateSummaryPanel() {
+        let summaryHtml = '';
+        
+        $('.quotation-item').each(function(index) {
+            const $item = $(this);
+            const itemNumber = index + 1;
+            const total = parseFloat($item.find('.item-total').val()) || 0;
+            
+            // Obtener descripción del header
+            const description = $item.find('h6.fw-bold').text().trim();
+            const shortDescription = description.length > 30 
+                ? description.substring(0, 30) + '...' 
+                : description;
+            
+            // Determinar color según si tiene valor
+            const hasValue = total > 0;
+            const textClass = hasValue ? 'text-dark' : 'text-muted';
+            const badgeClass = hasValue ? 'bg-primary' : 'bg-secondary';
+            
+            summaryHtml += `
+                <div class="d-flex justify-content-between align-items-start mb-2 ${textClass}">
+                    <div class="flex-grow-1 me-2">
+                        <span class="badge ${badgeClass} badge-sm me-1">${itemNumber}</span>
+                        <small>${shortDescription}</small>
+                    </div>
+                    <strong class="text-nowrap small">$${total.toFixed(2)}</strong>
+                </div>
+            `;
+        });
+        
+        if (summaryHtml === '') {
+            summaryHtml = '<p class="text-muted text-center small mb-0">Sin partidas cotizadas</p>';
+        }
+        
+        $('#summary-items').html(summaryHtml);
+    }
+
+    function calculateGrandTotal() {
+        let grandTotal = 0;
+        let grandSubtotal = 0;
+        let grandIva = 0;
+        
+        $('.quotation-item').each(function() {
+            const subtotal = parseFloat($(this).find('.subtotal').val()) || 0;
+            const ivaAmount = parseFloat($(this).find('.iva-amount').val()) || 0;
+            const total = parseFloat($(this).find('.item-total').val()) || 0;
+            
+            grandSubtotal += subtotal;
+            grandIva += ivaAmount;
+            grandTotal += total;
+        });
+        
+        // Actualizar el resumen en el sidebar
+        $('#summary-subtotal').text(grandSubtotal.toFixed(2));
+        $('#summary-iva').text(grandIva.toFixed(2));
+        $('#grand-total').text(grandTotal.toFixed(2));
+    }
+
+    // Escuchar cambios en precio, cantidad y tasa de IVA
+    $('.unit-price, .quantity, .iva-rate').on('input change', function() {
+        const index = $(this).closest('.quotation-item').data('item-index');
+        calculateItemTotals(index);
+    });
+
+    // Calcular al cargar la página
+    $('.quotation-item').each(function() {
+        const index = $(this).data('item-index');
+        calculateItemTotals(index);
+    });
+
+    // Inicializar el panel de resumen
+    updateSummaryPanel();
+    
+    // =========================================================================
+    // Validación antes de enviar
+    // =========================================================================
+    $('#submit-quotation-btn').on('click', function(e) {
+        e.preventDefault();
+        
+        // Validar que todos los campos requeridos estén llenos
+        let hasErrors = false;
+        let errorMessages = [];
+        
+        $('.quotation-item').each(function(index) {
+            const $item = $(this);
+            const itemNumber = index + 1;
+            const unitPrice = $item.find('.unit-price').val();
+            const quantity = $item.find('.quantity').val();
+            
+            // Validar precio unitario
+            if (!unitPrice || parseFloat(unitPrice) <= 0) {
+                hasErrors = true;
+                $item.find('.unit-price').addClass('is-invalid');
+                errorMessages.push(`Partida ${itemNumber}: Precio unitario es requerido`);
+            } else {
+                $item.find('.unit-price').removeClass('is-invalid');
+            }
+            
+            // Validar cantidad
+            if (!quantity || parseInt(quantity) <= 0) {
+                hasErrors = true;
+                $item.find('.quantity').addClass('is-invalid');
+                errorMessages.push(`Partida ${itemNumber}: Cantidad es requerida`);
+            } else {
+                $item.find('.quantity').removeClass('is-invalid');
+            }
+        });
+        
+        if (hasErrors) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Campos incompletos',
+                html: `
+                    <p class="mb-3">Por favor completa los siguientes campos:</p>
+                    <ul class="text-start small">
+                        ${errorMessages.map(msg => `<li>${msg}</li>`).join('')}
+                    </ul>
+                `,
+                confirmButtonText: 'Entendido',
+                width: '500px'
+            });
+            return;
+        }
+        
+        // Confirmación final
+        const grandTotal = $('#grand-total').text();
+        
+        Swal.fire({
+            icon: 'question',
+            title: '¿Enviar cotización?',
+            html: `
+                <div class="text-center">
+                    <p class="mb-3">Estás a punto de enviar tu cotización por un total de:</p>
+                    <div class="alert alert-primary mb-3">
+                        <h3 class="mb-0">$${grandTotal}</h3>
+                        <small class="text-muted">(Incluye IVA)</small>
+                    </div>
+                    <div class="alert alert-warning mb-3">
+                        <i class="ti ti-alert-triangle me-2"></i>
+                        <strong>Una vez enviada, no podrás modificarla.</strong>
+                    </div>
+                    <p class="mb-0">¿Deseas continuar?</p>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '<i class="ti ti-send me-2"></i>Sí, enviar',
+            cancelButtonText: '<i class="ti ti-x me-2"></i>Cancelar',
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d',
+            width: '500px'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Mostrar loading mientras se envía
+                Swal.fire({
+                    title: 'Enviando cotización...',
+                    html: 'Por favor espera un momento',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+                
+                $('#quotation-form').submit();
+            }
+        });
+    });
+    
+    // =========================================================================
+    // Validación de archivos PDF
+    // =========================================================================
+    $('input[type="file"]').on('change', function() {
+        const file = this.files[0];
+        const $input = $(this);
+        
+        if (file) {
+            // Validar tipo
+            if (file.type !== 'application/pdf') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Archivo no válido',
+                    text: 'Solo se permiten archivos PDF',
+                    confirmButtonText: 'Entendido'
+                });
+                $input.val('');
+                return;
+            }
+            
+            // Validar tamaño (5MB)
+            const maxSize = 5 * 1024 * 1024;
+            if (file.size > maxSize) {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Archivo muy grande',
+                    html: `
+                        <p>El archivo pesa <strong>${sizeMB} MB</strong></p>
+                        <p>El tamaño máximo permitido es <strong>5 MB</strong></p>
+                    `,
+                    confirmButtonText: 'Entendido'
+                });
+                $input.val('');
+                return;
+            }
+            
+            // Mostrar nombre del archivo seleccionado (opcional)
+            console.log(`✅ Archivo PDF válido: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+        }
+    });
+    
+    // =========================================================================
+    // Tooltip para ayuda (opcional)
+    // =========================================================================
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // =========================================================================
+    // Confirmar antes de salir si hay cambios sin guardar
+    // =========================================================================
+    let formChanged = false;
+    
+    $('input, select, textarea').on('change', function() {
+        formChanged = true;
+    });
+    
+    $('#quotation-form').on('submit', function() {
+        formChanged = false; // Permitir envío del formulario
+    });
+    
+    $(window).on('beforeunload', function(e) {
+        if (formChanged) {
+            const message = 'Tienes cambios sin guardar. ¿Estás seguro de salir?';
+            e.returnValue = message;
+            return message;
+        }
+    });
+
+    /**
+    * Función Maestra: Confirmación con Estilo Estandarizado Zircos
+    */
+    function confirmAction(config) {
+        // Agregar estilos CSS para los items con iconos
+        const customStyles = `
+            .step-item {
+                display: flex;
+                align-items: flex-start;
+                margin-bottom: 0.5rem;
+                padding: 0.625rem;
+                border-radius: 8px;
+                background: #f9fafb;
+                border: 1px solid #e5e7eb;
+                transition: all 0.2s ease;
+            }
+            .step-item:last-child {
+                margin-bottom: 0;
+            }
+            .step-item:hover {
+                background: #f3f4f6;
+                border-color: #d1d5db;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+            .step-icon {
+                color: ${config.confirmColor};
+                font-size: 1.15rem;
+                margin-right: 0.625rem;
+                margin-top: 0.125rem;
+                flex-shrink: 0;
+            }
+            .step-content {
+                flex-grow: 1;
+                color: #374151;
+                font-size: 0.85rem;
+                line-height: 1.4;
+            }
+            .step-content strong {
+                color: #1f2937;
+                font-weight: 600;
+            }
+            .steps-container {
+                margin: 0.75rem 0 1rem;
+            }
+            .swal-wide-modal {
+                width: 520px !important;
+                max-width: 90% !important;
+            }
+            .swal-wide-modal .card-body {
+                padding: 0.875rem !important;
+            }
+            .swal-wide-modal .swal2-checkbox {
+                margin-top: 1rem !important;
+            }
+        `;
+        
+        // Crear y agregar estilos temporalmente
+        const styleSheet = document.createElement("style");
+        styleSheet.textContent = customStyles;
+        document.head.appendChild(styleSheet);
+        
+        Swal.fire({
+            title: `<h5 class="mt-2">${config.title}</h5>`,
+            html: `
+                <div class="text-start">
+                    <div class="card bg-light shadow-none border mb-3">
+                        <div class="card-body p-3">
+                            <h6 class="mb-3 text-primary">
+                                <i class="${config.headerIcon} me-2"></i>
+                                ${config.headerText}
+                            </h6>
+                            <div class="steps-container">
+                                ${config.steps.map(step => `<div class="step-item">${step}</div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-check custom-checkbox ms-1">
+                        <input class="form-check-input" type="checkbox" id="swal-checkbox-confirm">
+                        <label class="form-check-label fw-bold text-dark" for="swal-checkbox-confirm" style="font-size: 0.85rem;">
+                            ${config.checkboxText}
+                        </label>
+                    </div>
+                </div>
+            `,
+            icon: config.icon,
+            showCancelButton: true,
+            confirmButtonText: config.confirmButtonText,
+            cancelButtonText: 'Regresar',
+            confirmButtonColor: config.confirmColor,
+            cancelButtonColor: '#6c757d',
+            customClass: {
+                popup: 'swal-wide-modal',
+                confirmButton: 'btn btn-primary px-4',
+                cancelButton: 'btn btn-outline-secondary px-4'
+            },
+            width: 520,
+            buttonsStyling: false,
+            didOpen: () => {
+                const confirmBtn = Swal.getConfirmButton();
+                confirmBtn.disabled = true;
+                const checkbox = document.getElementById('swal-checkbox-confirm');
+                checkbox.addEventListener('change', (e) => {
+                    confirmBtn.disabled = !e.target.checked;
+                });
+                
+                // Agregar iconos a los botones
+                if (config.actionValue === 'save_draft') {
+                    confirmBtn.innerHTML = `<i class="ti ti-device-floppy me-2"></i>${config.confirmButtonText}`;
+                } else if (config.actionValue === 'submit') {
+                    confirmBtn.innerHTML = `<i class="ti ti-send me-2"></i>${config.confirmButtonText}`;
+                }
+                
+                // Agregar icono al botón cancelar
+                const cancelBtn = Swal.getCancelButton();
+                if (cancelBtn) {
+                    cancelBtn.innerHTML = `<i class="ti ti-arrow-back me-2"></i>Regresar`;
+                }
+            },
+            willClose: () => {
+                // Remover estilos cuando se cierre el modal
+                document.head.removeChild(styleSheet);
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const hiddenInput = $('<input>').attr('type', 'hidden').attr('name', 'action').val(config.actionValue);
+                $('#quotation-form').append(hiddenInput).submit();
+                Swal.fire({
+                    title: 'Procesando...',
+                    didOpen: () => { Swal.showLoading(); }
+                });
+            }
+        });
+    }
+
+    // --- EVENTO: BOTÓN BORRADOR ---
+    $('button[value="save_draft"]').on('click', function(e) {
+        e.preventDefault();
+        confirmAction({
+            title: 'Guardar Progreso',
+            headerIcon: 'ti ti-device-floppy',
+            headerText: '¿Qué pasará con este borrador?',
+            actionValue: 'save_draft',
+            confirmColor: '#4b5563', 
+            icon: 'info',
+            confirmButtonText: 'Guardar Borrador',
+            checkboxText: 'Entiendo que esto no es un envío final',
+            steps: [
+                '<i class="ti ti-shield-lock step-icon"></i> <div class="step-content"><strong>Datos Protegidos:</strong> Sus avances quedarán almacenados de forma segura en nuestros servidores.</div>',
+                '<i class="ti ti-history step-icon"></i> <div class="step-content"><strong>Continuidad:</strong> Puede cerrar su sesión y retomar la cotización en cualquier momento desde su Dashboard.</div>',
+                '<i class="ti ti-eye-off step-icon"></i> <div class="step-content"><strong>Privacidad:</strong> El personal de TotalGas <strong>NO recibirá</strong> notificaciones ni podrá evaluar esta información mientras sea un borrador.</div>'
+            ]
+        });
+    });
+
+    // --- EVENTO: BOTÓN ENVIAR COTIZACIÓN ---
+    $('#submit-quotation-btn').on('click', function(e) {
+        e.preventDefault();
+        
+        // Validación de campos obligatorios antes de mostrar el modal
+        if (!validateFieldsBeforeSubmit()) return;
+
+        const grandTotal = $('#grand-total').text();
+        confirmAction({
+            title: 'Enviar Cotización Formal',
+            headerIcon: 'ti ti-send',
+            headerText: 'Efectos del envío definitivo',
+            actionValue: 'submit',
+            confirmColor: '#1a5276',
+            icon: 'warning',
+            confirmButtonText: 'Confirmar Envío',
+            checkboxText: 'Confirmo que los montos y documentos son correctos',
+            steps: [
+                `<i class="ti ti-currency-dollar step-icon"></i> <div class="step-content"><strong>Monto Total:</strong> Se enviará una oferta formal por <strong>$${grandTotal}</strong> (IVA incluido).</div>`,
+                '<i class="ti ti-lock step-icon"></i> <div class="step-content"><strong>Bloqueo de Edición:</strong> Una vez enviada, la cotización quedará en estado <strong>RECIBIDA</strong> y no podrá ser modificada.</div>',
+                '<i class="ti ti-bell-ringing step-icon"></i> <div class="step-content"><strong>Notificación:</strong> El departamento de compras será notificado inmediatamente para iniciar el proceso de comparativa.</div>'
+            ]
+        });
+    });
+
+    function validateFieldsBeforeSubmit() {
+        let hasErrors = false;
+        $('.quotation-item').each(function(index) {
+            const unitPrice = $(this).find('.unit-price').val();
+            if (!unitPrice || parseFloat(unitPrice) <= 0) {
+                $(this).find('.unit-price').addClass('is-invalid');
+                hasErrors = true;
+            }
+        });
+
+        if (hasErrors) {
+            Swal.fire('Atención', 'Faltan precios unitarios por llenar.', 'error');
+            return false;
+        }
+        return true;
+    }
+    
+});
+
+$(document).ready(function() {
+    // 1. Sincronización en tiempo real
+    $('#global_payment_terms').on('input change', function() {
+        const val = $(this).val();
+        $('.item-payment-terms').val(val);
+    });
+
+    // 2. Sincronización inicial (por si hay datos de OLD o de base de datos)
+    const initialGlobalVal = $('#global_payment_terms').val();
+    if(initialGlobalVal) {
+        $('.item-payment-terms').val(initialGlobalVal);
+    }
+
+    // 3. Validación de seguridad antes de enviar
+    $('#quotation-form').on('submit', function() {
+        const globalVal = $('#global_payment_terms').val();
+        if(!globalVal) {
+            Swal.fire('Atención', 'Debes especificar las condiciones de pago globales.', 'warning');
+            return false;
+        }
+        // Aseguramos una última vez que todos tengan el valor
+        $('.item-payment-terms').val(globalVal);
+    });
+});
+
+// PDF Upload Modal
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadPDFModal = new bootstrap.Modal(document.getElementById('uploadPDFModal'));
+    const fileDropArea = document.getElementById('fileDropArea');
+    const pdfFileInput = document.getElementById('pdf_file_input');
+    const selectFileBtn = document.getElementById('selectFileBtn');
+    const filePreview = document.getElementById('filePreview');
+    const confirmUploadPDF = document.getElementById('confirmUploadPDF');
+    const removePreviewFile = document.getElementById('removePreviewFile');
+    const quotationPdfFile = document.getElementById('quotation_pdf_file');
+    const deletePdfFlag = document.getElementById('delete_pdf_flag');
+    
+    // Botones dinámicos
+    const btnUploadPDF = document.getElementById('btnUploadPDF');
+    const btnChangePDF = document.getElementById('btnChangePDF');
+    const btnDeletePDF = document.getElementById('btnDeletePDF');
+    const modalTitle = document.getElementById('modalTitle');
+
+    let selectedFile = null;
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+    let isChangingPDF = false; // Flag para saber si estamos cambiando un PDF existente
+
+    // =====================================================================
+    // ABRIR MODAL - Cargar nuevo o Cambiar existente
+    // =====================================================================
+    
+    // Botón "Cargar PDF" (cuando NO hay archivo)
+    if (btnUploadPDF) {
+        btnUploadPDF.addEventListener('click', function() {
+            isChangingPDF = false;
+            modalTitle.textContent = 'Cargar Cotización en PDF';
+            uploadPDFModal.show();
+        });
+    }
+
+    // Botón "Cambiar PDF" (cuando SÍ hay archivo y es borrador)
+    if (btnChangePDF) {
+        btnChangePDF.addEventListener('click', function() {
+            isChangingPDF = true;
+            modalTitle.textContent = 'Cambiar PDF de Cotización';
+            uploadPDFModal.show();
+        });
+    }
+
+    // =====================================================================
+    // ELIMINAR PDF EXISTENTE
+    // =====================================================================
+    if (btnDeletePDF) {
+        btnDeletePDF.addEventListener('click', function() {
+            Swal.fire({
+                title: '¿Eliminar PDF de Cotización?',
+                text: 'Se eliminará el archivo PDF adjunto a esta cotización',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Marcar para eliminación
+                    deletePdfFlag.value = '1';
+                    
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'PDF marcado para eliminación',
+                        text: 'El archivo se eliminará al guardar la cotización',
+                        timer: 2000,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end'
+                    });
+
+                    // Cambiar visualmente el card
+                    btnDeletePDF.closest('.card').classList.add('border-danger', 'opacity-50');
+                    btnDeletePDF.closest('.card').querySelector('.text-success').innerHTML = 
+                        '<i class="ti ti-alert-triangle text-warning"></i> Pendiente de eliminar';
+                }
+            });
+        });
+    }
+
+    // =====================================================================
+    // DRAG & DROP Y SELECCIÓN DE ARCHIVO
+    // =====================================================================
+    
+    if (selectFileBtn) {
+        selectFileBtn.addEventListener('click', function() {
+            pdfFileInput.click();
+        });
+    }
+
+    if (fileDropArea) {
+        fileDropArea.addEventListener('click', function(e) {
+            if (e.target !== selectFileBtn && !selectFileBtn.contains(e.target)) {
+                pdfFileInput.click();
+            }
+        });
+
+        // Prevenir comportamiento por defecto
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Efectos visuales
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, () => {
+                fileDropArea.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, () => {
+                fileDropArea.classList.remove('dragover');
+            });
+        });
+
+        // Manejar drop
+        fileDropArea.addEventListener('drop', function(e) {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+    }
+
+    // Manejar selección
+    if (pdfFileInput) {
+        pdfFileInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                handleFile(this.files[0]);
+            }
+        });
+    }
+
+    // =====================================================================
+    // VALIDAR Y MOSTRAR ARCHIVO
+    // =====================================================================
+    function handleFile(file) {
+        // Validar tipo
+        if (file.type !== 'application/pdf') {
+            Swal.fire({
+                icon: 'error',
+                title: 'Tipo de archivo inválido',
+                text: 'Solo se permiten archivos PDF',
+                confirmButtonColor: '#d33'
+            });
+            return;
+        }
+
+        // Validar tamaño
+        if (file.size > MAX_FILE_SIZE) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Archivo muy grande',
+                text: 'El archivo no debe superar los 5 MB',
+                confirmButtonColor: '#d33'
+            });
+            return;
+        }
+
+        selectedFile = file;
+        showFilePreview(file);
+        confirmUploadPDF.disabled = false;
+    }
+
+    function showFilePreview(file) {
+        const fileName = file.name;
+        const fileSize = formatFileSize(file.size);
+
+        document.getElementById('previewFileName').textContent = fileName;
+        document.getElementById('previewFileSize').textContent = fileSize;
+        filePreview.style.display = 'block';
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // Eliminar preview
+    if (removePreviewFile) {
+        removePreviewFile.addEventListener('click', function() {
+            selectedFile = null;
+            pdfFileInput.value = '';
+            filePreview.style.display = 'none';
+            confirmUploadPDF.disabled = true;
+        });
+    }
+
+    // =====================================================================
+    // CONFIRMAR CARGA/CAMBIO
+    // =====================================================================
+    if (confirmUploadPDF) {
+        confirmUploadPDF.addEventListener('click', function() {
+            if (selectedFile) {
+                // Asignar archivo al input hidden
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(selectedFile);
+                quotationPdfFile.files = dataTransfer.files;
+
+                // Resetear flag de eliminación (por si estaba marcado)
+                deletePdfFlag.value = '0';
+
+                // Cerrar modal
+                uploadPDFModal.hide();
+
+                // Limpiar modal
+                resetModal();
+
+                // Notificación
+                const actionText = isChangingPDF ? 'cambiará' : 'adjuntará';
+                Swal.fire({
+                    icon: 'success',
+                    title: 'PDF Seleccionado',
+                    text: `El archivo se ${actionText} al guardar la cotización`,
+                    timer: 2000,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+
+                // Nota: La página se recargará al guardar, así que no necesitamos
+                // cambiar la UI aquí, simplemente se verá reflejado después del submit
+            }
+        });
+    }
+
+    // =====================================================================
+    // RESETEAR MODAL
+    // =====================================================================
+    document.getElementById('uploadPDFModal').addEventListener('hidden.bs.modal', function() {
+        resetModal();
+    });
+
+    function resetModal() {
+        selectedFile = null;
+        pdfFileInput.value = '';
+        filePreview.style.display = 'none';
+        confirmUploadPDF.disabled = true;
+    }
+});
+</script>
+@endpush

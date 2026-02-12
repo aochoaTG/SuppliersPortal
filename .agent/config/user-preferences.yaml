@@ -1,0 +1,17 @@
+# Preferencias de Usuario - TotalGas
+# Generado: 2026-02-03 14:30:00
+
+language: es
+timezone: America/Chihuahua
+date_format: d/m/Y
+decimal_separator: .
+thousand_separator: ','
+
+default_cli: gemini
+
+agent_cli_mapping:
+  frontend: gemini
+  backend: gemini
+  pm: gemini
+  qa: gemini
+  debug: gemini

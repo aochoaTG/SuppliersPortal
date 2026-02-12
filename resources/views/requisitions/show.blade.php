@@ -1,0 +1,320 @@
+@extends('layouts.zircos')
+
+@section('title', 'Requisición ' . $requisition->folio)
+
+@section('page.breadcrumbs')
+<li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+<li class="breadcrumb-item"><a href="{{ route('requisitions.index') }}">Requisiciones</a></li>
+<li class="breadcrumb-item active">{{ $requisition->folio }}</li>
+@endsection
+
+@section('content')
+
+{{-- Flash Alerts --}}
+@if (session('success'))
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="ti ti-circle-check me-2"></i>{{ session('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
+@if (session('warning'))
+<div class="alert alert-warning alert-dismissible fade show">
+    <i class="ti ti-alert-triangle me-2"></i>{{ session('warning') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
+@if (session('error'))
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="ti ti-octagon me-2"></i>{{ session('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
+
+{{-- Header con folio y estado --}}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0">
+        <i class="ti ti-file-text me-2"></i>Requisición {{ $requisition->folio }}
+    </h4>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="badge bg-{{ $requisition->status->badgeClass() }}">
+            {{ $requisition->status->label() }}
+        </span>
+    </div>
+</div>
+
+{{-- Alerta si está pausada --}}
+@if ($requisition->isPaused())
+<div class="alert alert-warning">
+    <i class="ti ti-alert-triangle me-2"></i>
+    <strong>Requisición pausada:</strong> {{ $requisition->pause_reason }}
+    @if ($requisition->pauser)
+    <br><small>Por {{ $requisition->pauser->name }} el {{ $requisition->paused_at->format('d/m/Y H:i') }}</small>
+    @endif
+</div>
+@endif
+
+{{-- Card de Información General --}}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="ti ti-info-circle me-2"></i>Información General
+        </h5>
+    </div>
+
+    <div class="card-body">
+        <div class="row g-3">
+            {{-- Columna izquierda --}}
+            <div class="col-12 col-md-6">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-hash me-1"></i> Folio
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="fw-bold">{{ $requisition->folio }}</span>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-building-bank me-1"></i> Compañía
+                    </dt>
+                    <dd class="col-sm-7 fw-semibold">
+                        {{ $requisition->company?->name ?? '—' }}
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-hierarchy-3 me-1"></i> Centro de costo
+                    </dt>
+                    <dd class="col-sm-7 fw-semibold">
+                        {{ $requisition->costCenter?->code }} - {{ $requisition->costCenter?->name ?? '—' }}
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-building me-1"></i> Departamento
+                    </dt>
+                    <dd class="col-sm-7 fw-semibold">
+                        {{ $requisition->department?->name ?? '—' }}
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-calendar-stats me-1"></i> Año fiscal
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="fw-semibold">{{ $requisition->fiscal_year }}</span>
+                    </dd>
+
+                    @if ($requisition->required_date)
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-calendar-due me-1"></i> Fecha requerida
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="fw-semibold">{{ $requisition->required_date->format('d/m/Y') }}</span>
+                    </dd>
+                    @endif
+
+                    @if ($requisition->description)
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-file-description me-1"></i> Descripción
+                    </dt>
+                    <dd class="col-sm-7">
+                        {{ $requisition->description }}
+                    </dd>
+                    @endif
+                </dl>
+            </div>
+
+            {{-- Columna derecha --}}
+            <div class="col-12 col-md-6">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-user-check me-1"></i> Solicitado por
+                    </dt>
+                    <dd class="col-sm-7 fw-semibold">
+                        {{ $requisition->requester?->name ?? '—' }}
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-calendar-event me-1"></i> Fecha creación
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="fw-semibold">{{ $requisition->created_at?->format('d/m/Y H:i') ?? '—' }}</span>
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-calendar-time me-1"></i> Última actualización
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="fw-semibold">{{ $requisition->updated_at?->format('d/m/Y H:i') ?? '—' }}</span>
+                    </dd>
+
+                    @if ($requisition->reviewer)
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-user-search me-1"></i> Revisado por
+                    </dt>
+                    <dd class="col-sm-7 fw-semibold">
+                        {{ $requisition->reviewer->name }}
+                    </dd>
+                    @endif
+
+                    @if ($requisition->reviewed_at)
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-calendar-check me-1"></i> Fecha revisión
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="fw-semibold">{{ $requisition->reviewed_at->format('d/m/Y H:i') }}</span>
+                    </dd>
+                    @endif
+
+                    @if ($requisition->approver)
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-user-check me-1"></i> Aprobado por
+                    </dt>
+                    <dd class="col-sm-7 fw-semibold">
+                        {{ $requisition->approver->name }}
+                    </dd>
+                    @endif
+
+                    @if ($requisition->approved_at)
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-calendar-check me-1"></i> Fecha aprobación
+                    </dt>
+                    <dd class="col-sm-7">
+                        <span class="fw-semibold">{{ $requisition->approved_at->format('d/m/Y H:i') }}</span>
+                    </dd>
+                    @endif
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Card de Partidas --}}
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="ti ti-list-details me-2"></i>Partidas
+            <span class="badge bg-primary ms-2">{{ $requisition->items->count() }}</span>
+        </h5>
+    </div>
+
+    <div class="card-body">
+        @if ($requisition->items->isEmpty())
+        <div class="text-center text-muted py-4">
+            <i class="ti ti-inbox fs-1 d-block mb-2"></i>
+            <p>No hay partidas en esta requisición</p>
+        </div>
+        @else
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th width="40" class="text-center">#</th>
+                        <th>Producto/Código</th>
+                        <th>Descripción</th>
+                        <th width="80" class="text-end">Cantidad</th>
+                        <th width="80" class="text-center">Unidad</th>
+                        <th width="150">Categoría Gasto</th>
+                        {{-- <th width="100" class="text-center">Mes Aplicación</th> ELIMINADA --}}
+                        <th width="150">Proveedor Sug.</th>
+                        <th width="60" class="text-center">Notas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($requisition->items as $item)
+                    <tr>
+                        <td class="text-center text-muted">{{ $item->line_number }}</td>
+                        <td>
+                            <strong>{{ $item->productService?->code ?? '—' }}</strong>
+                            @if ($item->productService?->product_type)
+                            <br>
+                            <span class="badge bg-{{ $item->productService->product_type === 'SERVICIO' ? 'info' : 'primary' }} badge-sm">
+                                <i class="ti ti-{{ $item->productService->product_type === 'SERVICIO' ? 'briefcase' : 'box' }} me-1"></i>
+                                {{ $item->productService->product_type }}
+                            </span>
+                            @endif
+                        </td>
+                        <td>
+                            {{ $item->description }}
+                            @if ($item->productService?->brand || $item->productService?->model)
+                            <br>
+                            <small class="text-muted">
+                                <i class="ti ti-tag me-1"></i>
+                                {{ collect([$item->productService->brand, $item->productService->model])->filter()->join(' / ') }}
+                            </small>
+                            @endif
+                        </td>
+                        <td class="text-end fw-semibold">{{ number_format($item->quantity, 3) }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">{{ $item->unit }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ $item->expenseCategory?->name ?? '—' }}</span>
+                        </td>
+                        {{-- COLUMNA ELIMINADA --}}
+                        <td>
+                            <small>{{ $item->suggestedVendor?->name ?? '—' }}</small>
+                        </td>
+                        <td class="text-center">
+                            @if ($item->notes)
+                            <i class="ti ti-note text-info"
+                                data-bs-toggle="tooltip"
+                                title="{{ $item->notes }}"></i>
+                            @else
+                            —
+                            @endif
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        {{-- Resumen de partidas --}}
+        <div class="mt-3 p-3 bg-light rounded">
+            <div class="row">
+                <div class="col-md-4">
+                    <i class="ti ti-package me-2 text-primary"></i>
+                    <strong>Total de Partidas:</strong>
+                    <span class="badge bg-primary ms-2">{{ $requisition->items->count() }}</span>
+                </div>
+                <div class="col-md-4">
+                    <i class="ti ti-box me-2 text-primary"></i>
+                    <strong>Productos:</strong>
+                    <span>{{ $requisition->items->filter(fn($i) => $i->productService?->product_type === 'PRODUCTO')->count() }}</span>
+                </div>
+                <div class="col-md-4">
+                    <i class="ti ti-briefcase me-2 text-info"></i>
+                    <strong>Servicios:</strong>
+                    <span>{{ $requisition->items->filter(fn($i) => $i->productService?->product_type === 'SERVICIO')->count() }}</span>
+                </div>
+            </div>
+        </div>
+        @endif
+    </div>
+</div>
+
+{{-- Botones de acción --}}
+<div class="d-flex justify-content-between mt-3">
+    <a href="{{ route('requisitions.index') }}" class="btn btn-outline-secondary">
+        <i class="ti ti-arrow-left me-1"></i>Regresar al Listado
+    </a>
+
+    <div class="d-flex gap-2">
+        @if ($requisition->isDraft() || $requisition->isPaused())
+        <a href="{{ route('requisitions.edit', $requisition) }}" class="btn btn-primary">
+            <i class="ti ti-edit me-1"></i>Editar Requisición
+        </a>
+        @endif
+
+        {{-- Aquí puedes agregar más botones según tu flujo de aprobación --}}
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+<script>
+    // Inicializar tooltips de Bootstrap
+    $(function() {
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+    });
+</script>
+@endpush

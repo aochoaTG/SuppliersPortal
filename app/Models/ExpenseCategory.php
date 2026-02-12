@@ -1,0 +1,305 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Auth\Auth;
+
+/**
+ * ExpenseCategory
+ *
+ * Categorías estándar de gasto:
+ * - MAT: Materiales (Insumos y materias primas)
+ * - SER: Servicios (Servicios profesionales y técnicos)
+ * - VIA: Viáticos (Gastos de viaje y representación)
+ * - MAN: Mantenimiento (Mantenimiento de equipos e instalaciones)
+ * - CAP: Capacitación (Programas de desarrollo de personal)
+ * - TEC: Tecnología (Software, hardware y servicios TI)
+ * - OTR: Otros Gastos (Gastos diversos no clasificados)
+ */
+class ExpenseCategory extends Model
+{
+    use SoftDeletes;
+
+    protected $table = 'expense_categories';
+
+    protected $fillable = [
+        'code',
+        'name',
+        'description',
+        'status',
+        'created_by',
+        'updated_by',
+        'deleted_by',
+    ];
+
+    protected $casts = [
+        'status' => 'string',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+    ];
+
+    // ===== RELACIONES =====
+
+    /**
+     * Distribuciones mensuales que usan esta categoría
+     */
+    public function monthlyDistributions()
+    {
+        return $this->hasMany(BudgetMonthlyDistribution::class);
+    }
+
+    /**
+     * Distribuciones mensuales presupuestales que usan esta categoría
+     * 
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function budgetMonthlyDistributions()
+    {
+        return $this->hasMany(BudgetMonthlyDistribution::class, 'expense_category_id');
+    }
+
+    /**
+     * Auditoría: creador
+     */
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Auditoría: modificador
+     */
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Auditoría: eliminador (soft delete)
+     */
+    public function deletedBy()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    // ===== SCOPES =====
+
+    /**
+     * Solo categorías activas
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'ACTIVO');
+    }
+
+    /**
+     * Solo categorías inactivas
+     */
+    public function scopeInactive($query)
+    {
+        return $query->where('status', 'INACTIVO');
+    }
+
+    /**
+     * No eliminadas (soft delete)
+     */
+    public function scopeNotDeleted($query)
+    {
+        return $query->whereNull('deleted_at');
+    }
+
+    /**
+     * Por código
+     */
+    public function scopeByCode($query, $code)
+    {
+        return $query->where('code', strtoupper($code));
+    }
+
+    /**
+     * Con distribuciones mensuales
+     */
+    public function scopeWithDistributions($query)
+    {
+        return $query->whereHas('monthlyDistributions');
+    }
+
+    // ===== MÉTODOS: INFORMACIÓN =====
+
+    /**
+     * Obtener etiqueta de estado
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            'ACTIVO' => 'Activa',
+            'INACTIVO' => 'Inactiva',
+            default => $this->status,
+        };
+    }
+
+    /**
+     * Verificar si está activa
+     */
+    public function isActive(): bool
+    {
+        return $this->status === 'ACTIVO';
+    }
+
+    /**
+     * Verificar si está inactiva
+     */
+    public function isInactive(): bool
+    {
+        return $this->status === 'INACTIVO';
+    }
+
+    /**
+     * Obtener descripción o fallback
+     */
+    public function getDescriptionOrDefault(): string
+    {
+        return $this->description ?? "Categoría: {$this->name}";
+    }
+
+    // ===== MÉTODOS: VALIDACIONES =====
+
+    /**
+     * Verificar si puede ser desactivada
+     * (No debe tener distribuciones activas con presupuesto)
+     */
+    public function canBeDeactivated(): bool
+    {
+        if ($this->isInactive()) {
+            return true; // Ya está inactiva
+        }
+
+        // Verificar si tiene distribuciones mensuales con monto asignado
+        return !$this->monthlyDistributions()
+            ->where('assigned_amount', '>', 0)
+            ->exists();
+    }
+
+    /**
+     * Obtener mensaje si no puede desactivarse
+     */
+    public function getDeactivationErrorMessage(): ?string
+    {
+        if ($this->canBeDeactivated()) {
+            return null;
+        }
+
+        return 'No se puede desactivar una categoría que tiene distribuciones presupuestales activas.';
+    }
+
+    /**
+     * Obtener total de presupuesto asignado en esta categoría
+     */
+    public function getTotalAssignedBudget(): float
+    {
+        return (float) $this->monthlyDistributions()
+            ->sum('assigned_amount');
+    }
+
+    /**
+     * Obtener total de presupuesto consumido en esta categoría
+     */
+    public function getTotalConsumedBudget(): float
+    {
+        return (float) $this->monthlyDistributions()
+            ->sum('consumed_amount');
+    }
+
+    /**
+     * Obtener total de presupuesto comprometido en esta categoría
+     */
+    public function getTotalCommittedBudget(): float
+    {
+        return (float) $this->monthlyDistributions()
+            ->sum('committed_amount');
+    }
+
+    /**
+     * Obtener total de presupuesto disponible en esta categoría
+     */
+    public function getTotalAvailableBudget(): float
+    {
+        $assigned = $this->getTotalAssignedBudget();
+        $consumed = $this->getTotalConsumedBudget();
+        $committed = $this->getTotalCommittedBudget();
+
+        return max(0, $assigned - $consumed - $committed);
+    }
+
+    /**
+     * Obtener resumen de presupuesto
+     */
+    public function getBudgetSummary(): array
+    {
+        $assigned = $this->getTotalAssignedBudget();
+        $consumed = $this->getTotalConsumedBudget();
+        $committed = $this->getTotalCommittedBudget();
+        $available = $this->getTotalAvailableBudget();
+
+        return [
+            'total_assigned' => $assigned,
+            'total_consumed' => $consumed,
+            'total_committed' => $committed,
+            'total_available' => $available,
+            'usage_percentage' => ($assigned > 0)
+                ? (($consumed + $committed) / $assigned) * 100
+                : 0,
+        ];
+    }
+
+    // ===== VALIDACIONES =====
+
+    /**
+     * Boot del modelo - Validaciones automáticas
+     */
+    public static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            // Código debe ser único y en mayúsculas
+            $model->code = strtoupper($model->code);
+
+            // Asegurar status válido
+            if (!in_array($model->status, ['ACTIVO', 'INACTIVO'])) {
+                $model->status = 'ACTIVO';
+            }
+
+            // Asegurar auditoría
+            if (!$model->created_by) {
+                $model->created_by = Auth::id();
+            }
+        });
+
+        static::updating(function ($model) {
+            // Código debe ser único y en mayúsculas
+            $model->code = strtoupper($model->code);
+
+            // Validar desactivación
+            if ($model->isDirty('status') && $model->status === 'INACTIVO') {
+                if (!$model->canBeDeactivated()) {
+                    throw new \Exception($model->getDeactivationErrorMessage());
+                }
+            }
+
+            // Asegurar auditoría
+            if (!$model->updated_by) {
+                $model->updated_by = Auth::id();
+            }
+        });
+
+        static::deleting(function ($model) {
+            // Registrar quién lo elimina (soft delete)
+            $model->deleted_by = Auth::id();
+            $model->save();
+        });
+    }
+}

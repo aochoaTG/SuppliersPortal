@@ -1,0 +1,136 @@
+{
+  "folders": [
+    { "path": "." }
+  ],
+
+  "settings": {
+    // ====== EDITOR ======
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "bmewburn.vscode-intelephense-client",
+    "editor.minimap.enabled": true,
+    "explorer.compactFolders": false,
+
+    // ====== PHP ======
+    "intelephense.format.enable": true,
+    // "intelephense.files.exclude": [
+    //   "**/*.blade.php"
+    // ],
+    "intelephense.stubs": [
+      "apache",
+      "bcmath",
+      "bz2",
+      "calendar",
+      "com_dotnet",
+      "Core",
+      "curl",
+      "date",
+      "dba",
+      "dom",
+      "enchant",
+      "exif",
+      "FFI",
+      "fileinfo",
+      "filter",
+      "fpm",
+      "ftp",
+      "gd",
+      "gettext",
+      "gmp",
+      "hash",
+      "iconv",
+      "imap",
+      "intl",
+      "json",
+      "ldap",
+      "libxml",
+      "mbstring",
+      "meta",
+      "mysqli",
+      "oci8",
+      "openssl",
+      "pcntl",
+      "pcre",
+      "PDO",
+      "pdo_mysql",
+      "pdo_sqlite",
+      "pgsql",
+      "Phar",
+      "posix",
+      "pspell",
+      "readline",
+      "Reflection",
+      "session",
+      "shmop",
+      "SimpleXML",
+      "snmp",
+      "soap",
+      "sockets",
+      "sodium",
+      "SPL",
+      "sqlite3",
+      "standard",
+      "superglobals",
+      "sysvsem",
+      "sysvshm",
+      "tidy",
+      "tokenizer",
+      "xml",
+      "xmlreader",
+      "xmlrpc",
+      "xmlwriter",
+      "Zend OPcache",
+      "zip",
+      "zlib"
+    ],
+
+    // ====== LARAVEL / BLADE ======
+    "laravel.blade.format.enable": true,
+    "laravel.blade.format.wrapAttributes": "force-expand-multiline",
+    
+    // Asociar archivos .blade.php con el lenguaje blade
+    "files.associations": {
+      "*.blade.php": "blade"
+    },
+    
+    // Habilitar Emmet en archivos Blade
+    "emmet.includeLanguages": {
+      "blade": "html"
+    },
+    
+    // Configuración específica para archivos Blade
+    "[blade]": {
+      "editor.autoClosingBrackets": "always",
+      "editor.defaultFormatter": "shufo.vscode-blade-formatter"
+    },
+
+    // ====== ARCHIVOS QUE NO DEBEN SALIR ======
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/vendor": false,
+      "**/.git": false,
+      "**/storage": false,
+      "**/bootstrap/cache": true
+    },
+
+    // ====== JS / VITE ======
+    "javascript.format.enable": true,
+    "prettier.useTabs": false,
+    "prettier.singleQuote": true
+  },
+
+  "extensions": {
+    "recommendations": [
+      "amiralizadeh9480.laravel-extra-intellisense",
+      "onecentlin.laravel5-snippets",
+      "shufo.vscode-blade-formatter",
+      "bmewburn.vscode-intelephense-client",
+      "naoray.laravel-goto-components",
+      "austenc.laravel-blade-spacer",
+      "formulahendry.auto-close-tag",
+      "streetsidesoftware.code-spell-checker",
+      "pkief.material-icon-theme"
+    ]
+  }
+}

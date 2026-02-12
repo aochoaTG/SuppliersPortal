@@ -1,0 +1,651 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Enum\ProductServiceStatus;
+use App\Http\Requests\StoreProductServiceRequest;
+use App\Http\Requests\UpdateProductServiceRequest;
+use App\Models\Category;
+use App\Models\Company;
+use App\Models\CostCenter;
+use App\Models\ProductService;
+use App\Models\Supplier;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Illuminate\Http\JsonResponse;
+use Yajra\DataTables\Facades\DataTables;
+use App\Notifications\NewProductRequestedNotification;
+use App\Models\User;
+use App\Events\ProductServiceApproved;
+
+/**
+ * ProductServiceController
+ * Gestiona el Catálogo de Productos y Servicios
+ * según ESPECIFICACIONES_TECNICAS_SISTEMA_CONTROL_PRESUPUESTAL.md
+ */
+class ProductServiceController extends Controller
+{
+    /**
+     * Muestra la vista principal del catálogo
+     */
+    public function index(): View
+    {
+        return view('products_services.index');
+    }
+
+    /**
+     * DataTable server-side para el listado de productos/servicios
+     */
+    public function datatable(Request $request)
+    {
+        $query = ProductService::query()
+            ->with(['category', 'costCenter', 'company', 'creator']);
+
+        return DataTables::of($query)
+            ->addColumn('category_name', fn($p) => e($p->category?->name ?? '—'))
+            ->addColumn('cost_center_name', fn($p) => e($p->costCenter?->name ?? '—'))
+            ->addColumn('company_name', fn($p) => e($p->company?->name ?? '—'))
+            ->addColumn('creator_name', fn($p) => e($p->creator?->name ?? '—'))
+            ->addColumn('product_type_badge', function ($p) {
+                $color = $p->product_type === 'SERVICIO' ? 'info' : 'primary';
+                return '<span class="badge bg-' . $color . '">' . $p->product_type . '</span>';
+            })
+            ->editColumn('estimated_price', fn($p) => number_format((float) $p->estimated_price, 2))
+            ->editColumn('status', function ($p) {
+                $status = ProductServiceStatus::from($p->status);
+                $cls = ProductServiceStatus::badgeClass($status);
+                $label = ProductServiceStatus::options()[$status->value] ?? $status->value;
+                $activeIcon = $p->is_active ? '<i class="ti ti-check-circle ms-1"></i>' : '';
+                return '<span class="badge bg-' . $cls . '">' . $label . $activeIcon . '</span>';
+            })
+            ->editColumn('technical_description', function ($p) {
+                $display = $p->short_name ?? Str::limit($p->technical_description, 60);
+                return e($display);
+            })
+            ->addColumn('actions', function ($p) {
+                $showUrl = route('products-services.show', $p->id);
+                $editUrl = route('products-services.edit', $p->id);
+                $deleteUrl = route('products-services.destroy', $p->id);
+
+                // Opciones según el estado
+                $canEdit = in_array($p->status, [ProductServiceStatus::PENDING->value, ProductServiceStatus::REJECTED->value]);
+                $canActivate = $p->status === ProductServiceStatus::PENDING->value;
+                $canDeactivate = $p->status === ProductServiceStatus::ACTIVE->value;
+                $canReject = $p->status === ProductServiceStatus::PENDING->value;
+                $canReactivate = $p->status === ProductServiceStatus::INACTIVE->value;
+
+                $html = '<div class="dropdown">
+                    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="ti ti-dots-vertical"></i> Acciones
+                    </button>
+                    <ul class="dropdown-menu">';
+
+                $html .= '<li>
+                    <a class="dropdown-item" href="' . $showUrl . '">
+                        <i class="ti ti-eye me-2"></i>Ver
+                    </a>
+                </li>';
+
+                if ($canEdit) {
+                    $html .= '<li>
+                        <a class="dropdown-item" href="' . $editUrl . '">
+                            <i class="ti ti-edit me-2"></i>Editar
+                        </a>
+                    </li>';
+                }
+
+                $html .= '<li><hr class="dropdown-divider"></li>';
+
+                // Acciones de estado (solo para Administrador del Catálogo)
+                if (auth()->check() && auth()->user()->hasRole(['catalog_admin', 'superadmin'])) {
+                    if ($canActivate) {
+                        $approveUrl = route('products-services.approve', $p->id);
+                        $html .= '<li>
+                            <form action="' . $approveUrl . '" method="POST" class="js-approve-form">
+                                ' . csrf_field() . '
+                                <button type="submit" class="dropdown-item text-success">
+                                    <i class="ti ti-check me-2"></i>Aprobar
+                                </button>
+                            </form>
+                        </li>';
+                    }
+
+                    if ($canReject) {
+                        $rejectUrl = route('products-services.reject', $p->id);
+                        $html .= '<li>
+                            <a class="dropdown-item text-warning js-reject-btn" href="#" data-url="' . $rejectUrl . '" data-entity="' . $p->code . '">
+                                <i class="ti ti-x me-2"></i>Rechazar
+                            </a>
+                        </li>';
+                    }
+
+                    if ($canDeactivate) {
+                        $deactivateUrl = route('products-services.deactivate', $p->id);
+                        $html .= '<li>
+                            <form action="' . $deactivateUrl . '" method="POST">
+                                ' . csrf_field() . '
+                                <button type="submit" class="dropdown-item text-secondary">
+                                    <i class="ti ti-circle-off me-2"></i>Desactivar
+                                </button>
+                            </form>
+                        </li>';
+                    }
+
+                    if ($canReactivate) {
+                        $reactivateUrl = route('products-services.reactivate', $p->id);
+                        $html .= '<li>
+                            <form action="' . $reactivateUrl . '" method="POST">
+                                ' . csrf_field() . '
+                                <button type="submit" class="dropdown-item text-success">
+                                    <i class="ti ti-circle-check me-2"></i>Reactivar
+                                </button>
+                            </form>
+                        </li>';
+                    }
+
+                    $html .= '<li><hr class="dropdown-divider"></li>';
+                }
+
+                $html .= '<li>
+                    <form action="' . $deleteUrl . '" method="POST" class="js-delete-form">
+                        ' . csrf_field() . method_field('DELETE') . '
+                        <button type="button" class="dropdown-item text-danger js-delete-btn" data-entity="' . $p->code . '">
+                            <i class="ti ti-trash me-2"></i>Eliminar
+                        </button>
+                    </form>
+                </li>';
+
+                $html .= '</ul></div>';
+
+                return $html;
+            })
+            ->rawColumns(['product_type_badge', 'status', 'actions'])
+            ->make(true);
+    }
+
+    /**
+     * Muestra el formulario de creación
+     */
+    public function create(): View
+    {
+        $productService = new ProductService([
+            'status' => ProductServiceStatus::PENDING->value,
+            'currency_code' => 'MXN',
+            'product_type' => 'PRODUCTO',
+            'unit_of_measure' => 'PIEZA',
+        ]);
+
+        $selectedCompanyId = old('company_id', Auth::user()->company_id ?? null);
+
+        $companies = Company::orderBy('name')->get(['id', 'name']);
+        $categories = Category::orderBy('name')->get(['id', 'name']);
+        $costCenters = CostCenter::orderBy('name')->get(['id', 'name', 'code', 'company_id', 'status']);
+        $suppliers = Supplier::active()->orderBy('company_name')->get(['id', 'company_name']);
+        $statusOpts = ProductServiceStatus::options();
+
+        // Unidades de medida comunes
+        $unitsOfMeasure = [
+            'PIEZA' => 'Pieza',
+            'SERVICIO' => 'Servicio',
+            'KG' => 'Kilogramo',
+            'LITRO' => 'Litro',
+            'METRO' => 'Metro',
+            'CAJA' => 'Caja',
+            'PAQUETE' => 'Paquete',
+            'HORA' => 'Hora',
+            'MES' => 'Mes',
+        ];
+
+        return view('products_services.create', compact(
+            'productService',
+            'companies',
+            'categories',
+            'costCenters',
+            'suppliers',
+            'statusOpts',
+            'selectedCompanyId',
+            'unitsOfMeasure'
+        ));
+    }
+
+    /**
+     * Almacena un nuevo producto/servicio
+     */
+    public function store(StoreProductServiceRequest $request): RedirectResponse
+    {
+        return DB::transaction(function () use ($request) {
+            $data = $request->validated();
+
+            $productService = new ProductService();
+            $productService->fill([
+                // Identificación
+                'code' => ProductService::nextCode(),
+                'technical_description' => $data['technical_description'],
+                'short_name' => $data['short_name'] ?? null,
+                'product_type' => $data['product_type'],
+
+                // Clasificación
+                'category_id' => $data['category_id'],
+                'subcategory' => $data['subcategory'] ?? null,
+
+                // Organización
+                'cost_center_id' => $data['cost_center_id'],
+                'company_id' => $data['company_id'],
+
+                // Especificaciones técnicas
+                'brand' => $data['brand'] ?? null,
+                'model' => $data['model'] ?? null,
+                'unit_of_measure' => $data['unit_of_measure'],
+                'specifications' => $data['specifications'] ?? null,
+
+                // Información comercial
+                'estimated_price' => $data['estimated_price'],
+                'currency_code' => $data['currency_code'] ?? 'MXN',
+                'default_vendor_id' => $data['default_vendor_id'] ?? null,
+                'minimum_quantity' => $data['minimum_quantity'] ?? null,
+                'maximum_quantity' => $data['maximum_quantity'] ?? null,
+                'lead_time_days' => $data['lead_time_days'] ?? null,
+
+                // Estructura contable
+                'account_major' => $data['account_major'] ?? null,
+                'account_sub' => $data['account_sub'] ?? null,
+                'account_subsub' => $data['account_subsub'] ?? null,
+
+                // Estado
+                'status' => ProductServiceStatus::PENDING->value,
+                'is_active' => false, // Se activa al aprobar
+
+                // Observaciones
+                'observations' => $data['observations'] ?? null,
+                'internal_notes' => $data['internal_notes'] ?? null,
+
+                // Auditoría
+                'created_by' => Auth::id(),
+            ]);
+            $productService->save();
+
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('success', 'Producto/Servicio registrado correctamente. Estado: Pendiente de Validación.');
+        });
+    }
+
+    /**
+     * Muestra los detalles de un producto/servicio
+     */
+    public function show(ProductService $productService): View
+    {
+        $productService->load([
+            'category',
+            'costCenter',
+            'company',
+            'defaultVendor',
+            'creator',
+            'approver',
+        ]);
+
+        return view('products_services.show', compact('productService'));
+    }
+
+    /**
+     * Muestra el formulario de edición
+     */
+    public function edit(ProductService $productService): View
+    {
+        $selectedCompanyId = old('company_id', $productService->company_id);
+
+        $companies = Company::orderBy('name')->get(['id', 'name']);
+        $categories = Category::orderBy('name')->get(['id', 'name']);
+        $costCenters = CostCenter::orderBy('name')->get(['id', 'name', 'code', 'company_id', 'status']);
+        $suppliers = Supplier::active()->orderBy('company_name')->get(['id', 'company_name']);
+        $statusOpts = ProductServiceStatus::options();
+
+        $unitsOfMeasure = [
+            'PIEZA' => 'Pieza',
+            'SERVICIO' => 'Servicio',
+            'KG' => 'Kilogramo',
+            'LITRO' => 'Litro',
+            'METRO' => 'Metro',
+            'CAJA' => 'Caja',
+            'PAQUETE' => 'Paquete',
+            'HORA' => 'Hora',
+            'MES' => 'Mes',
+        ];
+
+        return view('products_services.edit', compact(
+            'productService',
+            'companies',
+            'categories',
+            'costCenters',
+            'suppliers',
+            'statusOpts',
+            'selectedCompanyId',
+            'unitsOfMeasure'
+        ));
+    }
+
+    /**
+     * Actualiza un producto/servicio existente
+     */
+    public function update(UpdateProductServiceRequest $request, ProductService $productService): RedirectResponse
+    {
+
+        return DB::transaction(function () use ($request, $productService) {
+            $data = $request->validated();
+
+            $productService->fill([
+                // Identificación
+                'technical_description' => $data['technical_description'],
+                'short_name' => $data['short_name'] ?? null,
+                'product_type' => $data['product_type'],
+
+                // Clasificación
+                'category_id' => $data['category_id'],
+                'subcategory' => $data['subcategory'] ?? null,
+
+                // Organización
+                'cost_center_id' => $data['cost_center_id'],
+                'company_id' => $data['company_id'],
+
+                // Especificaciones técnicas
+                'brand' => $data['brand'] ?? null,
+                'model' => $data['model'] ?? null,
+                'unit_of_measure' => $data['unit_of_measure'],
+                'specifications' => $data['specifications'] ?? null,
+
+                // Información comercial
+                'estimated_price' => $data['estimated_price'],
+                'currency_code' => $data['currency_code'] ?? 'MXN',
+                'default_vendor_id' => $data['default_vendor_id'] ?? null,
+                'minimum_quantity' => $data['minimum_quantity'] ?? null,
+                'maximum_quantity' => $data['maximum_quantity'] ?? null,
+                'lead_time_days' => $data['lead_time_days'] ?? null,
+
+                // Estructura contable
+                'account_major' => $data['account_major'] ?? null,
+                'account_sub' => $data['account_sub'] ?? null,
+                'account_subsub' => $data['account_subsub'] ?? null,
+
+                // Observaciones
+                'observations' => $data['observations'] ?? null,
+                'internal_notes' => $data['internal_notes'] ?? null,
+
+                // Auditoría
+                'updated_by' => Auth::id(),
+            ]);
+
+            // Si estaba REJECTED, volver a PENDING
+            if ($productService->status === ProductServiceStatus::REJECTED->value) {
+                $productService->status = ProductServiceStatus::PENDING->value;
+                $productService->rejection_reason = null;
+            }
+
+            $productService->save();
+
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('success', 'Producto/Servicio actualizado correctamente.');
+        });
+    }
+
+    /**
+     * Elimina (soft delete) un producto/servicio
+     */
+    public function destroy(ProductService $productService): RedirectResponse
+    {
+        $productService->deleted_by = Auth::id();
+        $productService->save();
+        $productService->delete();
+
+        return redirect()
+            ->route('products-services.index')
+            ->with('success', 'Producto/Servicio eliminado correctamente.');
+    }
+
+    /**
+     * Aprueba un producto/servicio (Administrador del Catálogo)
+     */
+    public function approve(ProductService $productService): RedirectResponse
+    {
+        if ($productService->status !== ProductServiceStatus::PENDING->value) {
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('error', 'Solo se pueden aprobar productos en estado Pendiente.');
+        }
+
+        // Validar que tenga estructura contable completa
+        if (!$productService->hasCompleteAccountingStructure()) {
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('error', 'El producto debe tener estructura contable completa (Cuenta Mayor, Subcuenta, Subsubcuenta) para ser aprobado.');
+        }
+
+        return DB::transaction(function () use ($productService) {
+            $productService->status = ProductServiceStatus::ACTIVE->value;
+            $productService->is_active = true; // Activar
+            $productService->approved_by = Auth::id();
+            $productService->approved_at = now();
+            $productService->rejection_reason = null;
+            $productService->save();
+
+            event(new ProductServiceApproved($productService));
+
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('success', 'Producto/Servicio aprobado correctamente. Ahora está disponible para requisiciones.');
+        });
+    }
+
+    /**
+     * Rechaza un producto/servicio (Administrador del Catálogo)
+     */
+    public function reject(Request $request, ProductService $productService): RedirectResponse
+    {
+        $request->validate([
+            'rejection_reason' => 'required|string|min:10|max:500',
+        ]);
+
+        if ($productService->status !== ProductServiceStatus::PENDING->value) {
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('error', 'Solo se pueden rechazar productos en estado Pendiente.');
+        }
+
+        $productService->status = ProductServiceStatus::REJECTED->value;
+        $productService->rejection_reason = $request->rejection_reason;
+        $productService->updated_by = Auth::id();
+        $productService->save();
+
+        return redirect()
+            ->route('products-services.show', $productService)
+            ->with('success', 'Producto/Servicio rechazado.');
+    }
+
+    /**
+     * Desactiva un producto/servicio (Administrador del Catálogo)
+     */
+    public function deactivate(ProductService $productService): RedirectResponse
+    {
+        if ($productService->status !== ProductServiceStatus::ACTIVE->value) {
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('error', 'Solo se pueden desactivar productos en estado Activo.');
+        }
+
+        $productService->status = ProductServiceStatus::INACTIVE->value;
+        $productService->is_active = false;
+        $productService->updated_by = Auth::id();
+        $productService->save();
+
+        return redirect()
+            ->route('products-services.show', $productService)
+            ->with('success', 'Producto/Servicio desactivado. Ya no aparecerá en nuevas requisiciones.');
+    }
+
+    /**
+     * Reactiva un producto/servicio (Administrador del Catálogo)
+     */
+    public function reactivate(ProductService $productService): RedirectResponse
+    {
+        if ($productService->status !== ProductServiceStatus::INACTIVE->value) {
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('error', 'Solo se pueden reactivar productos en estado Inactivo.');
+        }
+
+        if (!$productService->hasCompleteAccountingStructure()) {
+            return redirect()
+                ->route('products-services.show', $productService)
+                ->with('error', 'El producto debe tener estructura contable completa para reactivarse.');
+        }
+
+        $productService->status = ProductServiceStatus::ACTIVE->value;
+        $productService->is_active = true;
+        $productService->updated_by = Auth::id();
+        $productService->save();
+
+        return redirect()
+            ->route('products-services.show', $productService)
+            ->with('success', 'Producto/Servicio reactivado. Ya está disponible para requisiciones nuevamente.');
+    }
+
+    /**
+     * API: Productos activos para requisiciones
+     */
+    public function apiActiveForRequisitions(Request $request): JsonResponse
+    {
+        $query = ProductService::active()
+            ->with(['category', 'costCenter', 'defaultVendor']);
+
+        // Filtrar por compañía (OBLIGATORIO)
+        if ($request->has('company_id') && $request->company_id) {
+            $query->where('company_id', $request->company_id);
+        } else {
+            return response()->json(['products' => []]);
+        }
+
+        // Filtrar por centro de costo (OPCIONAL)
+        if ($request->has('cost_center_id') && $request->cost_center_id) {
+            $query->where('cost_center_id', $request->cost_center_id);
+        }
+
+        // Búsqueda por término (para Select2)
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('short_name', 'like', "%{$search}%")
+                    ->orWhere('technical_description', 'like', "%{$search}%");
+            });
+        }
+
+        $query->orderBy('code');
+
+        // Si se solicita TODOS los productos (para Select2 local)
+        if ($request->boolean('all', false)) {
+            $products = $query->get();
+        } else {
+            $products = $query->limit(50)->get();
+        }
+
+        return response()->json([
+            'products' => $products->map(fn($p) => [
+                'id' => $p->id,
+                'code' => $p->code,
+                'description' => $p->technical_description,
+                'short_name' => $p->short_name,
+                'product_type' => $p->product_type,
+                'brand' => $p->brand,
+                'model' => $p->model,
+                'unit_of_measure' => $p->unit_of_measure,
+                'estimated_price' => (float) $p->estimated_price,
+                'currency_code' => $p->currency_code,
+                'category' => $p->category?->name,
+                'cost_center' => $p->costCenter?->name,
+                'cost_center_id' => $p->cost_center_id,
+                'default_vendor_id' => $p->default_vendor_id,
+                'default_vendor_name' => $p->defaultVendor?->name,
+                'minimum_quantity' => $p->minimum_quantity ? (float) $p->minimum_quantity : null,
+                'maximum_quantity' => $p->maximum_quantity ? (float) $p->maximum_quantity : null,
+                'lead_time_days' => $p->lead_time_days,
+                'account_major' => $p->account_major,
+                'account_sub' => $p->account_sub,
+                'account_subsub' => $p->account_subsub,
+            ])
+        ]);
+    }
+
+    /**
+     * Crea un producto desde una requisición (sin estructura contable)
+     */
+    public function storeFromRequisition(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'company_id' => 'required|exists:companies,id',
+            'category_id' => 'required|exists:categories,id',
+            'subcategory' => 'nullable|string|max:100',
+            'cost_center_id' => 'required|exists:cost_centers,id',
+            'technical_description' => 'required|string|min:20|max:5000',
+            'short_name' => 'nullable|string|max:100',
+            'product_type' => 'required|in:PRODUCTO,SERVICIO',
+            'brand' => 'nullable|string|max:100',
+            'model' => 'nullable|string|max:100',
+            'unit_of_measure' => 'required|string|max:30',
+            'estimated_price' => 'required|numeric|min:0',
+            'currency_code' => 'nullable|string|size:3|in:MXN,USD,EUR',
+            'default_vendor_id' => 'nullable|exists:suppliers,id',
+        ]);
+
+        return DB::transaction(function () use ($validated) {
+            $productService = new ProductService();
+            $productService->fill([
+                'code' => ProductService::nextCode(),
+                'technical_description' => $validated['technical_description'],
+                'short_name' => $validated['short_name'] ?? null,
+                'product_type' => $validated['product_type'],
+                'category_id' => $validated['category_id'],
+                'subcategory' => $validated['subcategory'] ?? null,
+                'cost_center_id' => $validated['cost_center_id'],
+                'company_id' => $validated['company_id'],
+                'brand' => $validated['brand'] ?? null,
+                'model' => $validated['model'] ?? null,
+                'unit_of_measure' => $validated['unit_of_measure'],
+                'estimated_price' => $validated['estimated_price'],
+                'currency_code' => $validated['currency_code'] ?? 'MXN',
+                'default_vendor_id' => $validated['default_vendor_id'] ?? null,
+
+                // Estructura contable VACÍA (Admin la completará)
+                'account_major' => null,
+                'account_sub' => null,
+                'account_subsub' => null,
+
+                'status' => ProductServiceStatus::PENDING->value,
+                'is_active' => false,
+                'created_by' => Auth::id(),
+            ]);
+            $productService->save();
+
+            // Notificar a admins del catálogo
+            $catalogAdmins = User::role(['catalog_admin', 'general_director', 'superadmin'])->get();
+            foreach ($catalogAdmins as $admin) {
+                $admin->notify(new NewProductRequestedNotification($productService, Auth::user()));
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Producto solicitado correctamente. El Administrador del Catálogo lo revisará.',
+                'product' => [
+                    'id' => $productService->id,
+                    'code' => $productService->code,
+                    'description' => $productService->technical_description,
+                    'unit_of_measure' => $productService->unit_of_measure,
+                    'status' => $productService->status,
+                ]
+            ], 201);
+        });
+    }
+}

@@ -1,0 +1,842 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
+use App\Models\Company;
+use Illuminate\Support\Facades\Auth;
+use App\Models\CostCenter;
+
+class UserController extends Controller
+{
+    public function index()
+    {
+        return view('users.staff.index');
+    }
+
+    function SupplierIndex(Request $request)
+    {
+        return view('users.suppliers.index');
+    }
+
+    // En tu UserController
+    public function datatable(Request $request)
+    {
+        $draw        = $request->get('draw');
+        $start       = $request->get('start');
+        $length      = $request->get('length');
+        $search      = $request->get('search')['value'] ?? '';
+        $orderColumn = $request->get('order')[0]['column'] ?? 0;
+        $orderDir    = $request->get('order')[0]['dir'] ?? 'asc';
+
+        // Índices de columnas (ya incluye 'empresas')
+        $columns = [
+            0 => 'id',
+            1 => 'name',
+            2 => 'email',
+            3 => 'phone',
+            4 => 'job_title',
+            5 => 'empresas',
+            6 => 'roles',
+            7 => 'is_active',
+            8 => 'acciones',
+        ];
+
+        // Query base
+        $query = User::with(['roles:id,name', 'companies:id,name,code', 'costCenters:id,name,code,company_id']);
+
+        $recordsTotal = User::count();
+
+        // Búsqueda global
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhere('phone', 'LIKE', "%{$search}%")
+                    ->orWhere('job_title', 'LIKE', "%{$search}%")
+                    ->orWhereHas('companies', function ($qc) use ($search) {
+                        $qc->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('code', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        $recordsFiltered = $query->count();
+
+        // Ordenamiento
+        $orderable = $columns[$orderColumn] ?? 'id';
+        if (!in_array($orderable, ['empresas', 'roles', 'acciones'])) {
+            $query->orderBy($orderable, $orderDir);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        // Paginación
+        $users = $query->skip($start)->take($length)->get();
+
+        // Paleta de colores por rol
+        $roleColors = [
+            'super-admin' => 'dark',
+            'admin'       => 'primary',
+            'manager'     => 'info',
+            'editor'      => 'warning',
+            'staff'       => 'secondary',
+            'supplier'    => 'success',
+        ];
+
+        // Formatear respuesta
+        $data = $users->map(function ($user) use ($roleColors) {
+
+            // === BADGES DE ROLES ===
+            $rolesHtml = $user->roles->pluck('name')->map(function ($name) use ($roleColors) {
+                $color = $roleColors[$name] ?? 'secondary';
+                return '<span class="badge bg-' . $color . ' me-1">' . e(Str::headline($name)) . '</span>';
+            })->implode('');
+
+            // === BADGES DE EMPRESAS ===
+            $empresasHtml = '';
+            if ($user->companies->isNotEmpty()) {
+
+                // Tooltip con lista completa
+                $tooltip = $user->companies->map(fn($c) => '[' . $c->code . '] ' . $c->name)->implode("\n");
+
+                // Mostrar solo las primeras 3 empresas
+                $badges = $user->companies->take(3)->map(function ($c) {
+                    return '<span class="badge bg-light text-dark border me-1">[' . e($c->code) . ']</span>';
+                })->implode('');
+
+                // Si hay más de 3, mostrar contador adicional
+                if ($user->companies->count() > 3) {
+                    $badges .= '<span class="badge bg-secondary">+' . ($user->companies->count() - 3) . '</span>';
+                }
+
+                // Tooltip Bootstrap con saltos de línea
+                $empresasHtml = '<span data-bs-toggle="tooltip" data-bs-placement="top"
+                                    data-bs-html="true"
+                                    title="' . e(nl2br($tooltip)) . '">' . $badges . '</span>';
+            }
+
+            return [
+                'id'       => $user->id,
+                'name'     => e($user->name),
+                'email'    => e($user->email),
+                'telefono' => e($user->phone),
+                'puesto'   => e($user->job_title),
+                'empresas' => $empresasHtml,
+                'centros_costo' => $this->formatCostCentersHtml($user),
+                'roles'    => $rolesHtml,
+                'activo'   => $user->is_active,
+                'acciones' => view('users.staff.partials.actions', compact('user'))->render(),
+            ];
+        });
+
+        // === RESPUESTA JSON PARA DATATABLES ===
+        return response()->json([
+            'draw'            => intval($draw),
+            'recordsTotal'    => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data'            => $data,
+        ]);
+    }
+
+    // Nuevo método helper:
+    private function formatCostCentersHtml($user)
+    {
+        if ($user->costCenters->isEmpty()) {
+            return '<span class="text-muted">—</span>';
+        }
+
+        // Agrupar por compañía para el tooltip
+        $grouped = $user->costCenters->groupBy('company_id');
+        $tooltipHtml = '';
+
+        foreach ($grouped as $companyId => $centers) {
+            $company = $user->companies->firstWhere('id', $companyId);
+            if ($company) {
+                $tooltipHtml .= '<strong>[' . $company->code . ']</strong><br>';
+                $tooltipHtml .= $centers->pluck('name')->implode('<br>');
+                $tooltipHtml .= '<br><br>';
+            }
+        }
+
+        // Mostrar solo los primeros 2 centros
+        $badges = $user->costCenters->take(2)->map(function ($cc) {
+            $badge = $cc->is_default ? 'bg-primary' : 'bg-light text-dark border';
+            return '<span class="badge ' . $badge . ' me-1">' . e($cc->code) . '</span>';
+        })->implode('');
+
+        // Contador si hay más
+        if ($user->costCenters->count() > 2) {
+            $badges .= '<span class="badge bg-secondary">+' . ($user->costCenters->count() - 2) . '</span>';
+        }
+
+        return '<span data-bs-toggle="tooltip" data-bs-placement="top"
+                  data-bs-html="true"
+                  title="' . $tooltipHtml . '">' . $badges . '</span>';
+    }
+
+    public function costCentersForm(User $user)
+    {
+        // Cargar compañías del usuario con sus centros de costo
+        $user->load(['companies.costCenters']);
+
+        // Obtener IDs de centros de costo ya asignados al usuario
+        $assignedCostCenterIds = $user->costCenters()->pluck('cost_center_id')->toArray();
+
+        return view('users.staff.partials.cost-centers-form', compact('user', 'assignedCostCenterIds'));
+    }
+
+    public function costCentersStore(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'cost_centers' => 'nullable|array',
+            'cost_centers.*' => 'exists:cost_centers,id',
+            'default_cost_center' => 'nullable|exists:cost_centers,id'
+        ]);
+
+        // Sincronizar centros de costo
+        $syncData = [];
+        foreach ($validated['cost_centers'] ?? [] as $costCenterId) {
+            $syncData[$costCenterId] = [
+                'is_default' => ($costCenterId == $validated['default_cost_center']),
+                'is_active' => true,
+                'created_by' => Auth::id(),
+                'created_at' => now(),
+                'updated_at' => now()
+            ];
+        }
+
+        $user->costCenters()->sync($syncData);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function create()
+    {
+        $user = new User();
+        if (request()->ajax()) {
+            return view('users.staff.partials.form', [
+                'user' => $user,
+                'mode' => 'create',
+                'action' => route('users.store'),
+                'method' => 'POST',
+                'title' => 'Crear usuario',
+            ]);
+        }
+        return view('users.staff.partials.form', compact('user')); // opcional si también quieres página completa
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'first_name' => ['nullable', 'string', 'max:120'],
+            'last_name'  => ['nullable', 'string', 'max:120'],
+            'name'       => ['required', 'string', 'max:180'],
+            'email'      => ['required', 'email', 'max:180', 'unique:users,email'],
+            'password'   => ['required', 'string', 'min:8'], // se hashea por cast
+            'phone'      => ['nullable', 'string', 'max:30'],
+            'job_title'  => ['nullable', 'string', 'max:120'],
+            'is_active'  => ['nullable', 'boolean'],
+        ]);
+
+        // Composería “name” si viene vacío desde first/last
+        if (blank($validated['name'])) {
+            $validated['name'] = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
+        }
+
+        // asegura boolean
+        $validated['is_active'] = (bool)($validated['is_active'] ?? true);
+
+        DB::transaction(function () use ($validated) {
+            User::create($validated);
+        });
+
+        return redirect()->route('users.staff.index')->with('success', 'Usuario creado correctamente.');
+    }
+
+    public function show(User $user)
+    {
+        return view('users.staff.show', compact('user'));
+    }
+
+    public function edit(User $user)
+    {
+        return view('users.staff.partials.form', [
+            'user'   => $user,
+            'mode'   => 'edit',
+            'action' => route('users.update', $user), // <= IMPORTANTE: /users/{id}
+            'method' => 'PUT',
+            'title'  => 'Editar usuario',
+        ]);
+    }
+
+    public function update(Request $request, User $user)
+    {
+        // Validación
+        $validated = $request->validate([
+            // ---- USER ----
+            'user.name'       => ['required', 'string', 'max:150'],
+            'user.email'      => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
+            'user.job_title'  => ['nullable', 'string', 'max:100'],
+            'user.is_active'  => ['nullable', 'in:1'],
+            'user.avatar'     => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+            'user.remove_avatar' => ['nullable', 'in:0,1'],
+
+            // ---- SUPPLIER (si el usuario tiene supplier relacionado) ----
+            'supplier.company_name'   => ['nullable', 'string', 'max:255'],
+            'supplier.rfc'            => ['nullable', 'string', 'max:13'],
+            'supplier.contact_person' => ['nullable', 'string', 'max:150'],
+            'supplier.contact_phone'  => ['nullable', 'string', 'max:50'],
+            'supplier.email'          => ['nullable', 'email', 'max:150'],
+            'supplier.supplier_type'  => ['nullable', Rule::in(['product', 'service', 'product_service'])],
+            'supplier.currency'       => ['nullable', 'string', 'max:10'],
+            'supplier.tax_regime'     => ['nullable', Rule::in(['individual', 'corporation', 'resico'])],
+            'supplier.address'        => ['nullable', 'string', 'max:500'],
+            'supplier.status'         => ['nullable', 'string', 'max:50'],
+        ], [], [
+            'user.name'  => 'nombre',
+            'user.email' => 'correo',
+            'user.avatar' => 'avatar',
+        ]);
+
+        // Flags / archivos
+        $removeAvatar = (int) data_get($validated, 'user.remove_avatar', 0) === 1;
+        $newAvatar    = $request->file('user.avatar');
+
+        DB::transaction(function () use ($request, $user, $validated, $removeAvatar, $newAvatar) {
+
+            // ----- Actualiza USER -----
+            $user->name      = data_get($validated, 'user.name', $user->name);
+            $user->email     = data_get($validated, 'user.email', $user->email);
+            $user->job_title = data_get($validated, 'user.job_title', $user->job_title);
+            $user->is_active = (bool) data_get($validated, 'user.is_active', false);
+
+            // Quitar avatar (si lo pide)
+            if ($removeAvatar && $user->avatar) {
+                Storage::disk('public')->delete($user->avatar);
+                $user->avatar = null;
+            }
+
+            // Subir avatar nuevo (reemplaza al anterior)
+            if ($newAvatar) {
+                if ($user->avatar) {
+                    Storage::disk('public')->delete($user->avatar);
+                }
+                $path = $newAvatar->store("users/{$user->id}/avatar", 'public');
+                $user->avatar = $path;
+            }
+
+            $user->save();
+
+            // ----- Actualiza SUPPLIER (si existe relación) -----
+            if ($user->supplier) {
+                $supplier = $user->supplier;
+
+                $supplier->company_name   = data_get($request, 'supplier.company_name', $supplier->company_name);
+                $supplier->rfc            = data_get($request, 'supplier.rfc', $supplier->rfc);
+                $supplier->contact_person = data_get($request, 'supplier.contact_person', $supplier->contact_person);
+                $supplier->contact_phone  = data_get($request, 'supplier.contact_phone', $supplier->contact_phone);
+                $supplier->email          = data_get($request, 'supplier.email', $supplier->email);
+                $supplier->supplier_type  = data_get($request, 'supplier.supplier_type', $supplier->supplier_type);
+                $supplier->currency       = data_get($request, 'supplier.currency', $supplier->currency);
+                $supplier->tax_regime     = data_get($request, 'supplier.tax_regime', $supplier->tax_regime);
+                $supplier->address        = data_get($request, 'supplier.address', $supplier->address);
+                $supplier->status         = data_get($request, 'supplier.status', $supplier->status ?? 'Pending_docs');
+
+                $supplier->save();
+            }
+        });
+
+        // Respuesta
+        if ($request->wantsJson()) {
+            // Prepara datos para refrescar el modal sin recargar
+            $avatarUrl = $user->avatar ? asset('storage/' . $user->avatar) : asset('assets/img/avatar-placeholder.png');
+
+            return response()->json([
+                'ok'        => true,
+                'user'      => [
+                    'id'         => $user->id,
+                    'name'       => $user->name,
+                    'email'      => $user->email,
+                    'job_title'  => $user->job_title,
+                    'is_active'  => (bool) $user->is_active,
+                    'avatar_url' => $avatarUrl,
+                    'avatar_path' => $user->avatar, // relativo en storage
+                ],
+                'supplier'  => $user->supplier ? [
+                    'id'              => $user->supplier->id,
+                    'company_name'    => $user->supplier->company_name,
+                    'rfc'             => $user->supplier->rfc,
+                    'contact_person'  => $user->supplier->contact_person,
+                    'contact_phone'   => $user->supplier->contact_phone,
+                    'email'           => $user->supplier->email,
+                    'supplier_type'   => $user->supplier->supplier_type,
+                    'currency'        => $user->supplier->currency,
+                    'tax_regime'      => $user->supplier->tax_regime,
+                    'address'         => $user->supplier->address,
+                    'status'          => $user->supplier->status,
+                ] : null,
+                'message'   => 'Usuario proveedor actualizado.',
+            ]);
+        }
+
+        return back()->with('success', 'Usuario proveedor actualizado.');
+    }
+
+    public function toggleActive(User $user)
+    {
+        $user->is_active = !$user->is_active;
+        $user->save();
+
+        return response()->json(['ok' => true, 'is_active' => $user->is_active]);
+    }
+
+    public function destroy(User $user)
+    {
+        $user->delete();
+        return redirect()->route('users.staff.index')->with('success', 'Usuario eliminado.');
+    }
+
+    public function editRoles(User $user)
+    {
+        // Trae todos los roles disponibles
+        $roles = Role::orderBy('name')->get(['name']);
+
+        // Devuelve solo el fragmento HTML para el modal
+        return view('users.staff.partials.roles_form', compact('user', 'roles'));
+    }
+
+    public function updateRoles(Request $request, User $user)
+    {
+        // Validar arreglo de roles por nombre
+        $data = $request->validate([
+            'roles'   => ['nullable', 'array'],
+            'roles.*' => ['string', 'exists:roles,name'],
+        ]);
+
+        // Sincroniza (agrega y quita automáticamente)
+        $user->syncRoles($data['roles'] ?? []);
+
+        // Respuesta JSON para que tu JS cierre el modal y recargue DataTable
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Endpoint de DataTables server-side SIN Yajra.
+     * Devuelve: draw, recordsTotal, recordsFiltered, data.
+     *
+     * Requisitos/Asunciones:
+     * - Tabla relacionada: suppliers (col: user_id, telefono, puesto)
+     * - Relación en User: supplier() y roles() (Spatie)
+     * - Campo activo en users: is_active|active|status (se detecta)
+     */
+    public function suppliersDatatable(Request $request)
+    {
+        $draw   = intval($request->input('draw', 1));
+        $start  = intval($request->input('start', 0));
+        $length = intval($request->input('length', 10));
+        $search = trim($request->input('search.value', '')) ?: null;
+
+        $columns = [
+            0 => 'id',
+            1 => 'company_name',
+            2 => 'rfc',
+            3 => 'contact_person',
+            4 => 'contact_phone',
+            5 => 'email',
+            6 => 'bank_name',
+            7 => 'status',
+            8 => 'last_login',  // NUEVA
+            9 => 'is_active',
+            10 => 'acciones',
+        ];
+        $orderIdx = intval($request->input('order.0.column', 0));
+        $orderDir = $request->input('order.0.dir', 'desc') === 'asc' ? 'asc' : 'desc';
+        $orderCol = $columns[$orderIdx] ?? 'id';
+
+        // === Query base sobre users con join a suppliers ===
+        $base = User::query()
+            ->select([
+                'users.id',
+                'users.name',
+                'users.email as user_email',
+                'users.is_active', // 👈 agregado
+                'users.last_login',
+                DB::raw('COALESCE(users.is_active, 0) as activo_flag'),
+                's.id as supplier_id',
+                's.company_name',
+                's.rfc',
+                's.contact_person',
+                's.contact_phone',
+                's.email',
+                's.bank_name',
+                's.status',
+            ])
+            ->join('suppliers as s', 's.user_id', '=', 'users.id');
+
+        $recordsTotal = (clone $base)->count('users.id');
+
+        // === Búsqueda global ===
+        if ($search) {
+            $base->where(function ($q) use ($search) {
+                $q->where('s.company_name', 'like', "%{$search}%")
+                    ->orWhere('s.rfc', 'like', "%{$search}%")
+                    ->orWhere('s.contact_person', 'like', "%{$search}%")
+                    ->orWhere('s.contact_phone', 'like', "%{$search}%")
+                    ->orWhere('s.email', 'like', "%{$search}%")
+                    ->orWhere('s.bank_name', 'like', "%{$search}%")
+                    ->orWhere('s.status', 'like', "%{$search}%");
+            });
+        }
+
+        $recordsFiltered = (clone $base)->count('users.id');
+
+        // === Ordenamiento dinámico ===
+        switch ($orderCol) {
+            case 'company_name':
+                $base->orderBy('s.company_name', $orderDir);
+                break;
+            case 'rfc':
+                $base->orderBy('s.rfc', $orderDir);
+                break;
+            case 'contact_person':
+                $base->orderBy('s.contact_person', $orderDir);
+                break;
+            case 'contact_phone':
+                $base->orderBy('s.contact_phone', $orderDir);
+                break;
+            case 'email':
+                $base->orderBy('s.email', $orderDir);
+                break;
+            case 'bank_name':
+                $base->orderBy('s.bank_name', $orderDir);
+                break;
+            case 'status':
+                $base->orderBy('s.status', $orderDir);
+                break;
+            default:
+                $base->orderBy('users.id', $orderDir);
+        }
+
+        // === Paginación ===
+        $rows = $base->skip($start)->take($length)->get();
+
+        // === Roles (Spatie) ===
+        $userIds = $rows->pluck('id')->all();
+        $rolesByUser = [];
+        if ($userIds) {
+            $roles = DB::table('model_has_roles as mhr')
+                ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+                ->where('mhr.model_type', '=', User::class)
+                ->whereIn('mhr.model_id', $userIds)
+                ->select('mhr.model_id as user_id', 'r.name as role_name')
+                ->get()
+                ->groupBy('user_id');
+
+            foreach ($roles as $uid => $list) {
+                $rolesByUser[$uid] = $list->pluck('role_name')->all();
+            }
+        }
+
+        // === Construir respuesta ===
+        $data = $rows->map(function ($row) use ($rolesByUser) {
+            $rolesArr = $rolesByUser[$row->id] ?? [];
+            $rolesHtml = empty($rolesArr)
+                ? '<span class="text-muted">—</span>'
+                : collect($rolesArr)->map(fn($r) => '<span class="badge bg-secondary me-1">' . $r . '</span>')->implode(' ');
+
+            $editUrl   = route('users.suppliers.edit', $row->id);
+            $toggleUrl = route('users.suppliers.toggle', $row->id);
+            $delUrl    = route('users.suppliers.destroy', $row->id);
+            $docsUrl   = route('admin.review.suppliers.show', $row->supplier_id);
+
+            $acciones = <<<HTML
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="ti ti-dots-vertical"></i> Acciones
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a href="{$editUrl}" class="dropdown-item js-open-user-modal" data-url="{$editUrl}">
+                            <i class="ti ti-pencil me-2"></i> Editar</a></li>
+                        <li><a href="#" class="dropdown-item js-toggle-active" data-url="{$toggleUrl}">
+                            <i class="ti ti-switch-2 me-2"></i> Activar/Desactivar</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a href="{$docsUrl}" class="dropdown-item" target="_blank">
+                            <i class="ti ti-file-description me-2"></i> Revisar documentos</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a href="#" class="dropdown-item text-danger js-delete-user" data-url="{$delUrl}" data-name="{$row->company_name}">
+                            <i class="ti ti-trash me-2"></i> Eliminar</a></li>
+                    </ul>
+                </div>
+                HTML;
+
+            return [
+                'id'             => $row->id,
+                'company_name'   => $row->company_name,
+                'rfc'            => $row->rfc,
+                'contact_person' => $row->contact_person,
+                'contact_phone'  => $row->contact_phone,
+                'email'          => $row->email,
+                'bank_name'      => $row->bank_name,
+                'last_login'     => optional($row->last_login)->format('Y-m-d H:i'), // 👈 NUEVO
+                'status' => match ($row->status) {
+                    'pending_docs' => '
+                        <span class="badge bg-warning text-dark">
+                            <i class="ti ti-file-text me-1"></i> En revisión
+                        </span>',
+                    'approved' => '
+                        <span class="badge bg-success">
+                            <i class="ti ti-check me-1"></i> Aprobado
+                        </span>',
+                    'rejected' => '
+                        <span class="badge bg-danger">
+                            <i class="ti ti-x me-1"></i> Rechazado
+                        </span>',
+                    default => '
+                        <span class="badge bg-secondary">
+                            <i class="ti ti-question-mark me-1"></i> ' . $row->status . '
+                        </span>',
+                },
+                'is_active' => (bool) $row->is_active,
+                'acciones'       => $acciones,
+            ];
+        })->values();
+
+        return response()->json([
+            'draw'            => $draw,
+            'recordsTotal'    => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data'            => $data,
+        ]);
+    }
+
+    public function toggleSupplier(User $user)
+    {
+        $user->is_active = ! $user->is_active;
+        $user->save();
+
+        return response()->json([
+            'message' => $user->is_active
+                ? 'Usuario activado correctamente'
+                : 'Usuario desactivado correctamente'
+        ]);
+    }
+
+    public function destroySupplier(User $user)
+    {
+        $name = $user->supplier->company_name ?? $user->name;
+        $user->delete();
+
+        return response()->json([
+            'message' => "El proveedor {$name} fue eliminado correctamente"
+        ]);
+    }
+
+    public function editSupplier(User $user)
+    {
+        $user->load('supplier');
+
+        // Opciones para selects
+        $statuses   = ['Pending_docs' => 'Documentos en revisión', 'approved' => 'Aprobado', 'rejected' => 'Rechazado'];
+        $currencies = ['MXN' => 'MXN (Peso Mexicano)', 'USD' => 'USD (Dólar USA)'];
+
+        return view('users.suppliers.partials.form', compact('user', 'statuses', 'currencies'));
+    }
+
+    public function updateSupplier(Request $request, User $user)
+    {
+        $user->load('supplier');
+        $supplierId = optional($user->supplier)->id;
+
+        // ... (tus validaciones actuales) ...
+
+        // === Guardar USER (nombre, email, etc.) ===
+        $user->fill([
+            'name'      => $request->input('user.name'),
+            'email'     => $request->input('user.email'),
+            'job_title' => $request->input('user.job_title'),
+        ]);
+        $user->is_active = (bool) $request->input('user.is_active', false);
+
+        // === Avatar ===
+        $remove = (bool) $request->input('user.remove_avatar', false);
+
+        if ($remove && $user->avatar) {
+            Storage::disk('public')->delete($user->avatar);
+            $user->avatar = null;
+        }
+
+        if ($request->hasFile('user.avatar')) {
+            /** @var UploadedFile $avatar */
+            $avatar = $request->file('user.avatar');
+
+            // (opcional) validación defensiva extra:
+            if ($avatar->isValid()) {
+                $path = $avatar->store('avatars', 'public'); // storage/app/public/avatars
+                if ($user->avatar && $user->avatar !== $path) {
+                    Storage::disk('public')->delete($user->avatar);
+                }
+                $user->avatar = $path;
+            }
+        }
+
+        $user->save();
+
+        // === Guardar SUPPLIER (lo que ya tienes) ===
+        $supplierData = [
+            'company_name'   => $request->input('supplier.company_name'),
+            'rfc'            => strtoupper((string) $request->input('supplier.rfc')),
+            'contact_person' => $request->input('supplier.contact_person'),
+            'contact_phone'  => $request->input('supplier.contact_phone'),
+            'email'          => $request->input('supplier.email'),
+            'address'        => $request->input('supplier.address'),
+            'supplier_type'  => $request->input('supplier.supplier_type'),
+            'currency'       => $request->input('supplier.currency'),
+            'tax_regime'     => $request->input('supplier.tax_regime'),
+            'status'         => $request->input('supplier.status', $user->supplier->status ?? 'Pending_docs'),
+        ];
+
+        $user->supplier
+            ? $user->supplier->update($supplierData)
+            : $user->supplier()->create($supplierData);
+
+        return response()->json(['message' => 'Proveedor actualizado correctamente.']);
+    }
+
+    public function editCompanies(User $user)
+    {
+        $companies = Company::orderBy('name')->get(['id', 'code', 'name']);
+        $attached  = $user->companies()->pluck('companies.id')->all();
+
+        return view('users.staff.partials.companies', compact('user', 'companies', 'attached'));
+    }
+
+    public function updateCompanies(Request $request, User $user)
+    {
+        // company_ids[] llega del <select multiple> o checkboxes
+        $ids = $request->input('company_ids', []);
+        // Normaliza a enteros por seguridad
+        $ids = array_map('intval', $ids);
+
+        $user->companies()->sync($ids);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mostrar formulario de asignación de centros de costo.
+     * Solo muestra centros de costo de las compañías que el usuario ya tiene asignadas.
+     */
+    public function editCostCenters(User $user)
+    {
+        // Cargar relaciones necesarias
+        $user->load([
+            'companies.costCenters' => function ($query) {
+                $query->orderBy('code');
+            },
+            'costCenters'
+        ]);
+
+        // Obtener IDs de centros de costo ya asignados al usuario
+        $assignedCostCenters = $user->costCenters->keyBy('id');
+
+        // Verificar si el usuario tiene compañías asignadas
+        if ($user->companies->isEmpty()) {
+            return response()->json([
+                'error' => true,
+                'message' => 'El usuario no tiene compañías asignadas. Primero asigna compañías.'
+            ], 422);
+        }
+
+        return view('users.staff.partials.cost-centers-form', compact('user', 'assignedCostCenters'));
+    }
+
+    /**
+     * Actualizar centros de costo del usuario.
+     * Validar que los centros pertenezcan a las compañías del usuario.
+     */
+    public function updateCostCenters(Request $request, User $user)
+    {
+        // Validar entrada
+        $validated = $request->validate([
+            'cost_centers' => 'nullable|array',
+            'cost_centers.*' => 'exists:cost_centers,id',
+            'default_cost_center' => 'nullable|exists:cost_centers,id'
+        ], [
+            'cost_centers.*.exists' => 'Uno o más centros de costo no son válidos.',
+            'default_cost_center.exists' => 'El centro de costo predeterminado no es válido.'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Obtener IDs de compañías del usuario
+            $userCompanyIds = $user->companies()->pluck('companies.id')->toArray();
+
+            // Validar que todos los centros de costo pertenezcan a las compañías del usuario
+            if (!empty($validated['cost_centers'])) {
+                $invalidCostCenters = CostCenter::whereIn('id', $validated['cost_centers'])
+                    ->whereNotIn('company_id', $userCompanyIds)
+                    ->exists();
+
+                if ($invalidCostCenters) {
+                    return response()->json([
+                        'error' => true,
+                        'message' => 'Algunos centros de costo no pertenecen a las compañías del usuario.'
+                    ], 422);
+                }
+            }
+
+            // Preparar datos para sincronización
+            $syncData = [];
+            $defaultCostCenter = $validated['default_cost_center'] ?? null;
+
+            foreach ($validated['cost_centers'] ?? [] as $costCenterId) {
+                $syncData[$costCenterId] = [
+                    'is_default' => ($costCenterId == $defaultCostCenter),
+                    'is_active' => true,
+                    'created_by' => $user->costCenters->contains($costCenterId)
+                        ? $user->costCenters->find($costCenterId)->pivot->created_by
+                        : Auth::id(),
+                    'updated_by' => Auth::id(),
+                    'created_at' => $user->costCenters->contains($costCenterId)
+                        ? $user->costCenters->find($costCenterId)->pivot->created_at
+                        : now(),
+                    'updated_at' => now()
+                ];
+            }
+
+            // Sincronizar centros de costo
+            $user->costCenters()->sync($syncData);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Centros de costo actualizados correctamente'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Error al actualizar centros de costo del usuario', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => true,
+                'message' => 'Error al actualizar centros de costo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+}

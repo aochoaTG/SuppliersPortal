@@ -1,0 +1,95 @@
+{
+    "project": "Autenticación Premium - TotalGas",
+    "version": "1.0.0",
+    "priority": "Alta",
+    "complexity": "Media-Alta (UI Intensiva)",
+    "modules": [
+        "auth"
+    ],
+    "estimates": {
+        "backend": 6,
+        "frontend": 12,
+        "testing": 4,
+        "total_hours": 22
+    },
+    "database": [
+        {
+            "table": "users",
+            "columns": [
+                "id (bigint, pk)",
+                "name (string)",
+                "email (string, unique)",
+                "password (string)",
+                "remember_token (string, nullable)",
+                "created_at",
+                "updated_at"
+            ]
+        },
+        {
+            "table": "password_reset_tokens",
+            "columns": [
+                "email (string, pk)",
+                "token (string)",
+                "created_at"
+            ]
+        }
+    ],
+    "tasks": {
+        "backend": [
+            {
+                "id": "auth-b-01",
+                "title": "Controlador de Autenticación",
+                "description": "Implementar LoginController, RegisterController y PasswordResetController",
+                "hours": 3.0
+            },
+            {
+                "id": "auth-b-02",
+                "title": "Middlewares y Rutas",
+                "description": "Configurar rutas de auth y middleware 'auth' / 'guest'",
+                "hours": 1.5
+            },
+            {
+                "id": "auth-b-03",
+                "title": "Mailables de Recuperación",
+                "description": "Configurar plantilla de email para reset de password",
+                "hours": 1.5
+            }
+        ],
+        "frontend": [
+            {
+                "id": "auth-f-01",
+                "title": "Escena de Galaxia CSS",
+                "description": "Crear fondo animado (estrellas/nebulosa) usando solo CSS y Keyframes",
+                "hours": 4.0
+            },
+            {
+                "id": "auth-f-02",
+                "title": "Componente Glassmorphism",
+                "description": "Diseñar tarjeta de login con backdrop-filter blur y bordes translúcidos",
+                "hours": 2.5
+            },
+            {
+                "id": "auth-f-03",
+                "title": "Vistas Blade (Login/Reg/Reset)",
+                "description": "Implementar las 3 vistas compartiendo el estilo visual",
+                "hours": 3.5
+            },
+            {
+                "id": "auth-f-04",
+                "title": "Validaciones e Interactividad",
+                "description": "Feedback visual, carga de botones y validación JS",
+                "hours": 2.0
+            }
+        ]
+    },
+    "risks": [
+        {
+            "risk": "Rendimiento del fondo animado",
+            "mitigation": "Usar transform: translate3d y hardware acceleration en el CSS de las estrellas"
+        },
+        {
+            "risk": "Compatibilidad del Glassmorphism",
+            "mitigation": "Añadir fallbacks para navegadores que no soportan backdrop-filter"
+        }
+    ]
+}
