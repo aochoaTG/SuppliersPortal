@@ -28,7 +28,7 @@
 @error('budget')
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="ti ti-alert-circle me-2"></i>
-        <strong>Error de Presupuesto:</strong> {{ $message }}
+        <strong>Error de Presupuesto: </strong> {{ $message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
     </div>
 @enderror
