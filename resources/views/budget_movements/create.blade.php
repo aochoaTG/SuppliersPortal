@@ -1,16 +1,14 @@
-    @extends('layouts.zircos')
+@extends('layouts.zircos')
 
-    @section('title', 'Nuevo Movimiento Presupuestal')
+@section('title', 'Nuevo Movimiento Presupuestal')
 
-    @section('page.breadcrumbs')
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ route('budget_movements.dashboard') }}">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="{{ route('budget_movements.index') }}">Movimientos Presupuestales</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Nuevo Movimiento</li>
-        </ol>
-    </nav>
-    @endsection
+@section('page.title', 'Nuevo Movimiento Presupuestal')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ route('budget_movements.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('budget_movements.index') }}">Movimientos Presupuestales</a></li>
+    <li class="breadcrumb-item active">Nuevo Movimiento</li>
+@endsection
 
     @section('content')
     <form action="{{ route('budget_movements.store') }}" method="POST" id="movementForm">
@@ -468,7 +466,7 @@
                 <div class="card" id="help_card" style="display: none;">
                     <div class="card-header">
                         <h5 class="mb-0">
-                            <i class="bi bi-question-circle me-2"></i>
+                            <i class="ti ti-help-circle me-2"></i>
                             Ayuda
                         </h5>
                     </div>

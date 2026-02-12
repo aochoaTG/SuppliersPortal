@@ -2,13 +2,11 @@
 
 @section('title', 'Movimientos Presupuestales')
 
+@section('page.title', 'Movimientos Presupuestales')
+
 @section('page.breadcrumbs')
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ route('budget_movements.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Movimientos Presupuestales</li>
-    </ol>
-</nav>
+    <li class="breadcrumb-item"><a href="{{ route('budget_movements.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Movimientos Presupuestales</li>
 @endsection
 
 @section('content')

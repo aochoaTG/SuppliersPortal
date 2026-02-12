@@ -1,3 +1,5 @@
+@extends('layouts.zircos')
+
 @php
     // Verificamos si TODAS las partidas están ya en un estado que no sea DRAFT
     $allLocked = $items->every(function($item) use ($responses) {
@@ -6,9 +8,9 @@
     });
 @endphp
 
-@extends('layouts.zircos')
-
 @section('title', 'Cotizar RFQ - ' . $rfq->folio)
+
+@section('page.title', 'Cotizar RFQ')
 
 {{-- Breadcrumbs personalizados --}}
 @section('page.breadcrumbs')

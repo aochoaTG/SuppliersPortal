@@ -1,6 +1,14 @@
 @extends('layouts.zircos')
 
+@section('title', 'Nueva Orden de Compra Directa')
+
 @section('page.title', 'Nueva Orden de Compra Directa')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('purchase-orders.index') }}">Órdenes de Compra</a></li>
+    <li class="breadcrumb-item active">Nueva</li>
+@endsection
 
 @section('content')
 <form action="{{ route('direct-purchase-orders.store') }}" method="POST" enctype="multipart/form-data" id="ocd-form">

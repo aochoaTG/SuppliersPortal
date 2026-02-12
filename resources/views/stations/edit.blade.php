@@ -2,6 +2,14 @@
 
 @section('title', 'Editar Estación')
 
+@section('page.title', 'Editar Estación')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('stations.index') }}">Estaciones</a></li>
+    <li class="breadcrumb-item active">Editar</li>
+@endsection
+
 @section('content')
     <div class="card">
         <div class="card-body">

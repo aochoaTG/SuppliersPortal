@@ -2,6 +2,8 @@
 
 @section('title', 'Validar Requisición - ' . $requisition->folio)
 
+@section('page.title', 'Validar Requisición')
+
 @section('page.breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
     <li class="breadcrumb-item"><a href="{{ route('requisitions.inbox.validation') }}">Bandeja de Validación</a></li>

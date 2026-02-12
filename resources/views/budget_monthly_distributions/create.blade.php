@@ -5,14 +5,10 @@
 @section('page.title', 'Crear Distribuciones Mensuales')
 
 @section('page.breadcrumbs')
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
-        <li class="breadcrumb-item"><a href="{{ route('annual_budgets.index') }}">Presupuestos Anuales</a></li>
-        <li class="breadcrumb-item"><a href="{{ route('annual_budgets.show', $annualBudget->id) }}">Presupuesto {{ $annualBudget->fiscal_year }}</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Crear Distribuciones</li>
-    </ol>
-</nav>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('annual_budgets.index') }}">Presupuestos Anuales</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('annual_budgets.show', $annualBudget->id) }}">Presupuesto {{ $annualBudget->fiscal_year }}</a></li>
+    <li class="breadcrumb-item active">Crear Distribuciones</li>
 @endsection
 
 @section('content')

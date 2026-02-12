@@ -1,5 +1,15 @@
 @extends('layouts.zircos')
 
+@section('title', 'Editar Orden de Compra Directa')
+
+@section('page.title', 'Editar Orden de Compra Directa')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('purchase-orders.index') }}">Órdenes de Compra</a></li>
+    <li class="breadcrumb-item active">Editar OCD</li>
+@endsection
+
 @section('content')
 <div class="page-container">
     <div class="container-fluid">

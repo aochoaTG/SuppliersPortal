@@ -2,6 +2,14 @@
 
 @section('title', 'Selección de Proveedores')
 
+@section('page.title', 'Selección de Proveedores')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('rfq.index') }}">RFQs</a></li>
+    <li class="breadcrumb-item active">Selección de Proveedores</li>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     {{-- HEADER --}}

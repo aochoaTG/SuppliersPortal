@@ -1,9 +1,17 @@
-@extends('layouts.app')
+@extends('layouts.zircos')
+
+@section('title', 'Editar Proveedor')
+
+@section('page.title', 'Editar Proveedor')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('cat-suppliers.index') }}">Proveedores</a></li>
+    <li class="breadcrumb-item active">Editar</li>
+@endsection
 
 @section('content')
 <div class="container">
-    <h1>Editar Proveedor</h1>
-
     <form method="POST" action="{{ route('cat-suppliers.update', $catSupplier) }}">
         @csrf
         @method('PUT')
@@ -40,7 +48,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="account_number" class="form-label">Número de cuenta</label>
+            <label for="account_number" class="form-label">Nmero de cuenta</label>
             <input type="text" name="account_number" id="account_number"
                    value="{{ old('account_number', $catSupplier->account_number) }}"
                    class="form-control">

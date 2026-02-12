@@ -1,6 +1,13 @@
 @extends('layouts.zircos')
 
+@section('title', 'Buzón de Autorizaciones')
+
 @section('page.title', 'Buzón de Autorizaciones')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item active">Buzón de Autorizaciones</li>
+@endsection
 
 @section('content')
 <div class="row">

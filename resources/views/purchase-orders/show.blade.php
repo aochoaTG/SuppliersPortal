@@ -1,6 +1,14 @@
 @extends('layouts.zircos')
 
-@section('page.title', 'Detalle de Orden de Compra: ' . $purchaseOrder->folio)
+@section('title', 'Detalle de Orden de Compra: ' . $purchaseOrder->folio)
+
+@section('page.title', 'Detalle de Orden de Compra')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('purchase-orders.index') }}">Órdenes de Compra</a></li>
+    <li class="breadcrumb-item active">{{ $purchaseOrder->folio }}</li>
+@endsection
 
 @section('content')
 <div class="row">

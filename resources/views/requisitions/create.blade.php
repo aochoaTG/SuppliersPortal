@@ -2,6 +2,8 @@
 
 @section('title', 'Nueva Requisición')
 
+@section('page.title', 'Nueva Requisición')
+
 @section('page.breadcrumbs')
 <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
 <li class="breadcrumb-item"><a href="{{ route('requisitions.index') }}">Requisiciones</a></li>

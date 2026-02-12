@@ -1,7 +1,15 @@
 @extends('layouts.zircos')
 
 @section('title', 'Bandeja de Validación')
+
 @section('page.title', 'Bandeja de Validación')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('requisitions.index') }}">Requisiciones</a></li>
+    <li class="breadcrumb-item active">Bandeja de Validación</li>
+@endsection
+
 @section('content')
     <div class="card">
         <div class="card-header">

@@ -1,5 +1,7 @@
 @extends('layouts.zircos')
 
+@section('title', 'Nueva Orden de Compra Directa')
+
 @section('page.title', 'Nueva OCD')
 
 @section('page.breadcrumbs')

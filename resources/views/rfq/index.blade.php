@@ -2,6 +2,8 @@
 
 @section('title', 'Solicitudes de Cotización (RFQ)')
 
+@section('page.title', 'Solicitudes de Cotización')
+
 {{-- Breadcrumbs personalizados --}}
 @section('page.breadcrumbs')
     <li class="breadcrumb-item">

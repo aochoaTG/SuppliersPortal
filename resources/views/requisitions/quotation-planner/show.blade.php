@@ -2,6 +2,14 @@
 
 @section('title', 'Planificador de Cotización')
 
+@section('page.title', 'Planificador de Cotización')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('requisitions.index') }}">Requisiciones</a></li>
+    <li class="breadcrumb-item active">Planificador de Cotización</li>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     {{-- HEADER --}}

@@ -2,20 +2,19 @@
 
 @section('title', 'Historial de Cotizaciones')
 
+@section('page.title', 'Historial de Cotizaciones')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ route('supplier.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Historial de Cotizaciones</li>
+@endsection
+
 @section('content')
 <div class="container-fluid py-4">
 
     {{-- Header --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('supplier.dashboard') }}">Dashboard</a>
-                    </li>
-                    <li class="breadcrumb-item active">Historial de Cotizaciones</li>
-                </ol>
-            </nav>
             <h1 class="h3 mb-0">
                 <i class="ti ti-history me-2"></i>
                 Historial de Cotizaciones

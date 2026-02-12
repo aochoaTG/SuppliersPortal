@@ -1,6 +1,14 @@
 @extends('layouts.zircos')
 
-@section('page.title', 'Detalle de OCD: ' . ($directPurchaseOrder->folio ?? 'Borrador'))
+@section('title', 'Detalle de OCD: ' . ($directPurchaseOrder->folio ?? 'Borrador'))
+
+@section('page.title', 'Detalle de OCD')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('purchase-orders.index') }}">Órdenes de Compra</a></li>
+    <li class="breadcrumb-item active">{{ $directPurchaseOrder->folio ?? 'Borrador' }}</li>
+@endsection
 
 @section('content')
 <div class="row">

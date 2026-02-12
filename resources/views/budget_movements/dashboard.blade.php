@@ -2,14 +2,12 @@
 
 @section('title', 'Dashboard - Movimientos Críticos')
 
+@section('page.title', 'Dashboard - Movimientos Críticos')
+
 @section('page.breadcrumbs')
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{{ route('budget_movements.index') }}">Movimientos Presupuestales</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Dashboard Crítico</li>
-    </ol>
-</nav>
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('budget_movements.index') }}">Movimientos Presupuestales</a></li>
+    <li class="breadcrumb-item active">Dashboard Crítico</li>
 @endsection
 
 @section('content')

@@ -2,6 +2,14 @@
 
 @section('title', 'Detalle RFQ - ' . $rfq->folio)
 
+@section('page.title', 'Detalle RFQ')
+
+@section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('rfq.index') }}">RFQs</a></li>
+    <li class="breadcrumb-item active">{{ $rfq->folio }}</li>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     {{-- HEADER --}}

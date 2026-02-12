@@ -1,6 +1,9 @@
 @extends('layouts.zircos')
 
 @section('title', 'Dashboard')
+
+@section('page.title', 'Dashboard')
+
 @php
     $labels = [
         'acta_constitutiva'        => 'Acta constitutiva',
