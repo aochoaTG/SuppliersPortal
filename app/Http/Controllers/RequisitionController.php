@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enum\RequisitionStatus;
 use App\Events\RequisitionUpdated;
-use App\Http\Requests\UpdateRequisitionRequest;
+use App\Http\Requests\SaveRequisitionRequest;
 use App\Models\CostCenter;
 use App\Models\Requisition;
 use App\Models\Company;
@@ -264,7 +264,7 @@ class RequisitionController extends Controller
     /**
      * Update the specified requisition in storage.
      */
-    public function update(UpdateRequisitionRequest $request, Requisition $requisition): RedirectResponse
+    public function update(SaveRequisitionRequest $request, Requisition $requisition): RedirectResponse
     {
         try {
             return DB::transaction(function () use ($request, $requisition) {

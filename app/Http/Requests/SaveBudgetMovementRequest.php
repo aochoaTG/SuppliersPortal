@@ -5,31 +5,22 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateBudgetMovementRequest extends FormRequest
+class SaveBudgetMovementRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        // Verificar que el movimiento esté en estado PENDIENTE
         $budgetMovement = $this->route('budget_movement');
-        
+
         if ($budgetMovement && $budgetMovement->status !== 'PENDIENTE') {
             return false;
         }
 
-        // TODO: Agregar lógica de autorización según roles/permisos
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         $rules = [
-            // Datos generales del movimiento
             'movement_type' => ['required', Rule::in(['TRANSFERENCIA', 'AMPLIACION', 'REDUCCION'])],
             'fiscal_year' => ['required', 'integer', 'min:2020', 'max:2050'],
             'movement_date' => ['required', 'date'],
@@ -37,31 +28,27 @@ class UpdateBudgetMovementRequest extends FormRequest
             'total_amount' => ['required', 'numeric', 'min:0.01', 'max:999999999.99'],
         ];
 
-        // Validaciones condicionales según el tipo de movimiento
         $movementType = $this->input('movement_type');
 
         if ($movementType === 'TRANSFERENCIA') {
-            // Para transferencias necesitamos ORIGEN y DESTINO
             $rules = array_merge($rules, [
                 // Origen
                 'origin_cost_center_id' => ['required', 'exists:cost_centers,id'],
                 'origin_month' => ['required', 'integer', 'min:1', 'max:12'],
                 'origin_expense_category_id' => ['required', 'exists:expense_categories,id'],
-                
+
                 // Destino
                 'destination_cost_center_id' => ['required', 'exists:cost_centers,id'],
                 'destination_month' => ['required', 'integer', 'min:1', 'max:12'],
                 'destination_expense_category_id' => ['required', 'exists:expense_categories,id'],
             ]);
         } elseif ($movementType === 'AMPLIACION') {
-            // Para ampliaciones solo necesitamos el destino
             $rules = array_merge($rules, [
                 'cost_center_id' => ['required', 'exists:cost_centers,id'],
                 'month' => ['required', 'integer', 'min:1', 'max:12'],
                 'expense_category_id' => ['required', 'exists:expense_categories,id'],
             ]);
         } elseif ($movementType === 'REDUCCION') {
-            // Para reducciones solo necesitamos el origen
             $rules = array_merge($rules, [
                 'cost_center_id' => ['required', 'exists:cost_centers,id'],
                 'month' => ['required', 'integer', 'min:1', 'max:12'],
@@ -72,13 +59,9 @@ class UpdateBudgetMovementRequest extends FormRequest
         return $rules;
     }
 
-    /**
-     * Configure the validator instance.
-     */
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            // Validación personalizada para transferencias
             if ($this->input('movement_type') === 'TRANSFERENCIA') {
                 $originCC = $this->input('origin_cost_center_id');
                 $destCC = $this->input('destination_cost_center_id');
@@ -87,7 +70,6 @@ class UpdateBudgetMovementRequest extends FormRequest
                 $originCat = $this->input('origin_expense_category_id');
                 $destCat = $this->input('destination_expense_category_id');
 
-                // Validar que al menos UNO sea diferente
                 if ($originCC == $destCC && $originMonth == $destMonth && $originCat == $destCat) {
                     $validator->errors()->add(
                         'destination_cost_center_id',
@@ -98,9 +80,6 @@ class UpdateBudgetMovementRequest extends FormRequest
         });
     }
 
-    /**
-     * Get custom messages for validator errors.
-     */
     public function messages(): array
     {
         return [
@@ -154,9 +133,6 @@ class UpdateBudgetMovementRequest extends FormRequest
         ];
     }
 
-    /**
-     * Get custom attributes for validator errors.
-     */
     public function attributes(): array
     {
         return [

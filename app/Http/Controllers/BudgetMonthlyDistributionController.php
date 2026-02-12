@@ -5,8 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AnnualBudget;
 use App\Models\BudgetMonthlyDistribution;
 use App\Models\ExpenseCategory;
-use App\Http\Requests\StoreBudgetMonthlyDistributionRequest;
-use App\Http\Requests\UpdateBudgetMonthlyDistributionRequest;
+use App\Http\Requests\SaveBudgetMonthlyDistributionRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -172,7 +171,7 @@ class BudgetMonthlyDistributionController extends Controller
     /**
      * Guardar distribuciones mensuales masivamente.
      */
-    public function store(StoreBudgetMonthlyDistributionRequest $request): RedirectResponse
+    public function store(SaveBudgetMonthlyDistributionRequest $request): RedirectResponse
     {
         $validated = $request->validated();
 
@@ -277,7 +276,7 @@ class BudgetMonthlyDistributionController extends Controller
     /**
      * Actualizar distribuciones mensuales masivamente.
      */
-    public function update(UpdateBudgetMonthlyDistributionRequest $request, AnnualBudget $annual_budget)
+    public function update(SaveBudgetMonthlyDistributionRequest $request, AnnualBudget $annual_budget)
     {
         $validated = $request->validated();
 

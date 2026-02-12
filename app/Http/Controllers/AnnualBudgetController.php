@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreAnnualBudgetRequest;
+use App\Http\Requests\SaveAnnualBudgetRequest;
 use Illuminate\Support\Facades\Auth;
-use App\Http\Requests\UpdateAnnualBudgetRequest;
 use App\Http\Requests\ApproveBudgetRequest;
 use App\Models\AnnualBudget;
 use App\Models\CostCenter;
@@ -246,7 +245,7 @@ class AnnualBudgetController extends Controller
     /**
      * Guardar nuevo presupuesto.
      */
-    public function store(StoreAnnualBudgetRequest $request): RedirectResponse
+    public function store(SaveAnnualBudgetRequest $request): RedirectResponse
     {
         $data = $request->validated();
         $data['created_by'] = Auth::id();
@@ -287,7 +286,7 @@ class AnnualBudgetController extends Controller
     /**
      * Actualizar presupuesto.
      */
-    public function update(UpdateAnnualBudgetRequest $request, AnnualBudget $annual_budget): RedirectResponse
+    public function update(SaveAnnualBudgetRequest $request, AnnualBudget $annual_budget): RedirectResponse
     {
         // Solo permitir editar si está en PLANIFICACION
         if ($annual_budget->status !== 'PLANIFICACION') {

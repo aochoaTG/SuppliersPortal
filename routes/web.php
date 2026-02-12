@@ -410,7 +410,6 @@ Route::middleware(['auth', 'lock'])->group(function () {
         Route::get('/by-budget', [ExpenseCategoryController::class, 'byBudget'])->name('by-budget');
         Route::get('/by-cost-center', [ExpenseCategoryController::class, 'getByCostCenter'])->name('by-cost-center');
     });
-
 }); // Fin del grupo auth + lock
 
 // ============================================================================
@@ -494,14 +493,6 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
 //  Rutas comentadas (sin uso actual, conservadas por decisión)
 // ============================================================================
 
-// RFQ Planning (AJAX desde wizard - sin uso en vistas/controladores)
-// Route::prefix('rfq/{requisition}/planning')->name('rfq.planning.')->group(function () {
-//     Route::post('/save-strategy', [QuotationPlannerController::class, 'saveStrategy'])->name('save');
-//     Route::post('/groups/create', [QuotationPlannerController::class, 'createGroup'])->name('groups.create');
-//     Route::delete('/groups/{group}', [QuotationPlannerController::class, 'deleteGroup'])->name('groups.delete');
-//     Route::post('/groups/{group}/add-items', [QuotationPlannerController::class, 'addItemsToGroup'])->name('groups.add-items');
-//     Route::post('/groups/{group}/remove-items', [QuotationPlannerController::class, 'removeItemsFromGroup'])->name('groups.remove-items');
-// });
 
 // ============================================================================
 //  Autenticación

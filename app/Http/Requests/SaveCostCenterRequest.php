@@ -3,8 +3,9 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class StoreCostCenterRequest extends FormRequest
+class SaveCostCenterRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -13,9 +14,16 @@ class StoreCostCenterRequest extends FormRequest
 
     public function rules(): array
     {
+        $costCenter = $this->route('cost_center');
+
+        $uniqueCode = Rule::unique('cost_centers', 'code')->whereNull('deleted_at');
+        if ($costCenter !== null) {
+            $uniqueCode->ignore($costCenter);
+        }
+
         return [
             // ===== DATOS BASE =====
-            'code' => ['required', 'string', 'max:50', 'unique:cost_centers,code,NULL,id,deleted_at,NULL'],
+            'code' => ['required', 'string', 'max:50', $uniqueCode],
             'name' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:500'],
 

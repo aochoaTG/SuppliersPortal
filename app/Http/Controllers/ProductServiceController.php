@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enum\ProductServiceStatus;
-use App\Http\Requests\StoreProductServiceRequest;
-use App\Http\Requests\UpdateProductServiceRequest;
+use App\Http\Requests\SaveProductServiceRequest;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\CostCenter;
@@ -215,7 +214,7 @@ class ProductServiceController extends Controller
     /**
      * Almacena un nuevo producto/servicio
      */
-    public function store(StoreProductServiceRequest $request): RedirectResponse
+    public function store(SaveProductServiceRequest $request): RedirectResponse
     {
         return DB::transaction(function () use ($request) {
             $data = $request->validated();
@@ -331,7 +330,7 @@ class ProductServiceController extends Controller
     /**
      * Actualiza un producto/servicio existente
      */
-    public function update(UpdateProductServiceRequest $request, ProductService $productService): RedirectResponse
+    public function update(SaveProductServiceRequest $request, ProductService $productService): RedirectResponse
     {
 
         return DB::transaction(function () use ($request, $productService) {

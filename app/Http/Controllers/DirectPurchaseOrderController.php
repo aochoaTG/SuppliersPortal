@@ -9,8 +9,7 @@ use App\Models\BudgetCommitment;
 use App\Models\Supplier;
 use App\Models\CostCenter;
 use App\Models\ExpenseCategory;
-use App\Http\Requests\StoreDirectPurchaseOrderRequest;
-use App\Http\Requests\UpdateDirectPurchaseOrderRequest;
+use App\Http\Requests\SaveDirectPurchaseOrderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -64,7 +63,7 @@ class DirectPurchaseOrderController extends Controller
     /**
      * Guardar nueva OCD
      */
-    public function store(StoreDirectPurchaseOrderRequest $request)
+    public function store(SaveDirectPurchaseOrderRequest $request)
     {
         try {
             DB::beginTransaction();
@@ -320,7 +319,7 @@ class DirectPurchaseOrderController extends Controller
     /**
      * Actualizar OCD existente
      */
-    public function update(UpdateDirectPurchaseOrderRequest $request, DirectPurchaseOrder $directPurchaseOrder)
+    public function update(SaveDirectPurchaseOrderRequest $request, DirectPurchaseOrder $directPurchaseOrder)
     {
         try {
             DB::beginTransaction();

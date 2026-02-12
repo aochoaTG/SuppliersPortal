@@ -3,27 +3,26 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-/**
- * StoreCategoryRequest
- *
- * Valida la creación de una categoría:
- * - name: requerido, string corto, único
- * - description: opcional
- * - is_active: booleano
- */
-class StoreCategoryRequest extends FormRequest
+class SaveCategoryRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Si usas Policies/Permisos, cámbialo por la verificación correspondiente.
         return true;
     }
 
     public function rules(): array
     {
+        $category = $this->route('category');
+
+        $uniqueName = Rule::unique('categories', 'name');
+        if ($category !== null) {
+            $uniqueName->ignore($category);
+        }
+
         return [
-            'name' => ['required', 'string', 'max:80', 'unique:categories,name'],
+            'name' => ['required', 'string', 'max:80', $uniqueName],
             'description' => ['nullable', 'string', 'max:255'],
             'is_active' => ['required', 'boolean'],
         ];

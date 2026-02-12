@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreCostCenterRequest;
-use App\Http\Requests\UpdateCostCenterRequest;
+use App\Http\Requests\SaveCostCenterRequest;
 use App\Models\Category;
 use App\Models\CostCenter;
 use App\Models\Company;
@@ -161,7 +160,7 @@ class CostCenterController extends Controller
     /**
      * Guardar nuevo centro de costo.
      */
-    public function store(StoreCostCenterRequest $request): RedirectResponse
+    public function store(SaveCostCenterRequest $request): RedirectResponse
     {
         // 🔴 CAMBIO: Agregar auditoría (created_by, updated_by)
         $data = $request->validated();
@@ -204,7 +203,7 @@ class CostCenterController extends Controller
     /**
      * Actualizar centro de costo.
      */
-    public function update(UpdateCostCenterRequest $request, CostCenter $cost_center): RedirectResponse
+    public function update(SaveCostCenterRequest $request, CostCenter $cost_center): RedirectResponse
     {
         // 🔴 CAMBIO: Agregar auditoría (updated_by)
         $data = $request->validated();

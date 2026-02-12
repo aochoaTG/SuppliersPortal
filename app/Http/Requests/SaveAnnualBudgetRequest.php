@@ -2,25 +2,36 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AnnualBudget;
+use App\Models\CostCenter;
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreAnnualBudgetRequest extends FormRequest
+class SaveAnnualBudgetRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // Por ahora permitir
+        return true;
     }
 
     public function rules(): array
     {
+        $budget = $this->route('annual_budget');
+        $isUpdate = $budget !== null;
+
         return [
             'cost_center_id' => [
                 'required',
                 'integer',
                 'exists:cost_centers,id',
-                // Validar que sea centro ANNUAL
-                function ($attribute, $value, $fail) {
-                    $costCenter = \App\Models\CostCenter::find($value);
+                function ($attribute, $value, $fail) use ($budget, $isUpdate) {
+                    if ($isUpdate) {
+                        if ($budget->cost_center_id != $value) {
+                            $fail('No se puede cambiar el centro de costo de un presupuesto existente.');
+                        }
+                        return;
+                    }
+
+                    $costCenter = CostCenter::find($value);
                     if ($costCenter && $costCenter->budget_type !== 'ANNUAL') {
                         $fail('El centro de costo debe ser de tipo ANNUAL.');
                     }
@@ -28,9 +39,8 @@ class StoreAnnualBudgetRequest extends FormRequest
                         $fail('El centro de costo debe estar ACTIVO.');
                     }
 
-                    // ✅ VALIDAR QUE NO EXISTA PRESUPUESTO DUPLICADO
                     if ($costCenter && $this->fiscal_year) {
-                        $exists = \App\Models\AnnualBudget::where('cost_center_id', $value)
+                        $exists = AnnualBudget::where('cost_center_id', $value)
                             ->where('fiscal_year', $this->fiscal_year)
                             ->whereNull('deleted_at')
                             ->exists();
@@ -46,6 +56,13 @@ class StoreAnnualBudgetRequest extends FormRequest
                 'integer',
                 'min:' . (date('Y') - 1),
                 'max:' . (date('Y') + 10),
+                ...($isUpdate ? [
+                    function ($attribute, $value, $fail) use ($budget) {
+                        if ($budget->fiscal_year != $value) {
+                            $fail('No se puede cambiar el año fiscal de un presupuesto existente.');
+                        }
+                    },
+                ] : []),
             ],
             'total_annual_amount' => [
                 'required',

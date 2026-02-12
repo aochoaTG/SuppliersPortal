@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreBudgetMovementRequest;
-use App\Http\Requests\UpdateBudgetMovementRequest;
+use App\Http\Requests\SaveBudgetMovementRequest;
 use App\Models\BudgetMovement;
 use App\Models\BudgetMovementDetail;
 use App\Models\CostCenter;
@@ -120,7 +119,7 @@ class BudgetMovementController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreBudgetMovementRequest $request)
+    public function store(SaveBudgetMovementRequest $request)
     {
         DB::beginTransaction();
         try {
@@ -245,7 +244,7 @@ class BudgetMovementController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateBudgetMovementRequest $request, BudgetMovement $budgetMovement)
+    public function update(SaveBudgetMovementRequest $request, BudgetMovement $budgetMovement)
     {
         // Solo se pueden actualizar movimientos pendientes
         if (!$budgetMovement->isPending()) {

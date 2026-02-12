@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreCategoryRequest;
-use App\Http\Requests\UpdateCategoryRequest;
+use App\Http\Requests\SaveCategoryRequest;
 use App\Models\Category;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -43,7 +42,7 @@ class CategoryController extends Controller
     /**
      * Guarda una categoría nueva.
      */
-    public function store(StoreCategoryRequest $request): RedirectResponse
+    public function store(SaveCategoryRequest $request): RedirectResponse
     {
         Category::create($request->validated());
 
@@ -64,7 +63,7 @@ class CategoryController extends Controller
     /**
      * Actualiza la categoría.
      */
-    public function update(UpdateCategoryRequest $request, Category $category): RedirectResponse
+    public function update(SaveCategoryRequest $request, Category $category): RedirectResponse
     {
         $category->update($request->validated());
 
