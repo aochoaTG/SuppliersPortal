@@ -42,7 +42,7 @@
         <div class="col-lg-9">
             <div class="card">
                 <div class="card-body">
-                    
+
                     {{-- FILA 1: PROVEEDOR Y CONDICIONES --}}
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
@@ -52,7 +52,7 @@
                                 <select name="supplier_id" id="supplier_id" class="form-select form-select-sm @error('supplier_id') is-invalid @enderror" required>
                                     <option value="">Seleccione...</option>
                                     @foreach($suppliers as $supplier)
-                                        <option value="{{ $supplier->id }}" 
+                                        <option value="{{ $supplier->id }}"
                                                 data-payment-terms="{{ $supplier->default_payment_terms }}"
                                                 data-delivery-days="{{ $supplier->avg_delivery_time }}"
                                                 {{ old('supplier_id') == $supplier->id ? 'selected' : '' }}>
@@ -86,9 +86,9 @@
                         </div>
                     </div>
 
-                    {{-- FILA 2: PRESUPUESTO --}}
+                    {{-- FILA 2: EMPRESA Y CENTRO DE COSTO --}}
                     <div class="row g-2 mb-3">
-                        <div class="col">
+                        <div class="col-md-6">
                             <label class="form-label small fw-bold">Empresa <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-building-store"></i></span>
@@ -103,14 +103,14 @@
                             </div>
                             @error('company_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
-                        <div class="col">
+                        <div class="col-md-6">
                             <label class="form-label small fw-bold">Centro de Costo <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-chart-pie"></i></span>
                                 <select name="cost_center_id" id="cost_center_id" class="form-select form-select-sm @error('cost_center_id') is-invalid @enderror" required disabled>
                                     <option value="">Seleccione empresa primero...</option>
                                     @foreach($costCenters as $cc)
-                                        <option value="{{ $cc->id }}" 
+                                        <option value="{{ $cc->id }}"
                                                 data-company-id="{{ $cc->company_id }}"
                                                 {{ old('cost_center_id') == $cc->id ? 'selected' : '' }}>
                                             {{ $cc->name }}
@@ -119,31 +119,6 @@
                                 </select>
                             </div>
                             @error('cost_center_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col">   
-                            <label class="form-label small fw-bold">Mes de Aplicación <span class="text-danger">*</span></label>
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text"><i class="ti ti-calendar"></i></span>
-                                <input type="month" name="application_month" id="application_month" class="form-control form-control-sm @error('application_month') is-invalid @enderror" value="{{ old('application_month', $currentMonth) }}" min="{{ $currentMonth }}" required>
-                            </div>
-                            @error('application_month') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col">
-                            <label class="form-label small fw-bold">Categoría de Gasto <span class="text-danger">*</span></label>
-                            <div class="input-group input-group-sm input-group-select2">
-                                <span class="input-group-text"><i class="ti ti-category"></i></span>
-                                <select name="expense_category_id" id="expense_category_id" class="form-select form-select-sm @error('expense_category_id') is-invalid @enderror" required disabled>
-                                    <option value="">Seleccione mes primero...</option>
-                                    @foreach($expenseCategories as $category)
-                                        <option value="{{ $category->id }}" 
-                                                data-category-name="{{ $category->name }}"
-                                                {{ old('expense_category_id') == $category->id ? 'selected' : '' }}>
-                                            {{ $category->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @error('expense_category_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
                     </div>
 
@@ -157,7 +132,7 @@
                         @error('justification') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                     </div>
 
-                    {{-- TABLA DE PARTIDAS CON TASA DE IVA --}}
+                    {{-- TABLA DE PARTIDAS --}}
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="m-0 fw-bold text-uppercase small text-primary">Partidas</h6>
                         <button type="button" class="btn btn-xs btn-outline-primary" id="add-item-btn"><i class="ti ti-plus"></i> Agregar</button>
@@ -166,53 +141,61 @@
                         <table class="table table-sm table-hover mb-0" id="items-table">
                             <thead class="table-light small">
                                 <tr>
-                                    <th width="28%" class="ps-2">Descripción</th>
-                                    <th width="8%">Cant.</th>
-                                    <th width="10%">P. Unit.</th>
-                                    <th width="9%">IVA</th>
-                                    <th width="11%">Subtotal</th>
-                                    <th width="11%">IVA $</th>
-                                    <th width="11%">Total</th>
+                                    <th width="22%" class="ps-2">Descripción</th>
+                                    <th width="18%">Categoría de Gasto</th>
+                                    <th width="6%">Cant.</th>
+                                    <th width="9%">P. Unit.</th>
+                                    <th width="7%">IVA</th>
+                                    <th width="9%">Subtotal</th>
+                                    <th width="9%">IVA $</th>
+                                    <th width="9%">Total</th>
                                     <th width="3%"></th>
                                 </tr>
                             </thead>
                             <tbody id="items-tbody">
-                                {{-- Si hay items viejos, renderizarlos --}}
                                 @if(old('items'))
                                     @foreach(old('items') as $index => $item)
                                         <tr class="item-row">
                                             <td class="ps-2">
-                                                <input type="text" 
-                                                       name="items[{{ $index }}][description]" 
-                                                       class="form-control form-control-sm border-0 item-description" 
-                                                       placeholder="Descripción" 
+                                                <input type="text"
+                                                       name="items[{{ $index }}][description]"
+                                                       class="form-control form-control-sm border-0 item-description"
+                                                       placeholder="Descripción"
                                                        value="{{ $item['description'] ?? '' }}"
-                                                       required 
+                                                       required
                                                        maxlength="500">
                                             </td>
                                             <td>
-                                                <input type="number" 
-                                                       name="items[{{ $index }}][quantity]" 
-                                                       class="form-control form-control-sm border-0 item-quantity" 
-                                                       step="0.01" 
-                                                       min="0.01" 
+                                                {{-- Las opciones se cargan vía AJAX al restaurar el CC --}}
+                                                <select name="items[{{ $index }}][expense_category_id]"
+                                                        class="form-select form-select-sm border-0 item-expense-category"
+                                                        required disabled>
+                                                    <option value="">Cargando...</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number"
+                                                       name="items[{{ $index }}][quantity]"
+                                                       class="form-control form-control-sm border-0 item-quantity"
+                                                       step="0.01"
+                                                       min="0.01"
                                                        placeholder="0"
                                                        value="{{ $item['quantity'] ?? '' }}"
                                                        required>
                                             </td>
                                             <td>
-                                                <input type="number" 
-                                                       name="items[{{ $index }}][unit_price]" 
-                                                       class="form-control form-control-sm border-0 item-unit-price" 
-                                                       step="0.01" 
-                                                       min="0.01" 
+                                                <input type="number"
+                                                       name="items[{{ $index }}][unit_price]"
+                                                       class="form-control form-control-sm border-0 item-unit-price"
+                                                       step="0.01"
+                                                       min="0.01"
                                                        placeholder="0.00"
                                                        value="{{ $item['unit_price'] ?? '' }}"
                                                        required>
                                             </td>
                                             <td>
-                                                <select name="items[{{ $index }}][iva_rate]" 
-                                                        class="form-select form-select-sm border-0 item-iva-rate" 
+                                                <select name="items[{{ $index }}][iva_rate]"
+                                                        class="form-select form-select-sm border-0 item-iva-rate"
                                                         required>
                                                     <option value="16" {{ ($item['iva_rate'] ?? '16') == '16' ? 'selected' : '' }}>16%</option>
                                                     <option value="8" {{ ($item['iva_rate'] ?? '') == '8' ? 'selected' : '' }}>8%</option>
@@ -220,67 +203,60 @@
                                                 </select>
                                             </td>
                                             <td>
-                                                <input type="text" 
-                                                       class="form-control form-control-sm border-0 bg-transparent item-subtotal text-end" 
-                                                       value="$0.00" 
-                                                       readonly 
-                                                       tabindex="-1">
+                                                <input type="text"
+                                                       class="form-control form-control-sm border-0 bg-transparent item-subtotal text-end"
+                                                       value="$0.00" readonly tabindex="-1">
                                             </td>
                                             <td>
-                                                <input type="text" 
-                                                       class="form-control form-control-sm border-0 bg-transparent item-iva text-end" 
-                                                       value="$0.00" 
-                                                       readonly 
-                                                       tabindex="-1">
+                                                <input type="text"
+                                                       class="form-control form-control-sm border-0 bg-transparent item-iva text-end"
+                                                       value="$0.00" readonly tabindex="-1">
                                             </td>
                                             <td>
-                                                <input type="text" 
-                                                       class="form-control form-control-sm border-0 bg-transparent item-total text-end fw-bold" 
-                                                       value="$0.00" 
-                                                       readonly 
-                                                       tabindex="-1">
+                                                <input type="text"
+                                                       class="form-control form-control-sm border-0 bg-transparent item-total text-end fw-bold"
+                                                       value="$0.00" readonly tabindex="-1">
                                             </td>
                                             <td class="text-center">
-                                                <button type="button" 
-                                                        class="btn btn-link text-danger p-0 remove-item-btn" 
-                                                        title="Eliminar">
+                                                <button type="button" class="btn btn-link text-danger p-0 remove-item-btn" title="Eliminar">
                                                     <i class="ti ti-trash"></i>
                                                 </button>
                                             </td>
                                         </tr>
                                     @endforeach
                                 @else
-                                    {{-- Fila por defecto si no hay items viejos --}}
+                                    {{-- Fila por defecto --}}
                                     <tr class="item-row">
                                         <td class="ps-2">
-                                            <input type="text" 
-                                                   name="items[0][description]" 
-                                                   class="form-control form-control-sm border-0 item-description" 
-                                                   placeholder="Descripción" 
-                                                   required 
+                                            <input type="text"
+                                                   name="items[0][description]"
+                                                   class="form-control form-control-sm border-0 item-description"
+                                                   placeholder="Descripción"
+                                                   required
                                                    maxlength="500">
                                         </td>
                                         <td>
-                                            <input type="number" 
-                                                   name="items[0][quantity]" 
-                                                   class="form-control form-control-sm border-0 item-quantity" 
-                                                   step="0.01" 
-                                                   min="0.01" 
-                                                   placeholder="0" 
-                                                   required>
+                                            <select name="items[0][expense_category_id]"
+                                                    class="form-select form-select-sm border-0 item-expense-category"
+                                                    required disabled>
+                                                <option value="">Seleccione CC primero...</option>
+                                            </select>
                                         </td>
                                         <td>
-                                            <input type="number" 
-                                                   name="items[0][unit_price]" 
-                                                   class="form-control form-control-sm border-0 item-unit-price" 
-                                                   step="0.01" 
-                                                   min="0.01" 
-                                                   placeholder="0.00" 
-                                                   required>
+                                            <input type="number"
+                                                   name="items[0][quantity]"
+                                                   class="form-control form-control-sm border-0 item-quantity"
+                                                   step="0.01" min="0.01" placeholder="0" required>
                                         </td>
                                         <td>
-                                            <select name="items[0][iva_rate]" 
-                                                    class="form-select form-select-sm border-0 item-iva-rate" 
+                                            <input type="number"
+                                                   name="items[0][unit_price]"
+                                                   class="form-control form-control-sm border-0 item-unit-price"
+                                                   step="0.01" min="0.01" placeholder="0.00" required>
+                                        </td>
+                                        <td>
+                                            <select name="items[0][iva_rate]"
+                                                    class="form-select form-select-sm border-0 item-iva-rate"
                                                     required>
                                                 <option value="16">16%</option>
                                                 <option value="8">8%</option>
@@ -288,30 +264,22 @@
                                             </select>
                                         </td>
                                         <td>
-                                            <input type="text" 
-                                                   class="form-control form-control-sm border-0 bg-transparent item-subtotal text-end" 
-                                                   value="$0.00" 
-                                                   readonly 
-                                                   tabindex="-1">
+                                            <input type="text"
+                                                   class="form-control form-control-sm border-0 bg-transparent item-subtotal text-end"
+                                                   value="$0.00" readonly tabindex="-1">
                                         </td>
                                         <td>
-                                            <input type="text" 
-                                                   class="form-control form-control-sm border-0 bg-transparent item-iva text-end" 
-                                                   value="$0.00" 
-                                                   readonly 
-                                                   tabindex="-1">
+                                            <input type="text"
+                                                   class="form-control form-control-sm border-0 bg-transparent item-iva text-end"
+                                                   value="$0.00" readonly tabindex="-1">
                                         </td>
                                         <td>
-                                            <input type="text" 
-                                                   class="form-control form-control-sm border-0 bg-transparent item-total text-end fw-bold" 
-                                                   value="$0.00" 
-                                                   readonly 
-                                                   tabindex="-1">
+                                            <input type="text"
+                                                   class="form-control form-control-sm border-0 bg-transparent item-total text-end fw-bold"
+                                                   value="$0.00" readonly tabindex="-1">
                                         </td>
                                         <td class="text-center">
-                                            <button type="button" 
-                                                    class="btn btn-link text-danger p-0 remove-item-btn" 
-                                                    title="Eliminar">
+                                            <button type="button" class="btn btn-link text-danger p-0 remove-item-btn" title="Eliminar">
                                                 <i class="ti ti-trash"></i>
                                             </button>
                                         </td>
@@ -389,8 +357,7 @@
     /* ==================================================
        SELECT2 CON INPUT-GROUP - CORRECCIÓN DE LAYOUT
        ================================================== */
-    
-    /* Contenedor del input-group con select2 */
+
     .input-group-select2 {
         position: relative;
         display: flex;
@@ -398,8 +365,7 @@
         align-items: stretch;
         width: 100%;
     }
-    
-    /* El span del icono mantiene su estilo */
+
     .input-group-select2 .input-group-text {
         display: flex;
         align-items: center;
@@ -414,19 +380,16 @@
         border: 1px solid #ced4da;
         border-radius: 0.2rem 0 0 0.2rem;
     }
-    
-    /* Ocultar el select original */
+
     .input-group-select2 .form-select {
         display: none;
     }
-    
-    /* El contenedor de Select2 ocupa el espacio restante */
+
     .input-group-select2 .select2-container {
         flex: 1 1 auto;
-        width: 1% !important; /* Truco para flex */
+        width: 1% !important;
     }
-    
-    /* Ajustar el wrapper de Select2 */
+
     .input-group-select2 .select2-container .select2-selection--single {
         height: calc(1.5em + 0.5rem + 2px) !important;
         border-radius: 0 0.2rem 0.2rem 0 !important;
@@ -434,66 +397,59 @@
         padding: 0.25rem 0.5rem;
         font-size: 0.875rem;
     }
-    
-    /* Alinear verticalmente el texto */
+
     .input-group-select2 .select2-container .select2-selection__rendered {
         line-height: calc(1.5em + 0.5rem) !important;
         padding-left: 0.5rem !important;
         padding-right: 1.5rem !important;
     }
-    
-    /* Posicionar la flecha */
+
     .input-group-select2 .select2-container .select2-selection__arrow {
         height: calc(1.5em + 0.5rem) !important;
         top: 1px !important;
         right: 1px !important;
     }
-    
-    /* Placeholder en Select2 */
+
     .input-group-select2 .select2-container .select2-selection__placeholder {
         color: #6c757d;
         font-size: 0.875rem;
     }
-    
-    /* Focus state */
+
     .input-group-select2 .select2-container--focus .select2-selection--single,
     .input-group-select2 .select2-container--open .select2-selection--single {
         border-color: #80bdff !important;
         outline: 0;
         box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
     }
-    
-    /* Validación - Error */
+
     .input-group-select2 .select2-container.is-invalid .select2-selection--single {
         border-color: #dc3545 !important;
     }
-    
-    /* Dropdown del Select2 */
+
     .select2-container--bootstrap-5 .select2-dropdown {
         border-color: #ced4da;
         font-size: 0.875rem;
     }
-    
-    /* Opciones del dropdown */
+
     .select2-container--bootstrap-5 .select2-results__option {
         padding: 0.375rem 0.75rem;
         font-size: 0.875rem;
     }
-    
-    /* Select2 dentro de tabla (IVA) */
+
+    /* Select2 dentro de tabla (IVA y Categoría) */
     .table .select2-container .select2-selection--single {
         border: 0 !important;
         background: transparent !important;
         height: auto !important;
         padding: 0.25rem 0.5rem;
     }
-    
+
     .table .select2-container .select2-selection__rendered {
         padding-left: 0.25rem !important;
         padding-right: 1.25rem !important;
         line-height: 1.5 !important;
     }
-    
+
     .table .select2-container .select2-selection__arrow {
         height: 100% !important;
         top: 0 !important;
@@ -504,28 +460,28 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
-    
+
+    // Opciones de categoría actuales (se reemplaza al cargar por CC)
+    let currentCategoryOptions = '<option value="">Seleccione CC primero...</option>';
+
+    // Valores de categoría a restaurar tras la carga AJAX (para old input)
+    let pendingCategoryRestore = null;
+
     // ============================================
     // INICIALIZACIÓN SELECT2
     // ============================================
-    
-    // Select2 para los selects principales (con búsqueda)
-    $('#supplier_id, #cost_center_id, #expense_category_id, #company_id').select2({
+
+    $('#supplier_id, #cost_center_id, #company_id').select2({
         theme: 'bootstrap-5',
         width: '100%',
         placeholder: 'Seleccione...',
         allowClear: true,
         language: {
-            noResults: function() {
-                return "No se encontraron resultados";
-            },
-            searching: function() {
-                return "Buscando...";
-            }
+            noResults: function() { return "No se encontraron resultados"; },
+            searching: function() { return "Buscando..."; }
         }
     });
-    
-    // Select2 para el select de condiciones de pago (sin búsqueda, pocas opciones)
+
     $('#payment_terms').select2({
         theme: 'bootstrap-5',
         width: '100%',
@@ -533,16 +489,13 @@ $(document).ready(function() {
         allowClear: true,
         minimumResultsForSearch: Infinity,
         language: {
-            noResults: function() {
-                return "No se encontraron resultados";
-            }
+            noResults: function() { return "No se encontraron resultados"; }
         }
     });
-    
-    // Select2 para los selects de IVA en la tabla (primera fila)
+
+    // Select2 solo para IVA en la primera fila (categorías inician deshabilitadas)
     initializeIvaSelect($('.item-iva-rate').first());
-    
-    // Función para inicializar Select2 en los selects de IVA
+
     function initializeIvaSelect(element) {
         element.select2({
             theme: 'bootstrap-5',
@@ -551,41 +504,118 @@ $(document).ready(function() {
             dropdownParent: element.closest('td')
         });
     }
-    
+
+    function initializeCategorySelect(element) {
+        element.select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: 'Categoría...',
+            minimumResultsForSearch: 5,
+            dropdownParent: element.closest('td'),
+            language: {
+                noResults: function() { return "Sin resultados"; },
+                searching: function() { return "Buscando..."; }
+            }
+        });
+    }
+
+    // ============================================
+    // CARGA DE CATEGORÍAS POR CENTRO DE COSTO
+    // ============================================
+
+    function loadCategoriesForCostCenter(costCenterId) {
+        if (!costCenterId) {
+            resetCategorySelects();
+            return;
+        }
+
+        // Estado de carga en todos los selects
+        $('.item-expense-category').each(function() {
+            if ($(this).hasClass('select2-hidden-accessible')) $(this).select2('destroy');
+            $(this).prop('disabled', true).html('<option value="">Cargando...</option>');
+        });
+
+        $.ajax({
+            url: "{{ route('direct-purchase-orders.categories') }}",
+            method: 'GET',
+            data: { cost_center_id: costCenterId },
+            success: function(response) {
+                if (response.success && response.categories.length > 0) {
+                    let options = '<option value="">Seleccione...</option>';
+                    response.categories.forEach(function(cat) {
+                        options += `<option value="${cat.id}">${cat.name}</option>`;
+                    });
+                    currentCategoryOptions = options;
+
+                    // Actualizar todos los selects existentes
+                    $('.item-expense-category').each(function(index) {
+                        $(this).html(options).prop('disabled', false);
+                        // Restaurar valor previo si aplica (tras fallo de validación)
+                        if (pendingCategoryRestore && pendingCategoryRestore[index]) {
+                            $(this).val(pendingCategoryRestore[index]);
+                        }
+                        initializeCategorySelect($(this));
+                    });
+                    pendingCategoryRestore = null;
+
+                } else {
+                    resetCategorySelects('Sin categorías disponibles');
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Sin categorías de gasto',
+                        text: response.message || 'El centro de costo seleccionado no tiene categorías de gasto configuradas para el año actual.',
+                        confirmButtonText: 'Entendido'
+                    });
+                }
+            },
+            error: function() {
+                resetCategorySelects('Error al cargar');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Ocurrió un error al consultar las categorías de gasto.',
+                    confirmButtonText: 'Cerrar'
+                });
+            }
+        });
+    }
+
+    function resetCategorySelects(message) {
+        message = message || 'Seleccione CC primero...';
+        currentCategoryOptions = `<option value="">${message}</option>`;
+        $('.item-expense-category').each(function() {
+            if ($(this).hasClass('select2-hidden-accessible')) $(this).select2('destroy');
+            $(this).html(`<option value="">${message}</option>`).prop('disabled', true);
+        });
+    }
+
     // ============================================
     // FILTRADO DE CENTROS DE COSTO POR EMPRESA
     // ============================================
-    
-    // Guardar todas las opciones de centros de costo
+
     const allCostCenterOptions = $('#cost_center_id option').clone();
-    
-    // Evento al cambiar la empresa
+
     $('#company_id').on('change', function() {
         const selectedCompanyId = $(this).val();
         const selectedCompanyName = $(this).find('option:selected').text();
         const $costCenterSelect = $('#cost_center_id');
-        
-        // Limpiar y deshabilitar mientras se actualiza
+
         $costCenterSelect.prop('disabled', true).html('<option value="">Cargando...</option>').trigger('change');
-        
+
         if (selectedCompanyId) {
-            // Filtrar centros de costo por empresa
             const filteredOptions = allCostCenterOptions.filter(function() {
                 const companyId = $(this).data('company-id');
                 return !companyId || companyId == selectedCompanyId || $(this).val() === '';
             });
-            
-            // Actualizar el select
+
             $costCenterSelect.html(filteredOptions.clone());
-            
-            // Verificar si hay centros de costo disponibles (más de la opción vacía)
+
             if (filteredOptions.length > 1) {
                 $costCenterSelect.prop('disabled', false);
                 $costCenterSelect.find('option:first').text('Seleccione...');
             } else {
-                // NO HAY CENTROS DE COSTO - MOSTRAR SWAL
                 $costCenterSelect.html('<option value="">Sin centros de costo asignados</option>');
-                
+
                 Swal.fire({
                     icon: 'warning',
                     title: 'Sin Centros de Costo Asignados',
@@ -607,105 +637,34 @@ $(document).ready(function() {
                     confirmButtonText: 'Entendido',
                     confirmButtonColor: '#3085d6',
                     width: '600px',
-                    customClass: {
-                        popup: 'text-start'
-                    }
+                    customClass: { popup: 'text-start' }
                 });
             }
         } else {
-            // Si no hay empresa seleccionada
             $costCenterSelect.html('<option value="">Seleccione empresa primero...</option>');
         }
-        
-        // Refrescar Select2
+
         $costCenterSelect.trigger('change');
     });
-    
-    // Si hay un valor previo (old input), disparar el filtrado
+
+    // Al cambiar el CC cargar sus categorías disponibles
+    $('#cost_center_id').on('change', function() {
+        loadCategoriesForCostCenter($(this).val());
+    });
+
+    // Restaurar valores previos (tras fallo de validación)
     @if(old('company_id'))
         $('#company_id').trigger('change');
         @if(old('cost_center_id'))
+            @if(old('items'))
+            pendingCategoryRestore = @json(array_column(old('items', []), 'expense_category_id'));
+            @endif
             setTimeout(function() {
                 $('#cost_center_id').val('{{ old('cost_center_id') }}').trigger('change');
             }, 100);
         @endif
     @endif
 
-    // ============================================
-    // FILTRADO DE CATEGORÍAS POR C.C. Y MES
-    // ============================================
-
-    // Función para cargar categorías dinámicamente
-    function loadAvailableCategories() {
-        const costCenterId = $('#cost_center_id').val();
-        const applicationMonth = $('#application_month').val();
-        const $categorySelect = $('#expense_category_id');
-
-        // Si falta alguno, deshabilitar y limpiar
-        if (!costCenterId || !applicationMonth) {
-            $categorySelect.prop('disabled', true).html('<option value="">Seleccione mes y CC primero...</option>').trigger('change');
-            return;
-        }
-
-        // Mostrar estado de carga
-        $categorySelect.prop('disabled', true).html('<option value="">Cargando categorías...</option>').trigger('change');
-
-        // Llamada AJAX
-        $.ajax({
-            url: "{{ route('direct-purchase-orders.categories') }}",
-            method: 'GET',
-            data: {
-                cost_center_id: costCenterId,
-                application_month: applicationMonth
-            },
-            success: function(response) {
-                if (response.success && response.categories.length > 0) {
-                    let options = '<option value="">Seleccione...</option>';
-                    response.categories.forEach(function(cat) {
-                        options += `<option value="${cat.id}">${cat.name}</option>`;
-                    });
-                    $categorySelect.html(options).prop('disabled', false);
-                } else {
-                    $categorySelect.html('<option value="">Sin categorías disponibles</option>');
-                    
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Presupuesto no disponible',
-                        text: response.message || 'No se encontraron categorías con presupuesto asignado para el centro de costo y mes seleccionados.',
-                        confirmButtonText: 'Entendido'
-                    });
-                }
-                $categorySelect.trigger('change');
-            },
-            error: function() {
-                $categorySelect.html('<option value="">Error al cargar categorías</option>').trigger('change');
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Ocurrió un error al intentar consultar las categorías de gasto.',
-                    confirmButtonText: 'Cerrar'
-                });
-            }
-        });
-    }
-
-    // Escuchar cambios en CC y Mes
-    $('#cost_center_id, #application_month').on('change', function() {
-        loadAvailableCategories();
-    });
-
-    // Si hay valores previos, cargar categorías al inicio
-    @if(old('cost_center_id') && old('application_month'))
-        setTimeout(function() {
-            loadAvailableCategories();
-            @if(old('expense_category_id'))
-                setTimeout(function() {
-                    $('#expense_category_id').val('{{ old('expense_category_id') }}').trigger('change');
-                }, 500);
-            @endif
-        }, 300);
-    @endif
-    
     // ============================================
     // CONTADOR DE CARACTERES
     // ============================================
@@ -721,7 +680,7 @@ $(document).ready(function() {
         const opt = $(this).find('option:selected');
         const paymentTerms = opt.data('payment-terms');
         const deliveryDays = opt.data('delivery-days');
-        
+
         if (!$('#payment_terms').val() && paymentTerms) {
             $('#payment_terms').val(paymentTerms).trigger('change');
         }
@@ -733,7 +692,7 @@ $(document).ready(function() {
     // ============================================
     // CÁLCULOS DE MONTOS
     // ============================================
-    
+
     $(document).on('input change', '.item-quantity, .item-unit-price, .item-iva-rate', function() {
         calculateItemRow($(this).closest('tr'));
         calculateTotals();
@@ -743,11 +702,11 @@ $(document).ready(function() {
         const qty = parseFloat(row.find('.item-quantity').val()) || 0;
         const price = parseFloat(row.find('.item-unit-price').val()) || 0;
         const ivaRate = parseFloat(row.find('.item-iva-rate').val()) || 0;
-        
+
         const subtotal = qty * price;
         const iva = subtotal * (ivaRate / 100);
         const total = subtotal + iva;
-        
+
         row.find('.item-subtotal').val('$' + subtotal.toFixed(2));
         row.find('.item-iva').val('$' + iva.toFixed(2));
         row.find('.item-total').val('$' + total.toFixed(2));
@@ -756,21 +715,21 @@ $(document).ready(function() {
     function calculateTotals() {
         let subtotal = 0;
         let ivaTotal = 0;
-        
+
         $('.item-row').each(function() {
             const qty = parseFloat($(this).find('.item-quantity').val()) || 0;
             const price = parseFloat($(this).find('.item-unit-price').val()) || 0;
             const ivaRate = parseFloat($(this).find('.item-iva-rate').val()) || 0;
-            
+
             const itemSubtotal = qty * price;
             const itemIva = itemSubtotal * (ivaRate / 100);
-            
+
             subtotal += itemSubtotal;
             ivaTotal += itemIva;
         });
-        
+
         const total = subtotal + ivaTotal;
-        
+
         $('#summary-subtotal').text('$' + subtotal.toFixed(2));
         $('#summary-iva').text('$' + ivaTotal.toFixed(2));
         $('#summary-total').text('$' + total.toFixed(2)).toggleClass('text-danger', total > 250000).toggleClass('text-primary', total <= 250000);
@@ -779,13 +738,19 @@ $(document).ready(function() {
     // ============================================
     // AGREGAR/ELIMINAR PARTIDAS
     // ============================================
-    
+
     let itemIndex = {{ old('items') ? count(old('items')) : 1 }};
 
     $('#add-item-btn').on('click', function() {
+        const ccSelected = !!$('#cost_center_id').val();
         const newRow = `
             <tr class="item-row">
-                <td class="ps-2"><input type="text" name="items[${itemIndex}][description]" class="form-control form-control-sm border-0 item-description" required maxlength="500"></td>
+                <td class="ps-2"><input type="text" name="items[${itemIndex}][description]" class="form-control form-control-sm border-0 item-description" placeholder="Descripción" required maxlength="500"></td>
+                <td>
+                    <select name="items[${itemIndex}][expense_category_id]" class="form-select form-select-sm border-0 item-expense-category" required ${ccSelected ? '' : 'disabled'}>
+                        ${currentCategoryOptions}
+                    </select>
+                </td>
                 <td><input type="number" name="items[${itemIndex}][quantity]" class="form-control form-control-sm border-0 item-quantity" step="0.01" min="0.01" required></td>
                 <td><input type="number" name="items[${itemIndex}][unit_price]" class="form-control form-control-sm border-0 item-unit-price" step="0.01" min="0.01" required></td>
                 <td>
@@ -802,23 +767,24 @@ $(document).ready(function() {
             </tr>
         `;
         $('#items-tbody').append(newRow);
-        
-        const newIvaSelect = $('#items-tbody tr:last-child .item-iva-rate');
-        initializeIvaSelect(newIvaSelect);
-        
+
+        const lastRow = $('#items-tbody tr:last-child');
+        initializeIvaSelect(lastRow.find('.item-iva-rate'));
+        if (ccSelected) {
+            initializeCategorySelect(lastRow.find('.item-expense-category'));
+        }
+
         itemIndex++;
     });
 
-    // También necesitas recalcular los totales después de cargar los old values
     @if(old('items'))
         setTimeout(function() {
-            // Inicializar Select2 en todos los selects de IVA existentes
+            // Inicializar IVA selects; los de categoría los inicializa el callback AJAX
             $('.item-iva-rate').each(function() {
                 if (!$(this).hasClass('select2-hidden-accessible')) {
                     initializeIvaSelect($(this));
                 }
             });
-            // Recalcular todos los totales
             $('.item-row').each(function() {
                 calculateItemRow($(this));
             });
@@ -830,6 +796,9 @@ $(document).ready(function() {
         if ($('#items-tbody tr').length > 1) {
             const row = $(this).closest('tr');
             row.find('.item-iva-rate').select2('destroy');
+            if (row.find('.item-expense-category').hasClass('select2-hidden-accessible')) {
+                row.find('.item-expense-category').select2('destroy');
+            }
             row.remove();
             calculateTotals();
         } else {
@@ -847,7 +816,7 @@ $(document).ready(function() {
     // ============================================
     $('#ocd-form').on('submit', function(e) {
         const total = parseFloat($('#summary-total').text().replace(/[$,]/g, ''));
-        
+
         if (total > 250000) {
             e.preventDefault();
             Swal.fire({
@@ -858,7 +827,7 @@ $(document).ready(function() {
             });
             return false;
         }
-        
+
         if ($('#justification').val().length < 100) {
             e.preventDefault();
             Swal.fire({

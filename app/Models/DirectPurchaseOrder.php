@@ -19,7 +19,6 @@ class DirectPurchaseOrder extends Model
         'folio',
         'supplier_id',
         'cost_center_id',
-        'expense_category_id',
         'application_month',
         'justification',
         'subtotal',
@@ -72,11 +71,6 @@ class DirectPurchaseOrder extends Model
     public function costCenter(): BelongsTo
     {
         return $this->belongsTo(CostCenter::class);
-    }
-
-    public function expenseCategory(): BelongsTo
-    {
-        return $this->belongsTo(ExpenseCategory::class);
     }
 
     public function creator(): BelongsTo
@@ -230,61 +224,40 @@ class DirectPurchaseOrder extends Model
 
     /**
      * =========================================
-     * MÉTODOS DE NEGOCIO
+     * VALIDACIONES DE PERMISOS Y ACCIONES
      * =========================================
      */
 
-    /**
-     * Verifica si el usuario es el creador de esta OCD
-     */
     public function isCreatedBy(User $user): bool
     {
         return $this->created_by === $user->id;
     }
 
-    /**
-     * Verifica si el usuario es el aprobador asignado
-     */
     public function isApproverFor(User $user): bool
     {
         return $this->assigned_approver_id === $user->id;
     }
 
-    /**
-     * Verifica si la OCD puede ser editada
-     */
     public function canBeEdited(): bool
     {
         return in_array($this->status, ['DRAFT', 'RETURNED']);
     }
 
-    /**
-     * Verifica si la OCD puede ser enviada a aprobación
-     */
     public function canBeSubmitted(): bool
     {
         return $this->status === 'DRAFT' && $this->items()->count() > 0;
     }
 
-    /**
-     * Verifica si la OCD puede ser aprobada
-     */
     public function canBeApproved(): bool
     {
         return $this->status === 'PENDING_APPROVAL';
     }
 
-    /**
-     * Verifica si la OCD puede recibir bienes/servicios
-     */
     public function canBeReceived(): bool
     {
         return $this->status === 'ISSUED';
     }
 
-    /**
-     * Obtiene el badge de color según el estatus
-     */
     public function getStatusBadgeClass(): string
     {
         return match ($this->status) {
@@ -300,9 +273,6 @@ class DirectPurchaseOrder extends Model
         };
     }
 
-    /**
-     * Obtiene el texto legible del estatus
-     */
     public function getStatusLabel(): string
     {
         return match ($this->status) {
@@ -319,13 +289,14 @@ class DirectPurchaseOrder extends Model
     }
 
     /**
-     * Calcula el total de la OCD sumando sus items
+     * Calcula el total de la OCD sumando de forma segura sus items
      */
     public function calculateTotals(): array
     {
-        $subtotal = $this->items->sum('subtotal');
-        $iva = $subtotal * 0.16;
-        $total = $subtotal + $iva;
+        // Usamos items() como query builder para asegurar que tomamos los datos frescos de la BD
+        $subtotal = (float) $this->items()->sum('subtotal');
+        $iva = (float) $this->items()->sum('iva_amount');
+        $total = (float) $this->items()->sum('total');
 
         return [
             'subtotal' => round($subtotal, 2),
@@ -354,50 +325,32 @@ class DirectPurchaseOrder extends Model
      * =========================================
      */
 
-    /**
-     * Scope para filtrar por estatus
-     */
     public function scopeWithStatus($query, string $status)
     {
         return $query->where('status', $status);
     }
 
-    /**
-     * Scope para OCD pendientes de aprobación
-     */
     public function scopePendingApproval($query)
     {
         return $query->where('status', 'PENDING_APPROVAL');
     }
 
-    /**
-     * Scope para OCD creadas por un usuario
-     */
     public function scopeCreatedBy($query, $userId)
     {
         return $query->where('created_by', $userId);
     }
 
-    /**
-     * Scope para OCD asignadas a un aprobador
-     */
     public function scopeAssignedToApprover($query, $userId)
     {
         return $query->where('assigned_approver_id', $userId)
             ->where('status', 'PENDING_APPROVAL');
     }
 
-    /**
-     * Scope para OCD de un centro de costo
-     */
     public function scopeByCostCenter($query, $costCenterId)
     {
         return $query->where('cost_center_id', $costCenterId);
     }
 
-    /**
-     * Scope para OCD de un mes específico
-     */
     public function scopeByMonth($query, string $month)
     {
         return $query->where('application_month', $month);

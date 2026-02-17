@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -30,21 +29,11 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
         $isUpdate = $this->route('directPurchaseOrder') !== null;
 
         return [
+            // ✅ AGREGADOS: Proveedor y Mes de aplicación
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+
             // Datos Presupuestales
             'cost_center_id' => ['required', 'integer', 'exists:cost_centers,id'],
-            'expense_category_id' => ['required', 'integer', 'exists:expense_categories,id'],
-            'application_month' => [
-                'required',
-                'date_format:Y-m',
-                function ($attribute, $value, $fail) {
-                    $selectedMonth = Carbon::createFromFormat('Y-m', $value)->startOfMonth();
-                    $currentMonth = Carbon::now()->startOfMonth();
-
-                    if ($selectedMonth->lt($currentMonth)) {
-                        $fail('No se pueden crear OCD para meses pasados.');
-                    }
-                },
-            ],
 
             // Justificación
             'justification' => ['required', 'string', 'min:100', 'max:2000'],
@@ -58,11 +47,13 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
             'items.*.description' => ['required', 'string', 'max:500'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
-            'items.*.iva_rate' => [
-                'required',
-                'numeric',
-                'in:0,8,16',
-            ],
+            'items.*.expense_category_id' => ['required', 'integer', 'exists:expense_categories,id'],
+            'items.*.iva_rate' => ['required', 'numeric', 'in:0,8,16'],
+
+            // ✅ AGREGADOS: Campos adicionales de la partida
+            'items.*.unit_of_measure' => ['nullable', 'string', 'max:50'],
+            'items.*.sku' => ['nullable', 'string', 'max:100'],
+            'items.*.notes' => ['nullable', 'string'],
 
             // Documentos: required en store, nullable en update
             'quotation_file' => [$isUpdate ? 'nullable' : 'required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
@@ -81,10 +72,6 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
             // Datos Presupuestales
             'cost_center_id.required' => 'Debe seleccionar un centro de costo.',
             'cost_center_id.exists' => 'El centro de costo seleccionado no existe.',
-            'expense_category_id.required' => 'Debe seleccionar una categoría de gasto.',
-            'expense_category_id.exists' => 'La categoría de gasto seleccionada no existe.',
-            'application_month.required' => 'Debe seleccionar el mes de aplicación.',
-            'application_month.date_format' => 'El formato del mes debe ser YYYY-MM.',
 
             // Justificación
             'justification.required' => 'La justificación es obligatoria.',
@@ -100,6 +87,10 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
             'items.*.quantity.min' => 'La cantidad debe ser mayor a 0.',
             'items.*.unit_price.required' => 'El precio unitario es obligatorio.',
             'items.*.unit_price.min' => 'El precio unitario debe ser mayor a 0.',
+
+            // Categoría de Gasto por partida
+            'items.*.expense_category_id.required' => 'Debe seleccionar una categoría de gasto para cada partida.',
+            'items.*.expense_category_id.exists' => 'La categoría de gasto seleccionada no existe.',
 
             // Tasa de IVA
             'items.*.iva_rate.required' => 'Debe seleccionar una tasa de IVA.',
@@ -120,15 +111,17 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
         return [
             'supplier_id' => 'proveedor',
             'cost_center_id' => 'centro de costo',
-            'expense_category_id' => 'categoría de gasto',
-            'application_month' => 'mes de aplicación',
             'justification' => 'justificación',
             'quotation_file' => 'cotización',
             'support_documents' => 'documentos de soporte',
             'items.*.description' => 'descripción',
             'items.*.quantity' => 'cantidad',
             'items.*.unit_price' => 'precio unitario',
+            'items.*.expense_category_id' => 'categoría de gasto',
             'items.*.iva_rate' => 'tasa de IVA',
+            'items.*.unit_of_measure' => 'unidad de medida',
+            'items.*.sku' => 'SKU/Código',
+            'items.*.notes' => 'notas del artículo',
         ];
     }
 

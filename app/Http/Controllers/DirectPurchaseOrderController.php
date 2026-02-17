@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 
+
 class DirectPurchaseOrderController extends Controller
 {
     /**
@@ -48,15 +49,11 @@ class DirectPurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Mes actual en formato YYYY-MM
-        $currentMonth = now()->format('Y-m');
-
         return view('direct-purchase-orders.create', compact(
             'companies',
             'costCenters',
             'suppliers',
-            'expenseCategories',
-            'currentMonth'
+            'expenseCategories'
         ));
     }
 
@@ -67,57 +64,52 @@ class DirectPurchaseOrderController extends Controller
     {
         try {
             DB::beginTransaction();
-            
-            // 1. Calcular totales
-            $totals = $this->calculateTotals($request->items);
-            
-            // 2. Validar presupuesto disponible
-            $budgetValidation = $this->validateBudgetAvailability(
-                $request->cost_center_id,
-                $request->application_month,
-                $request->expense_category_id,
-                $totals['total']
-            );
-            
-            if (!$budgetValidation['available']) {
-                return back()
-                ->withInput()
-                ->withErrors(['budget' => $budgetValidation['message']]);
-            }
 
-            // 3. Obtener datos del proveedor para heredar condiciones
+            // 1. Calcular totales iniciales
+            $totals = $this->calculateTotals($request->items);
+
+            // 2. Obtener datos del proveedor para heredar condiciones
             $supplier = Supplier::active()->find($request->supplier_id);
 
-            // 4. Crear la OCD
+            // ✅ NUEVO: Calcular días de entrega y el mes de aplicación dinámico
+            $estimatedDays = (int) ($request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30);
+            $applicationMonth = now()->addDays($estimatedDays)->format('Y-m');
+
+            // 3. Crear la OCD
             $ocd = DirectPurchaseOrder::create([
                 'folio' => null, // Se genera al enviar a aprobación
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
-                'expense_category_id' => $request->expense_category_id,
-                'application_month' => $request->application_month,
+                'application_month' => $applicationMonth, // ✅ CORREGIDO: Usamos la variable calculada
                 'justification' => $request->justification,
                 'subtotal' => $totals['subtotal'],
                 'iva_amount' => $totals['iva'],
                 'total' => $totals['total'],
                 'currency' => 'MXN',
                 'payment_terms' => $request->payment_terms ?? $supplier->default_payment_terms ?? 'Contado',
-                'estimated_delivery_days' => $request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30,
+                'estimated_delivery_days' => $estimatedDays, // ✅ CORREGIDO: Usamos la variable para mantener coherencia
                 'status' => 'DRAFT',
                 'created_by' => Auth::id(),
             ]);
 
-            // 5. Crear los items
+            // 4. Crear los items (Camino B: la categoría va por partida)
             foreach ($request->items as $itemData) {
                 DirectPurchaseOrderItem::create([
                     'direct_purchase_order_id' => $ocd->id,
+                    'expense_category_id' => $itemData['expense_category_id'],
                     'description' => $itemData['description'],
                     'quantity' => $itemData['quantity'],
                     'unit_price' => $itemData['unit_price'],
-                    // Los montos se calculan automáticamente en el modelo
+                    'iva_rate' => $itemData['iva_rate'],
+                    // ✅ NUEVOS: Campos opcionales de la partida
+                    'unit_of_measure' => $itemData['unit_of_measure'] ?? null,
+                    'sku' => $itemData['sku'] ?? null,
+                    'notes' => $itemData['notes'] ?? null,
+                    // Los montos (subtotal, iva_amount, total) se calculan automáticamente en el boot del modelo
                 ]);
             }
 
-            // 6. Guardar documentos
+            // 5. Guardar documentos
             // Cotización (obligatoria)
             if ($request->hasFile('quotation_file')) {
                 $this->uploadDocument($ocd, $request->file('quotation_file'), 'quotation');
@@ -136,9 +128,13 @@ class DirectPurchaseOrderController extends Controller
                 ->route('purchase-orders.index')
                 ->with('success', 'Orden de Compra Directa creada exitosamente. Ahora puede enviarla a aprobación.');
         } catch (\Exception $e) {
-            dd("Entré 3");
-            die();  
             DB::rollBack();
+
+            // ✅ NUEVO: Guardar el error en los logs de Laravel para diagnóstico rápido
+            \Illuminate\Support\Facades\Log::error('Error al crear OCD: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'request_data' => $request->except(['quotation_file', 'support_documents'])
+            ]);
 
             return back()
                 ->withInput()
@@ -180,7 +176,7 @@ class DirectPurchaseOrderController extends Controller
 
             // En este sistema simplificado para OCD, el primer aprobador es el final
             // TODO: Si se requieren múltiples niveles, implementar lógica de tránsito aquí
-            
+
             $directPurchaseOrder->update([
                 'status' => 'APPROVED',
                 'approved_by' => Auth::id(),
@@ -327,46 +323,41 @@ class DirectPurchaseOrderController extends Controller
             // 1. Calcular nuevos totales
             $totals = $this->calculateTotals($request->items);
 
-            // 2. Validar presupuesto disponible
-            $budgetValidation = $this->validateBudgetAvailability(
-                $request->cost_center_id,
-                $request->application_month,
-                $request->expense_category_id,
-                $totals['total']
-            );
+            // 2. Obtener datos del proveedor para heredar condiciones
+            $supplier = Supplier::active()->find($request->supplier_id);
 
-            if (!$budgetValidation['available']) {
-                return back()
-                    ->withInput()
-                    ->withErrors(['budget' => $budgetValidation['message']]);
-            }
+            // Calcular días de entrega y el mes de aplicación dinámico
+            $estimatedDays = $request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30;
+            $applicationMonth = now()->addDays($estimatedDays)->format('Y-m');
 
-            // 3. Obtener datos del proveedor
-            $supplier = Supplier::find($request->supplier_id);
-
-            // 4. Actualizar la OCD
+            // 3. Actualizar la OCD
             $directPurchaseOrder->update([
+                'folio' => null,
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
-                'expense_category_id' => $request->expense_category_id,
-                'application_month' => $request->application_month,
+                'application_month' => $applicationMonth,
                 'justification' => $request->justification,
                 'subtotal' => $totals['subtotal'],
                 'iva_amount' => $totals['iva'],
                 'total' => $totals['total'],
+                'currency' => 'MXN',
                 'payment_terms' => $request->payment_terms ?? $supplier->default_payment_terms ?? 'Contado',
-                'estimated_delivery_days' => $request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30,
+                'estimated_delivery_days' => $estimatedDays,
+                'status' => 'DRAFT',
+                'created_by' => Auth::id(),
             ]);
 
-            // 5. Eliminar items anteriores y crear nuevos
+            // 4. Eliminar items anteriores y crear nuevos
             $directPurchaseOrder->items()->delete();
 
             foreach ($request->items as $itemData) {
                 DirectPurchaseOrderItem::create([
                     'direct_purchase_order_id' => $directPurchaseOrder->id,
+                    'expense_category_id' => $itemData['expense_category_id'],
                     'description' => $itemData['description'],
                     'quantity' => $itemData['quantity'],
                     'unit_price' => $itemData['unit_price'],
+                    'iva_rate' => $itemData['iva_rate'],
                 ]);
             }
 
@@ -479,50 +470,49 @@ class DirectPurchaseOrderController extends Controller
     }
 
     /**
-     * Obtener categorías de gasto disponibles para un Centro de Costo y Mes
+     * Obtener categorías de gasto disponibles para un Centro de Costo.
+     *
+     * - CC con presupuesto anual aprobado → solo categorías presentes en la
+     *   distribución mensual del año en curso (independientemente del saldo).
+     * - CC de consumo libre (sin presupuesto anual) → todas las categorías activas.
      */
     public function getAvailableCategories(Request $request)
     {
         $request->validate([
             'cost_center_id' => 'required|exists:cost_centers,id',
-            'application_month' => 'required|date_format:Y-m',
         ]);
 
         try {
-            $date = \Carbon\Carbon::parse($request->application_month . '-01');
-            $year = $date->year;
-            $month = $date->month;
+            $year = now()->year;
 
-            // 1. Buscar presupuesto anual aprobado
+            // Buscar presupuesto anual aprobado para el CC y año actual
             $budget = \App\Models\AnnualBudget::where('cost_center_id', $request->cost_center_id)
                 ->where('fiscal_year', $year)
                 ->where('status', 'APROBADO')
                 ->first();
 
-            if (!$budget) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No hay presupuesto aprobado para este centro de costo y año.',
-                    'categories' => []
-                ]);
+            if ($budget) {
+                // CC con presupuesto: solo categorías configuradas en la distribución mensual
+                $categoryIds = \App\Models\BudgetMonthlyDistribution::where('annual_budget_id', $budget->id)
+                    ->distinct()
+                    ->pluck('expense_category_id');
+
+                $categories = ExpenseCategory::whereIn('id', $categoryIds)
+                    ->active()
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+            } else {
+                // CC de consumo libre: todas las categorías activas
+                $categories = ExpenseCategory::active()
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
             }
-
-            // 2. Obtener categorías con distribución en ese mes
-            $categoryIds = \App\Models\BudgetMonthlyDistribution::where('annual_budget_id', $budget->id)
-                ->where('month', $month)
-                ->whereRaw('assigned_amount - consumed_amount - committed_amount > 0')
-                ->pluck('expense_category_id');
-
-            $categories = ExpenseCategory::whereIn('id', $categoryIds)
-                ->active()
-                ->orderBy('name')
-                ->get(['id', 'name']);
 
             return response()->json([
                 'success' => true,
-                'categories' => $categories
+                'is_free_consumption' => !$budget,
+                'categories' => $categories,
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

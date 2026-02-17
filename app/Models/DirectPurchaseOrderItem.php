@@ -11,19 +11,23 @@ class DirectPurchaseOrderItem extends Model
 
     protected $fillable = [
         'direct_purchase_order_id',
+        'expense_category_id',
         'description',
         'quantity',
         'unit_price',
-        'iva_rate',        // ← NUEVO CAMPO
+        'iva_rate',
         'subtotal',
         'iva_amount',
         'total',
+        'unit_of_measure',
+        'sku',
+        'notes',
     ];
 
     protected $casts = [
         'quantity' => 'decimal:2',
         'unit_price' => 'decimal:2',
-        'iva_rate' => 'decimal:2',    // ← NUEVO CAST
+        'iva_rate' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'iva_amount' => 'decimal:2',
         'total' => 'decimal:2',
@@ -76,12 +80,29 @@ class DirectPurchaseOrderItem extends Model
     }
 
     /**
-     * Relación con DirectPurchaseOrder
+     * =========================================
+     * RELACIONES
+     * =========================================
      */
+
     public function directPurchaseOrder(): BelongsTo
     {
         return $this->belongsTo(DirectPurchaseOrder::class, 'direct_purchase_order_id');
     }
+
+    /**
+     * ✅ NUEVA RELACIÓN: Categoría de gasto de esta partida específica
+     */
+    public function expenseCategory(): BelongsTo
+    {
+        return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');
+    }
+
+    /**
+     * =========================================
+     * MÉTODOS Y SCOPES
+     * =========================================
+     */
 
     /**
      * Obtener etiqueta de la tasa de IVA
@@ -98,25 +119,16 @@ class DirectPurchaseOrderItem extends Model
         };
     }
 
-    /**
-     * Scope para items con IVA general
-     */
     public function scopeWithGeneralIva($query)
     {
         return $query->where('iva_rate', 16.00);
     }
 
-    /**
-     * Scope para items con IVA fronterizo
-     */
     public function scopeWithBorderIva($query)
     {
         return $query->where('iva_rate', 8.00);
     }
 
-    /**
-     * Scope para items exentos
-     */
     public function scopeExempt($query)
     {
         return $query->where('iva_rate', 0.00);

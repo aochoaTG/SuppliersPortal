@@ -6,6 +6,7 @@ use App\Models\PurchaseOrder;
 use App\Models\DirectPurchaseOrder;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Facades\Auth;
 
 class PurchaseOrderController extends Controller
 {

@@ -20,7 +20,7 @@ return new class extends Migration
             // Relaciones principales
             $table->foreignId('supplier_id')->constrained()->noActionOnDelete();
             $table->foreignId('cost_center_id')->constrained()->noActionOnDelete();
-            $table->foreignId('expense_category_id')->constrained()->noActionOnDelete();
+            // ❌ ELIMINADO: expense_category_id
 
             // Datos de la solicitud
             $table->string('application_month', 7); // YYYY-MM (ej: 2026-03)
@@ -41,8 +41,6 @@ return new class extends Migration
             $table->foreignId('assigned_approver_id')->nullable()->constrained('users')->noActionOnDelete();
 
             // Estados del ciclo de vida
-            // DRAFT -> PENDING_APPROVAL -> APPROVED -> ISSUED -> RECEIVED
-            // También puede ser: REJECTED, RETURNED, CANCELLED
             $table->enum('status', [
                 'DRAFT',              // Borrador (aún editando)
                 'PENDING_APPROVAL',   // Enviada a aprobación
@@ -68,12 +66,12 @@ return new class extends Migration
             $table->foreignId('received_by')->nullable()->constrained('users')->noActionOnDelete();
 
             // Timestamps de eventos importantes
-            $table->timestamp('submitted_at')->nullable();  // Cuándo se envió a aprobación
-            $table->timestamp('approved_at')->nullable();   // Cuándo se aprobó
-            $table->timestamp('rejected_at')->nullable();   // Cuándo se rechazó
-            $table->timestamp('returned_at')->nullable();   // Cuándo se devolvió
-            $table->timestamp('issued_at')->nullable();     // Cuándo se emitió (PDF)
-            $table->timestamp('received_at')->nullable();   // Cuándo se recibió
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->timestamp('returned_at')->nullable();
+            $table->timestamp('issued_at')->nullable();
+            $table->timestamp('received_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
