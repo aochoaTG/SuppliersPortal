@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\ApprovalLevel;
 use Illuminate\Http\Request;
 use App\Services\ApprovalService;
-use Illuminate\Support\Facades\Auth;
 
 class ApprovalLevelController extends Controller
 {
