@@ -34,16 +34,12 @@
 <div class="sidenav-menu">
     <a href="{{ route('dashboard') }}" class="logo">
         <span class="logo-light">
-            <span class="logo-lg"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}" alt="TotalGas"
-                    width="190" style="min-height:55px!important;"></span>
-            <span class="logo-sm"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}"
-                    alt="small logo"></span>
+            <span class="logo-lg"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}" alt="TotalGas" class="sidenav-logo-img"></span>
+            <span class="logo-sm"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}" alt="TotalGas" class="sidenav-logo-img"></span>
         </span>
         <span class="logo-dark">
-            <span class="logo-lg"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}" alt="TotalGas"
-                    width="190" style="min-height:55px!important;"></span>
-            <span class="logo-sm"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}"
-                    alt="small logo"></span>
+            <span class="logo-lg"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}" alt="TotalGas" class="sidenav-logo-img"></span>
+            <span class="logo-sm"><img src="{{ asset('images/logos/logo_TotalGas_hor_azul.png') }}" alt="TotalGas" class="sidenav-logo-img"></span>
         </span>
     </a>
 

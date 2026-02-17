@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-sidenav-size="compact">
 
     <head>
         <meta charset="utf-8" />
@@ -15,6 +15,9 @@
 
         <!-- Theme Config Js -->
         <script src="{{ asset('assets/js/config.js') }}"></script>
+
+        <!-- Preferencias del tema (sidebar size, modo claro/oscuro) -->
+        <script src="{{ asset('js/sidebar-settings.js') }}"></script>
 
         <!-- Vendor css -->
         <link href="{{ asset('assets/css/vendor.min.css') }}" rel="stylesheet" type="text/css" />
@@ -38,6 +41,42 @@
             rel="stylesheet" type="text/css" />
         <link href="{{ asset('assets/vendor/datatables.net-select-bs5/css/select.bootstrap5.min.css') }}"
             rel="stylesheet" type="text/css" />
+
+        {{-- Logo del sidebar ─────────────────────────────────────────────── --}}
+        <style>
+            /*
+             * Anula la restricción del template (--ct-logo-lg-height: 24px) y
+             * hace que el logo se ajuste automáticamente al ancho del sidebar,
+             * tanto en modo Normal (235px) como en Compacto (160px).
+             */
+            .sidenav-logo-img {
+                display: block;
+                width: 100%;
+                height: auto !important;        /* anula height: var(--ct-logo-lg-height) */
+                max-width: 100%;
+                padding: 10px 16px;
+                box-sizing: border-box;
+                object-fit: contain;
+            }
+
+            /* En modo compacto el padding lateral es menor */
+            html[data-sidenav-size=compact] .sidenav-menu .logo {
+                padding: 0 4px;
+            }
+            html[data-sidenav-size=compact] .sidenav-logo-img {
+                padding: 8px 10px;
+            }
+
+            /*
+             * Opciones de color: solo aplican en modo claro.
+             * En modo oscuro se deshabilitan visualmente.
+             */
+            html[data-bs-theme=dark] .light-only-section {
+                opacity: 0.38;
+                pointer-events: none;
+                user-select: none;
+            }
+        </style>
 
         {{-- CSS Personalizado --}}
         <style>

@@ -99,7 +99,7 @@ class UserController extends Controller
             // === BADGES DE ROLES ===
             $rolesHtml = $user->roles->pluck('name')->map(function ($name) use ($roleColors) {
                 $color = $roleColors[$name] ?? 'secondary';
-                return '<span class="badge bg-' . $color . ' me-1">' . e(Str::headline($name)) . '</span>';
+                return '<span class="badge bg-' . $color . ' me-1">' . e(trans("roles.{$name}")) . '</span>';
             })->implode('');
 
             // === BADGES DE EMPRESAS ===
@@ -222,17 +222,21 @@ class UserController extends Controller
 
     public function create()
     {
-        $user = new User();
+        $user  = new User();
+        $roles = Role::orderBy('name')->get(['id', 'name']);
+
         if (request()->ajax()) {
             return view('users.staff.partials.form', [
-                'user' => $user,
-                'mode' => 'create',
-                'action' => route('users.store'),
-                'method' => 'POST',
-                'title' => 'Crear usuario',
+                'user'      => $user,
+                'roles'     => $roles,
+                'userRoles' => collect(),
+                'mode'      => 'create',
+                'action'    => route('users.store'),
+                'method'    => 'POST',
+                'title'     => 'Crear usuario',
             ]);
         }
-        return view('users.staff.partials.form', compact('user')); // opcional si también quieres página completa
+        return view('users.staff.partials.form', compact('user', 'roles') + ['userRoles' => collect()]);
     }
 
     public function store(Request $request)
@@ -242,22 +246,32 @@ class UserController extends Controller
             'last_name'  => ['nullable', 'string', 'max:120'],
             'name'       => ['required', 'string', 'max:180'],
             'email'      => ['required', 'email', 'max:180', 'unique:users,email'],
-            'password'   => ['required', 'string', 'min:8'], // se hashea por cast
+            'password'   => ['required', 'string', 'min:8'],
             'phone'      => ['nullable', 'string', 'max:30'],
             'job_title'  => ['nullable', 'string', 'max:120'],
             'is_active'  => ['nullable', 'boolean'],
+            'avatar'     => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+            'roles'      => ['nullable', 'array'],
+            'roles.*'    => ['string', 'exists:roles,name'],
         ]);
 
-        // Composería “name” si viene vacío desde first/last
         if (blank($validated['name'])) {
             $validated['name'] = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
         }
 
-        // asegura boolean
-        $validated['is_active'] = (bool)($validated['is_active'] ?? true);
+        $validated['is_active'] = (bool) ($validated['is_active'] ?? true);
 
-        DB::transaction(function () use ($validated) {
-            User::create($validated);
+        DB::transaction(function () use ($request, $validated) {
+            $user = User::create(Arr::except($validated, ['avatar', 'roles']));
+
+            if ($request->hasFile('avatar')) {
+                $path = $request->file('avatar')->store("users/{$user->id}/avatar", 'public');
+                $user->update(['avatar' => $path]);
+            }
+
+            if (!empty($validated['roles'])) {
+                $user->syncRoles($validated['roles']);
+            }
         });
 
         return redirect()->route('users.staff.index')->with('success', 'Usuario creado correctamente.');
@@ -270,126 +284,87 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
+        $roles     = Role::orderBy('name')->get(['id', 'name']);
+        $userRoles = $user->roles->pluck('name');
+
         return view('users.staff.partials.form', [
-            'user'   => $user,
-            'mode'   => 'edit',
-            'action' => route('users.update', $user), // <= IMPORTANTE: /users/{id}
-            'method' => 'PUT',
-            'title'  => 'Editar usuario',
+            'user'      => $user,
+            'roles'     => $roles,
+            'userRoles' => $userRoles,
+            'mode'      => 'edit',
+            'action'    => route('users.update', $user),
+            'method'    => 'PUT',
+            'title'     => 'Editar usuario',
         ]);
     }
 
     public function update(Request $request, User $user)
     {
-        // Validación
         $validated = $request->validate([
-            // ---- USER ----
-            'user.name'       => ['required', 'string', 'max:150'],
-            'user.email'      => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
-            'user.job_title'  => ['nullable', 'string', 'max:100'],
-            'user.is_active'  => ['nullable', 'in:1'],
-            'user.avatar'     => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
-            'user.remove_avatar' => ['nullable', 'in:0,1'],
-
-            // ---- SUPPLIER (si el usuario tiene supplier relacionado) ----
-            'supplier.company_name'   => ['nullable', 'string', 'max:255'],
-            'supplier.rfc'            => ['nullable', 'string', 'max:13'],
-            'supplier.contact_person' => ['nullable', 'string', 'max:150'],
-            'supplier.contact_phone'  => ['nullable', 'string', 'max:50'],
-            'supplier.email'          => ['nullable', 'email', 'max:150'],
-            'supplier.supplier_type'  => ['nullable', Rule::in(['product', 'service', 'product_service'])],
-            'supplier.currency'       => ['nullable', 'string', 'max:10'],
-            'supplier.tax_regime'     => ['nullable', Rule::in(['individual', 'corporation', 'resico'])],
-            'supplier.address'        => ['nullable', 'string', 'max:500'],
-            'supplier.status'         => ['nullable', 'string', 'max:50'],
+            'first_name'    => ['nullable', 'string', 'max:120'],
+            'last_name'     => ['nullable', 'string', 'max:120'],
+            'name'          => ['required', 'string', 'max:150'],
+            'email'         => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone'         => ['nullable', 'string', 'max:30'],
+            'job_title'     => ['nullable', 'string', 'max:100'],
+            'is_active'     => ['nullable', 'boolean'],
+            'avatar'        => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+            'remove_avatar' => ['nullable', 'boolean'],
+            'roles'         => ['nullable', 'array'],
+            'roles.*'       => ['string', 'exists:roles,name'],
         ], [], [
-            'user.name'  => 'nombre',
-            'user.email' => 'correo',
-            'user.avatar' => 'avatar',
+            'name'  => 'nombre',
+            'email' => 'correo',
         ]);
 
-        // Flags / archivos
-        $removeAvatar = (int) data_get($validated, 'user.remove_avatar', 0) === 1;
-        $newAvatar    = $request->file('user.avatar');
+        $removeAvatar = (bool) ($validated['remove_avatar'] ?? false);
+        $newAvatar    = $request->file('avatar');
 
-        DB::transaction(function () use ($request, $user, $validated, $removeAvatar, $newAvatar) {
+        DB::transaction(function () use ($user, $validated, $removeAvatar, $newAvatar) {
 
-            // ----- Actualiza USER -----
-            $user->name      = data_get($validated, 'user.name', $user->name);
-            $user->email     = data_get($validated, 'user.email', $user->email);
-            $user->job_title = data_get($validated, 'user.job_title', $user->job_title);
-            $user->is_active = (bool) data_get($validated, 'user.is_active', false);
+            $user->first_name = $validated['first_name'] ?? $user->first_name;
+            $user->last_name  = $validated['last_name']  ?? $user->last_name;
+            $user->name       = $validated['name'];
+            $user->email      = $validated['email'];
+            $user->phone      = $validated['phone']      ?? $user->phone;
+            $user->job_title  = $validated['job_title']  ?? $user->job_title;
+            $user->is_active  = (bool) ($validated['is_active'] ?? false);
 
-            // Quitar avatar (si lo pide)
             if ($removeAvatar && $user->avatar) {
                 Storage::disk('public')->delete($user->avatar);
                 $user->avatar = null;
             }
 
-            // Subir avatar nuevo (reemplaza al anterior)
             if ($newAvatar) {
                 if ($user->avatar) {
                     Storage::disk('public')->delete($user->avatar);
                 }
-                $path = $newAvatar->store("users/{$user->id}/avatar", 'public');
-                $user->avatar = $path;
+                $user->avatar = $newAvatar->store("users/{$user->id}/avatar", 'public');
             }
 
             $user->save();
 
-            // ----- Actualiza SUPPLIER (si existe relación) -----
-            if ($user->supplier) {
-                $supplier = $user->supplier;
-
-                $supplier->company_name   = data_get($request, 'supplier.company_name', $supplier->company_name);
-                $supplier->rfc            = data_get($request, 'supplier.rfc', $supplier->rfc);
-                $supplier->contact_person = data_get($request, 'supplier.contact_person', $supplier->contact_person);
-                $supplier->contact_phone  = data_get($request, 'supplier.contact_phone', $supplier->contact_phone);
-                $supplier->email          = data_get($request, 'supplier.email', $supplier->email);
-                $supplier->supplier_type  = data_get($request, 'supplier.supplier_type', $supplier->supplier_type);
-                $supplier->currency       = data_get($request, 'supplier.currency', $supplier->currency);
-                $supplier->tax_regime     = data_get($request, 'supplier.tax_regime', $supplier->tax_regime);
-                $supplier->address        = data_get($request, 'supplier.address', $supplier->address);
-                $supplier->status         = data_get($request, 'supplier.status', $supplier->status ?? 'Pending_docs');
-
-                $supplier->save();
-            }
+            $user->syncRoles($validated['roles'] ?? []);
         });
 
-        // Respuesta
         if ($request->wantsJson()) {
-            // Prepara datos para refrescar el modal sin recargar
-            $avatarUrl = $user->avatar ? asset('storage/' . $user->avatar) : asset('assets/img/avatar-placeholder.png');
-
             return response()->json([
-                'ok'        => true,
-                'user'      => [
+                'ok'      => true,
+                'message' => 'Usuario actualizado correctamente.',
+                'user'    => [
                     'id'         => $user->id,
                     'name'       => $user->name,
                     'email'      => $user->email,
                     'job_title'  => $user->job_title,
                     'is_active'  => (bool) $user->is_active,
-                    'avatar_url' => $avatarUrl,
-                    'avatar_path' => $user->avatar, // relativo en storage
+                    'avatar_url' => $user->avatar
+                        ? asset('storage/' . $user->avatar)
+                        : null,
                 ],
-                'supplier'  => $user->supplier ? [
-                    'id'              => $user->supplier->id,
-                    'company_name'    => $user->supplier->company_name,
-                    'rfc'             => $user->supplier->rfc,
-                    'contact_person'  => $user->supplier->contact_person,
-                    'contact_phone'   => $user->supplier->contact_phone,
-                    'email'           => $user->supplier->email,
-                    'supplier_type'   => $user->supplier->supplier_type,
-                    'currency'        => $user->supplier->currency,
-                    'tax_regime'      => $user->supplier->tax_regime,
-                    'address'         => $user->supplier->address,
-                    'status'          => $user->supplier->status,
-                ] : null,
-                'message'   => 'Usuario proveedor actualizado.',
             ]);
         }
 
-        return back()->with('success', 'Usuario proveedor actualizado.');
+        return back()->with('success', 'Usuario actualizado correctamente.');
     }
 
     public function toggleActive(User $user)
@@ -552,7 +527,7 @@ class UserController extends Controller
             $rolesArr = $rolesByUser[$row->id] ?? [];
             $rolesHtml = empty($rolesArr)
                 ? '<span class="text-muted">—</span>'
-                : collect($rolesArr)->map(fn($r) => '<span class="badge bg-secondary me-1">' . $r . '</span>')->implode(' ');
+                : collect($rolesArr)->map(fn($r) => '<span class="badge bg-secondary me-1">' . e(trans("roles.{$r}")) . '</span>')->implode(' ');
 
             $editUrl   = route('users.suppliers.edit', $row->id);
             $toggleUrl = route('users.suppliers.toggle', $row->id);

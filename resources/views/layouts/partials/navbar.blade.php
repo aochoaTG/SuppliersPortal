@@ -204,12 +204,6 @@
                         </a>
 
                         <!-- item-->
-                        <a href="javascript:void(0);" class="dropdown-item">
-                            <i class="ti ti-settings me-1 fs-17 align-middle"></i>
-                            <span class="align-middle">Configuración</span>
-                        </a>
-
-                        <!-- item-->
                         <a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#reportIssueModal">
                             <i class="ti ti-lifebuoy me-1 fs-17 align-middle"></i>
                             <span class="align-middle">Soporte</span>
@@ -238,3 +232,142 @@
     </div>
 </header>
 <!-- Topbar End -->
+
+<!-- Theme Settings Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="theme-settings-offcanvas" aria-labelledby="themeSettingsLabel">
+    <div class="offcanvas-header border-bottom py-3">
+        <h5 class="offcanvas-title" id="themeSettingsLabel">
+            <i class="ti ti-settings me-2 text-primary"></i>Configuración
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+
+    <div class="offcanvas-body p-0" data-simplebar>
+
+        {{-- ── Modo Claro / Oscuro ─────────────────────────────── --}}
+        <div class="p-3 border-bottom">
+            <p class="fw-semibold text-uppercase text-muted fs-11 mb-2">Modo</p>
+            <div class="btn-group w-100" role="group" aria-label="Modo de color">
+                <input type="radio" class="btn-check" name="data-bs-theme"
+                       id="layout-mode-light" value="light" autocomplete="off">
+                <label class="btn btn-outline-secondary" for="layout-mode-light">
+                    <i class="ti ti-sun me-1"></i>Claro
+                </label>
+
+                <input type="radio" class="btn-check" name="data-bs-theme"
+                       id="layout-mode-dark" value="dark" autocomplete="off">
+                <label class="btn btn-outline-secondary" for="layout-mode-dark">
+                    <i class="ti ti-moon me-1"></i>Oscuro
+                </label>
+            </div>
+        </div>
+
+        {{-- ── Tamaño del Sidebar ───────────────────────────────── --}}
+        <div class="p-3 border-bottom">
+            <p class="fw-semibold text-uppercase text-muted fs-11 mb-2">Tamaño del Sidebar</p>
+            <div class="btn-group w-100" role="group" aria-label="Tamaño del sidebar">
+                <input type="radio" class="btn-check" name="data-sidenav-size"
+                       id="sidenav-size-default" value="default" autocomplete="off">
+                <label class="btn btn-outline-secondary" for="sidenav-size-default">
+                    <i class="ti ti-layout-sidebar me-1"></i>Normal
+                </label>
+
+                <input type="radio" class="btn-check" name="data-sidenav-size"
+                       id="sidenav-size-compact" value="compact" autocomplete="off">
+                <label class="btn btn-outline-secondary" for="sidenav-size-compact">
+                    <i class="ti ti-layout-sidebar-right-collapse me-1"></i>Compacto
+                </label>
+            </div>
+        </div>
+
+        {{-- ── Colores (solo modo claro) ──────────────────────────── --}}
+        <div class="light-only-section">
+
+            {{-- Aviso --}}
+            <div class="px-3 pt-3 pb-0">
+                <p class="text-muted mb-0" style="font-size:10px;line-height:1.4;">
+                    <i class="ti ti-info-circle me-1"></i>
+                    Las opciones de color solo aplican en modo <strong>claro</strong>.
+                </p>
+            </div>
+
+            {{-- Color del Topbar --}}
+            <div class="p-3 border-bottom">
+                <p class="fw-semibold text-uppercase text-muted fs-11 mb-2">Color del Topbar</p>
+                <div class="btn-group w-100" role="group" aria-label="Color del topbar">
+                    <input type="radio" class="btn-check" name="data-topbar-color"
+                           id="topbar-color-light" value="light" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="topbar-color-light">
+                        <i class="ti ti-sun me-1"></i>Claro
+                    </label>
+
+                    <input type="radio" class="btn-check" name="data-topbar-color"
+                           id="topbar-color-dark" value="dark" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="topbar-color-dark">
+                        <i class="ti ti-moon me-1"></i>Oscuro
+                    </label>
+                </div>
+            </div>
+
+            {{-- Color del Sidebar --}}
+            <div class="p-3 border-bottom">
+                <p class="fw-semibold text-uppercase text-muted fs-11 mb-2">Color del Sidebar</p>
+                <div class="btn-group w-100" role="group" aria-label="Color del sidebar">
+                    <input type="radio" class="btn-check" name="data-menu-color"
+                           id="menu-color-light" value="light" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="menu-color-light">
+                        <i class="ti ti-sun me-1"></i>Claro
+                    </label>
+
+                    <input type="radio" class="btn-check" name="data-menu-color"
+                           id="menu-color-dark" value="dark" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="menu-color-dark">
+                        <i class="ti ti-moon me-1"></i>Oscuro
+                    </label>
+                </div>
+            </div>
+
+        </div>{{-- /light-only-section --}}
+
+        {{-- ── Zoom / Accesibilidad ─────────────────────────────── --}}
+        <div class="p-3 border-bottom">
+            <p class="fw-semibold text-uppercase text-muted fs-11 mb-2">
+                <i class="ti ti-accessible me-1"></i>Zoom de Página
+            </p>
+            <div class="d-flex align-items-center gap-2">
+                <button id="zoom-out" type="button"
+                        class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                        style="width:36px;height:36px;padding:0;" title="Reducir zoom">
+                    <i class="ti ti-minus fs-16"></i>
+                </button>
+
+                <div class="flex-grow-1 text-center">
+                    <span id="zoom-display"
+                          class="fw-bold fs-16 text-body">100%</span>
+                    <div class="text-muted" style="font-size:10px;line-height:1.2;">70% – 130%</div>
+                </div>
+
+                <button id="zoom-reset" type="button"
+                        class="btn btn-outline-secondary btn-sm flex-shrink-0 px-2"
+                        title="Restablecer zoom al 100%">
+                    <i class="ti ti-refresh fs-14 me-1"></i><span style="font-size:11px;">100%</span>
+                </button>
+
+                <button id="zoom-in" type="button"
+                        class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                        style="width:36px;height:36px;padding:0;" title="Aumentar zoom">
+                    <i class="ti ti-plus fs-16"></i>
+                </button>
+            </div>
+        </div>
+
+        {{-- ── Botón restablecer todo ───────────────────────────── --}}
+        <div class="p-3">
+            <button type="button" class="btn btn-outline-danger btn-sm w-100" id="reset-theme-settings">
+                <i class="ti ti-restore me-1"></i>Restablecer todo
+            </button>
+        </div>
+
+    </div>{{-- /offcanvas-body --}}
+</div>
+<!-- End Theme Settings Offcanvas -->
