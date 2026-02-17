@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
+use Illuminate\Support\Facades\Auth;
 
 
 class AnnouncementController extends Controller
@@ -37,13 +38,13 @@ class AnnouncementController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'title'         => ['required','string','max:50'],
-            'description'   => ['required','string','max:500'],
-            'published_at'  => ['required','date'],
-            'visible_until' => ['nullable','date','after_or_equal:published_at'],
-            'is_active'     => ['required','boolean'],
-            'cover'         => ['nullable','image','max:4096'], // 4MB
-            'priority'      => ['required','integer','in:1,2,3,4'], // 1: Baja, 2: Normal, 3: Alta, 4: Urgente
+            'title'         => ['required', 'string', 'max:50'],
+            'description'   => ['required', 'string', 'max:500'],
+            'published_at'  => ['required', 'date'],
+            'visible_until' => ['nullable', 'date', 'after_or_equal:published_at'],
+            'is_active'     => ['required', 'boolean'],
+            'cover'         => ['nullable', 'image', 'max:4096'], // 4MB
+            'priority'      => ['required', 'integer', 'in:1,2,3,4'], // 1: Baja, 2: Normal, 3: Alta, 4: Urgente
         ]);
 
         $coverPath = null;
@@ -77,14 +78,14 @@ class AnnouncementController extends Controller
     public function update(Request $request, Announcement $announcement)
     {
         $data = $request->validate([
-            'title'         => ['required','string','max:50'],
-            'description'   => ['required','string','max:500'],
-            'published_at'  => ['required','date'],
-            'visible_until' => ['nullable','date','after_or_equal:published_at'],
-            'is_active'     => ['required','boolean'],
-            'cover'         => ['nullable','image','max:4096'],
-            'remove_cover'  => ['nullable','boolean'], // checkbox para quitar portada
-            'priority'      => ['required','integer','in:1,2,3,4'], // 1: Baja, 2: Normal, 3: Alta, 4: Urgente
+            'title'         => ['required', 'string', 'max:50'],
+            'description'   => ['required', 'string', 'max:500'],
+            'published_at'  => ['required', 'date'],
+            'visible_until' => ['nullable', 'date', 'after_or_equal:published_at'],
+            'is_active'     => ['required', 'boolean'],
+            'cover'         => ['nullable', 'image', 'max:4096'],
+            'remove_cover'  => ['nullable', 'boolean'], // checkbox para quitar portada
+            'priority'      => ['required', 'integer', 'in:1,2,3,4'], // 1: Baja, 2: Normal, 3: Alta, 4: Urgente
         ]);
 
         // Portada
@@ -204,7 +205,7 @@ class AnnouncementController extends Controller
      * ========================================================================= */
     protected function getSupplierIdFromAuth(): ?int
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!$user) {
             return null;
         }
@@ -237,7 +238,7 @@ class AnnouncementController extends Controller
             7 => 'acciones', // no ordenable
         ];
         $orderColumn = $columns[$order['column'] ?? 0] ?? 'id';
-        $orderDir    = in_array(strtolower($order['dir'] ?? 'desc'), ['asc','desc']) ? $order['dir'] : 'desc';
+        $orderDir    = in_array(strtolower($order['dir'] ?? 'desc'), ['asc', 'desc']) ? $order['dir'] : 'desc';
 
         // Subquery base (ahora usando el campo priority del modelo)
         $base = Announcement::query()
@@ -277,16 +278,16 @@ class AnnouncementController extends Controller
         if ($search !== '') {
             $wrapped->where(function ($q) use ($search) {
                 $q->where('x.titulo', 'like', "%{$search}%")
-                ->orWhere('x.contenido', 'like', "%{$search}%");
+                    ->orWhere('x.contenido', 'like', "%{$search}%");
             });
         }
 
         // Filtro por estado (activo|inactivo)
-        if ($estado && in_array($estado, ['activo','inactivo'], true)) {
+        if ($estado && in_array($estado, ['activo', 'inactivo'], true)) {
             $wrapped->where('x.estado', $estado);
         }
-        if ($priori && in_array($priori, ['baja','normal','alta','urgente'], true)) {
-            $priorityMap = ['baja'=>1, 'normal'=>2, 'alta'=>3, 'urgente'=>4];
+        if ($priori && in_array($priori, ['baja', 'normal', 'alta', 'urgente'], true)) {
+            $priorityMap = ['baja' => 1, 'normal' => 2, 'alta' => 3, 'urgente' => 4];
             $wrapped->where('x.priority', $priorityMap[$priori]);
         }
 
@@ -386,7 +387,7 @@ class AnnouncementController extends Controller
             6 => 'actions',
         ];
         $orderColumn = $columns[$order['column'] ?? 0] ?? 'id';
-        $orderDir    = in_array(strtolower($order['dir'] ?? 'desc'), ['asc','desc']) ? $order['dir'] : 'desc';
+        $orderDir    = in_array(strtolower($order['dir'] ?? 'desc'), ['asc', 'desc']) ? $order['dir'] : 'desc';
 
         $now = now();
 
@@ -434,17 +435,17 @@ class AnnouncementController extends Controller
         // --- FILTRO POR DEFECTO: SOLO VIGENTES ---
         // is_active = 1, published_at <= now, (visible_until is null or >= now)
         $wrapped->where('x.is_active', 1)
-                ->where('x.published_at', '<=', $now)
-                ->where(function ($qq) use ($now) {
-                    $qq->whereNull('x.visible_until')
+            ->where('x.published_at', '<=', $now)
+            ->where(function ($qq) use ($now) {
+                $qq->whereNull('x.visible_until')
                     ->orWhere('x.visible_until', '>=', $now);
-                });
+            });
 
         // Busca en título/descr.
         if ($search !== '') {
             $wrapped->where(function ($q) use ($search) {
                 $q->where('x.title', 'like', "%{$search}%")
-                ->orWhere('x.description', 'like', "%{$search}%");
+                    ->orWhere('x.description', 'like', "%{$search}%");
             });
         }
 
@@ -454,7 +455,7 @@ class AnnouncementController extends Controller
         } elseif ($dismissed === 'not_dismissed') {
             $wrapped->where(function ($q) {
                 $q->where('x.is_dismissed', 0)
-                ->orWhereNull('x.is_dismissed');
+                    ->orWhereNull('x.is_dismissed');
             });
         }
 
@@ -462,7 +463,7 @@ class AnnouncementController extends Controller
         if ($status === 'expired') {
             // Quita la condición de vigencia y aplica "expirados"
             $wrapped->whereNotNull('x.visible_until')
-                    ->where('x.visible_until', '<', $now);
+                ->where('x.visible_until', '<', $now);
         } elseif ($status === 'upcoming') {
             $wrapped->where('x.published_at', '>', $now);
         }
@@ -486,7 +487,7 @@ class AnnouncementController extends Controller
             $pdfUrl     = route('supplier.announcements.pdf',  $r->id);
             $dismissUrl = route('supplier.announcements.dismiss', $r->id);
 
-            $coverUrl = $r->cover_path ? asset('storage/'.$r->cover_path) : null;
+            $coverUrl = $r->cover_path ? asset('storage/' . $r->cover_path) : null;
 
             $actions = <<<HTML
                 <div class="dropdown">
@@ -542,7 +543,7 @@ class AnnouncementController extends Controller
     {
         $logoPath = public_path('images/logos/logo_TotalGas_hor.png');
         // Marca visto si quieres (opcional, ya se marca en show())
-        if ($supplierId = optional(auth()->user()->supplier)->id) {
+        if ($supplierId = optional(Auth::user()->supplier)->id) {
             $announcement->markViewedBy($supplierId);
         }
 
@@ -563,7 +564,7 @@ class AnnouncementController extends Controller
             'faviconUrl'  => $faviconUrl
         ])->setPaper('a4', 'portrait');
 
-        $filename = 'announcement_'.$announcement->id.'.pdf';
+        $filename = 'announcement_' . $announcement->id . '.pdf';
         return $pdf->stream($filename); // o ->download($filename)
     }
 }
