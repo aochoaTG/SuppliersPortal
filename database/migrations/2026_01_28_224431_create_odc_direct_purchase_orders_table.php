@@ -20,7 +20,6 @@ return new class extends Migration
             // Relaciones principales
             $table->foreignId('supplier_id')->constrained()->noActionOnDelete();
             $table->foreignId('cost_center_id')->constrained()->noActionOnDelete();
-            // ❌ ELIMINADO: expense_category_id
 
             // Datos de la solicitud
             $table->string('application_month', 7); // YYYY-MM (ej: 2026-03)

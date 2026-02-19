@@ -185,7 +185,6 @@ class PurchaseOrderController extends Controller
             'supplier',
             'creator',
             'costCenter',
-            'expenseCategory',
             'approvals.approver',
             'documents'
         ]);

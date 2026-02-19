@@ -9,6 +9,9 @@ use App\Models\BudgetCommitment;
 use App\Models\Supplier;
 use App\Models\CostCenter;
 use App\Models\ExpenseCategory;
+use App\Models\ApprovalLevel;
+use App\Models\User;
+use App\Notifications\NewDirectPurchaseOrderNotification;
 use App\Http\Requests\SaveDirectPurchaseOrderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,21 +78,34 @@ class DirectPurchaseOrderController extends Controller
             $estimatedDays = (int) ($request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30);
             $applicationMonth = now()->addDays($estimatedDays)->format('Y-m');
 
+            // ✅ NUEVO: Determinar nivel de aprobación según el total
+            $totalAmount = $totals['total'];
+            $approvalLevel = ApprovalLevel::where('min_amount', '<=', $totalAmount)
+                ->where(function ($query) use ($totalAmount) {
+                    $query->where('max_amount', '>=', $totalAmount)
+                        ->orWhereNull('max_amount');
+                })
+                ->first();
+            $levelNumber = $approvalLevel ? $approvalLevel->level_number : 1;
+
             // 3. Crear la OCD
             $ocd = DirectPurchaseOrder::create([
-                'folio' => null, // Se genera al enviar a aprobación
+                'folio' => DirectPurchaseOrder::generateNextFolio(), // ✅ CORREGIDO: Generar folio de inmediato
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
-                'application_month' => $applicationMonth, // ✅ CORREGIDO: Usamos la variable calculada
+                'application_month' => $applicationMonth,
                 'justification' => $request->justification,
                 'subtotal' => $totals['subtotal'],
                 'iva_amount' => $totals['iva'],
                 'total' => $totals['total'],
                 'currency' => 'MXN',
                 'payment_terms' => $request->payment_terms ?? $supplier->default_payment_terms ?? 'Contado',
-                'estimated_delivery_days' => $estimatedDays, // ✅ CORREGIDO: Usamos la variable para mantener coherencia
-                'status' => 'DRAFT',
+                'estimated_delivery_days' => $estimatedDays,
+                'status' => 'PENDING_APPROVAL', // ✅ CAMBIO: Directo a pendiente de aprobación
+                'required_approval_level' => $levelNumber, // ✅ NUEVO
+                'assigned_approver_id' => 1, // ✅ NUEVO: Según requerimiento temporal
                 'created_by' => Auth::id(),
+                'submitted_at' => now(),
             ]);
 
             // 4. Crear los items (Camino B: la categoría va por partida)
@@ -105,7 +121,6 @@ class DirectPurchaseOrderController extends Controller
                     'unit_of_measure' => $itemData['unit_of_measure'] ?? null,
                     'sku' => $itemData['sku'] ?? null,
                     'notes' => $itemData['notes'] ?? null,
-                    // Los montos (subtotal, iva_amount, total) se calculan automáticamente en el boot del modelo
                 ]);
             }
 
@@ -122,11 +137,17 @@ class DirectPurchaseOrderController extends Controller
                 }
             }
 
+            // ✅ NUEVO: Notificar al aprobador (User ID 1 por ahora)
+            $approver = User::find(1);
+            if ($approver) {
+                $approver->notify(new NewDirectPurchaseOrderNotification($ocd));
+            }
+
             DB::commit();
 
             return redirect()
                 ->route('purchase-orders.index')
-                ->with('success', 'Orden de Compra Directa creada exitosamente. Ahora puede enviarla a aprobación.');
+                ->with('success', 'Orden de Compra Directa creada y enviada a aprobación exitosamente bajo el folio: ' . $ocd->folio);
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -174,16 +195,56 @@ class DirectPurchaseOrderController extends Controller
         try {
             DB::beginTransaction();
 
-            // En este sistema simplificado para OCD, el primer aprobador es el final
-            // TODO: Si se requieren múltiples niveles, implementar lógica de tránsito aquí
+            // 1. Re-validar disponibilidad presupuestal por cada categoría de los items
+            $itemsByCategory = $directPurchaseOrder->items->groupBy('expense_category_id');
+            $costCenterId = $directPurchaseOrder->cost_center_id;
+            $monthStr = $directPurchaseOrder->application_month;
 
+            foreach ($itemsByCategory as $categoryId => $items) {
+                $requiredAmount = $items->sum('total');
+                $budgetCheck = $this->validateBudgetAvailability($costCenterId, $monthStr, $categoryId, $requiredAmount);
+
+                if (!$budgetCheck['available']) {
+                    throw new \Exception('Presupuesto insuficiente: ' . $budgetCheck['message']);
+                }
+            }
+
+            // 2. Cambiar estatus a Aprobada
             $directPurchaseOrder->update([
                 'status' => 'APPROVED',
                 'approved_by' => Auth::id(),
                 'approved_at' => now(),
             ]);
 
-            // Registrar en el historial
+            // 3. Comprometer presupuesto en cada categoría
+            foreach ($itemsByCategory as $categoryId => $items) {
+                $amountToCommit = (float) $items->sum('total');
+
+                // Obtener la distribución mensual correspondiente
+                $date = \Carbon\Carbon::parse($monthStr . '-01');
+                $year = $date->year;
+                $month = $date->month;
+
+                $budget = \App\Models\AnnualBudget::where('cost_center_id', $costCenterId)
+                    ->where('fiscal_year', $year)
+                    ->where('status', 'APROBADO')
+                    ->first();
+
+                if ($budget) {
+                    $distribution = $budget->monthlyDistributions()
+                        ->where('month', $month)
+                        ->where('expense_category_id', $categoryId)
+                        ->first();
+
+                    if ($distribution) {
+                        if (!$distribution->commitAmount($amountToCommit)) {
+                            throw new \Exception('No se pudo comprometer el presupuesto para la categoría: ' . ($items->first()->expenseCategory->name ?? $categoryId));
+                        }
+                    }
+                }
+            }
+
+            // 4. Registrar en el historial
             $directPurchaseOrder->approvals()->create([
                 'approval_level' => $directPurchaseOrder->required_approval_level,
                 'approver_user_id' => Auth::id(),
@@ -192,11 +253,16 @@ class DirectPurchaseOrderController extends Controller
                 'approved_at' => now(),
             ]);
 
+            // 5. Notificar al proveedor (Correo + Portal/Base de datos)
+            if ($directPurchaseOrder->supplier) {
+                $directPurchaseOrder->supplier->notify(new \App\Notifications\DirectPurchaseOrderApprovedNotification($directPurchaseOrder));
+            }
+
             DB::commit();
 
             return redirect()
                 ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
-                ->with('success', 'OCD aprobada correctamente.');
+                ->with('success', 'La Orden de Compra ha sido aprobada, el presupuesto comprometido y el proveedor notificado.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Error al aprobar la OCD: ' . $e->getMessage()]);
@@ -208,30 +274,58 @@ class DirectPurchaseOrderController extends Controller
      */
     public function reject(Request $request, DirectPurchaseOrder $directPurchaseOrder)
     {
-        $request->validate(['comments' => 'required|string|max:500']);
+        $request->validate([
+            'comments' => 'required|string|min:50|max:500',
+        ]);
 
         try {
             DB::beginTransaction();
 
             $directPurchaseOrder->update([
-                'status' => 'REJECTED',
+                'status'      => 'REJECTED',
                 'rejected_by' => Auth::id(),
                 'rejected_at' => now(),
             ]);
 
             $directPurchaseOrder->approvals()->create([
-                'approval_level' => $directPurchaseOrder->required_approval_level,
+                'approval_level'  => $directPurchaseOrder->required_approval_level,
                 'approver_user_id' => Auth::id(),
-                'action' => 'REJECTED',
-                'comments' => $request->comments,
-                'approved_at' => now(),
+                'action'          => 'REJECTED',
+                'comments'        => $request->comments,
+                'approved_at'     => now(),
             ]);
+
+            // Notificar al solicitante (creador) con el motivo de rechazo
+            $creator = $directPurchaseOrder->creator;
+            if ($creator) {
+                $creator->notify(new \App\Notifications\DirectPurchaseOrderRejectedNotification(
+                    $directPurchaseOrder,
+                    $request->comments
+                ));
+            }
+
+            // Notificar al equipo de Compras (buyers), excepto el aprobador actual
+            $buyers = User::role('buyer')->get();
+            foreach ($buyers as $buyer) {
+                if ($buyer->id !== Auth::id()) {
+                    $buyer->notify(new \App\Notifications\DirectPurchaseOrderRejectedNotification(
+                        $directPurchaseOrder,
+                        $request->comments
+                    ));
+                }
+            }
 
             DB::commit();
 
             return redirect()
                 ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
-                ->with('warning', 'OCD rechazada.');
+                ->with('rejection_data', [
+                    'folio'        => $directPurchaseOrder->folio,
+                    'total'        => $directPurchaseOrder->total,
+                    'currency'     => $directPurchaseOrder->currency,
+                    'comments'     => $request->comments,
+                    'creator_name' => $creator?->name ?? 'el solicitante',
+                ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Error al rechazar la OCD: ' . $e->getMessage()]);
@@ -249,24 +343,37 @@ class DirectPurchaseOrderController extends Controller
             DB::beginTransaction();
 
             $directPurchaseOrder->update([
-                'status' => 'RETURNED',
+                'status'      => 'RETURNED',
                 'returned_by' => Auth::id(),
                 'returned_at' => now(),
             ]);
 
             $directPurchaseOrder->approvals()->create([
-                'approval_level' => $directPurchaseOrder->required_approval_level,
+                'approval_level'   => $directPurchaseOrder->required_approval_level,
                 'approver_user_id' => Auth::id(),
-                'action' => 'RETURNED',
-                'comments' => $request->comments,
-                'approved_at' => now(),
+                'action'           => 'RETURNED',
+                'comments'         => $request->comments,
+                'approved_at'      => now(),
             ]);
+
+            // Notificar al solicitante con las instrucciones de corrección
+            $creator = $directPurchaseOrder->creator;
+            if ($creator) {
+                $creator->notify(new \App\Notifications\DirectPurchaseOrderReturnedNotification(
+                    $directPurchaseOrder,
+                    $request->comments
+                ));
+            }
 
             DB::commit();
 
             return redirect()
                 ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
-                ->with('info', 'OCD devuelta al creador para corrección.');
+                ->with('return_data', [
+                    'folio'        => $directPurchaseOrder->folio,
+                    'creator_name' => $creator?->name ?? 'el solicitante',
+                    'comments'     => $request->comments,
+                ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Error al devolver la OCD: ' . $e->getMessage()]);

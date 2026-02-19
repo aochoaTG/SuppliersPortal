@@ -63,17 +63,24 @@
                         @endif
                     @endif
 
+                    {{-- ETIQUETA DE RECHAZO --}}
+                    @if($directPurchaseOrder->status === 'REJECTED')
+                        <span class="badge bg-danger fs-6 px-3 py-2 d-flex align-items-center gap-1">
+                            <i class="ti ti-ban"></i> OC RECHAZADA
+                        </span>
+                    @endif
+
                     {{-- BOTONES DE ACCIÓN PARA EL APROBADOR --}}
                     @if($directPurchaseOrder->status === 'PENDING_APPROVAL')
                         {{-- En este flujo simplificado, cualquier superadmin o buyer con permiso puede aprobar --}}
-                        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalApprove">
-                            <i class="ti ti-check me-1"></i>Aprobar
+                        <button type="button" class="btn btn-sm btn-success" onclick="confirmApproval()">
+                            <i class="ti ti-check me-1"></i>Aprobar OC
                         </button>
-                        <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#modalReturn">
+                        <button type="button" class="btn btn-sm btn-info" onclick="confirmReturn()">
                             <i class="ti ti-arrow-back-up me-1"></i>Devolver
                         </button>
-                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modalReject">
-                            <i class="ti ti-x me-1"></i>Rechazar
+                        <button type="button" class="btn btn-sm btn-danger" onclick="confirmReject()">
+                            <i class="ti ti-x me-1"></i>Rechazar OC
                         </button>
                     @endif
 
@@ -143,7 +150,6 @@
                         <h6 class="text-primary text-uppercase fw-bold fs-12 mb-3">Control y Presupuesto</h6>
                         <p class="text-muted small mb-0">
                             <strong>Centro de Costo:</strong> {{ $directPurchaseOrder->costCenter->name ?? 'N/A' }}<br>
-                            <strong>Categoría de Gasto:</strong> {{ $directPurchaseOrder->expenseCategory->name ?? 'N/A' }}<br>
                             <strong>Mes Aplicación:</strong> {{ $directPurchaseOrder->application_month }}<br>
                             <strong>Solicitado por:</strong> {{ $directPurchaseOrder->creator->name }}
                         </p>
@@ -275,75 +281,17 @@
 
 {{-- MODALES DE APROBACIÓN --}}
 @if($directPurchaseOrder->status === 'PENDING_APPROVAL')
-    {{-- Modal Aprobar --}}
-    <div class="modal fade" id="modalApprove" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <form action="{{ route('direct-purchase-orders.approve', $directPurchaseOrder->id) }}" method="POST" class="modal-content">
-                @csrf
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirmar Aprobación</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>¿Estás seguro de que deseas aprobar esta Orden de Compra Directa?</p>
-                    <div class="mb-3">
-                        <label class="form-label">Comentarios (Opcional)</label>
-                        <textarea name="comments" class="form-control" rows="3"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">SÍ, APROBAR</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    {{-- Formulario oculto para devolución (enviado por SweetAlert) --}}
+    <form id="form-return" action="{{ route('direct-purchase-orders.return', $directPurchaseOrder->id) }}" method="POST" style="display:none">
+        @csrf
+        <input type="hidden" name="comments" id="return-comments-input">
+    </form>
 
-    {{-- Modal Devolver --}}
-    <div class="modal fade" id="modalReturn" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <form action="{{ route('direct-purchase-orders.return', $directPurchaseOrder->id) }}" method="POST" class="modal-content">
-                @csrf
-                <div class="modal-header text-white bg-info">
-                    <h5 class="modal-title">Devolver para Corrección</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label text-danger fw-bold">Motivo de la Devolución (Requerido)</label>
-                        <textarea name="comments" class="form-control" rows="3" required placeholder="Explica qué debe corregir el solicitante..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-info text-white">DEVOLVER</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    {{-- Modal Rechazar --}}
-    <div class="modal fade" id="modalReject" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <form action="{{ route('direct-purchase-orders.reject', $directPurchaseOrder->id) }}" method="POST" class="modal-content">
-                @csrf
-                <div class="modal-header text-white bg-danger">
-                    <h5 class="modal-title">Rechazar Definitivamente</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label text-danger fw-bold">Motivo del Rechazo (Requerido)</label>
-                        <textarea name="comments" class="form-control" rows="3" required placeholder="Explica por qué se rechaza la orden..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-danger">RECHAZAR</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    {{-- Formulario oculto para rechazo (enviado por SweetAlert) --}}
+    <form id="form-reject" action="{{ route('direct-purchase-orders.reject', $directPurchaseOrder->id) }}" method="POST" style="display:none">
+        @csrf
+        <input type="hidden" name="comments" id="reject-comments-input">
+    </form>
 @endif
 
 @push('styles')
@@ -365,6 +313,305 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    // Feedback de éxito genérico
+    @if(session('success'))
+        Swal.fire({
+            title: '¡Operación Exitosa!',
+            text: "{{ session('success') }}",
+            icon: 'success',
+            confirmButtonColor: '#28a745'
+        });
+    @endif
+
+    // Feedback de devolución exitosa
+    @if(session('return_data'))
+    @php $rtd = session('return_data'); @endphp
+    Swal.fire({
+        title: '<span class="fw-bold" style="color:#0dcaf0">↩️ OC devuelta para correcciones</span>',
+        icon: 'info',
+        html: `
+            <div class="text-start">
+                <div class="mb-2"><strong>Folio:</strong> {{ $rtd['folio'] }}</div>
+                <div class="mb-3"><strong>Nuevo estatus:</strong> <span class="badge bg-info text-dark">Corrección requerida</span></div>
+                <div class="border-top pt-3">
+                    <p class="mb-1 small text-muted fw-bold">Instrucciones enviadas a <strong>{{ $rtd['creator_name'] }}</strong>:</p>
+                    <div class="p-2 bg-light rounded fst-italic text-muted small">"{{ Str::limit($rtd['comments'], 120) }}"</div>
+                </div>
+                <div class="mt-3 text-muted small">
+                    <div><i class="ti ti-edit me-1"></i>El solicitante podrá editar la OC y reenviarla.</div>
+                    <div class="mt-1"><i class="ti ti-calendar me-1"></i>El presupuesto se mantiene reservado por 7 días.</div>
+                </div>
+            </div>
+        `,
+        confirmButtonText: 'ACEPTAR',
+        confirmButtonColor: '#0dcaf0',
+    });
+    @endif
+
+    // Feedback de rechazo exitoso
+    @if(session('rejection_data'))
+    @php $rd = session('rejection_data'); @endphp
+    Swal.fire({
+        title: '<span class="text-danger fw-bold">OC Rechazada</span>',
+        icon: 'error',
+        html: `
+            <div class="text-start">
+                <div class="mb-2"><strong>Folio:</strong> {{ $rd['folio'] }}</div>
+                <div class="mb-2"><strong>Estatus:</strong> <span class="badge bg-danger">Rechazada</span></div>
+                <div class="mb-3"><strong>Monto:</strong> ${{ number_format($rd['total'], 2) }} {{ $rd['currency'] }}</div>
+                <div class="border-top pt-3">
+                    <p class="mb-1 small text-muted fw-bold">Se notificó a <strong>{{ $rd['creator_name'] }}</strong> con el motivo:</p>
+                    <div class="p-2 bg-light rounded fst-italic text-muted small">"{{ Str::limit($rd['comments'], 120) }}"</div>
+                </div>
+            </div>
+        `,
+        confirmButtonText: 'ACEPTAR',
+        confirmButtonColor: '#dc3545',
+    });
+    @endif
+
+    function confirmApproval() {
+        Swal.fire({
+            title: '<h4 class="fw-bold mb-0">Confirmar Aprobación</h4>',
+            icon: 'question',
+            html: `
+                <div class="text-start mt-3 p-3 bg-light rounded border">
+                    <p class="mb-3 fw-bold text-dark">Al aprobar esta Orden de Compra:</p>
+                    <div class="mb-2"><i class="ti ti-check text-success me-2"></i>Se comprometerá el presupuesto del centro de costos</div>
+                    <div class="mb-2"><i class="ti ti-check text-success me-2"></i>Se generará el folio único de OC</div>
+                    <div class="mb-0"><i class="ti ti-check text-success me-2"></i>Se notificará al proveedor vía correo y portal</div>
+                </div>
+                <div class="text-start mt-3">
+                    <label class="form-label fw-bold small text-uppercase">Comentarios de Aprobación (Opcional)</label>
+                    <textarea id="swal-comments" class="form-control" rows="3" placeholder="Escriba algún comentario si lo desea..."></textarea>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '<i class="ti ti-check me-1"></i>SÍ, APROBAR OC',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            reverseButtons: true,
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                const comments = document.getElementById('swal-comments').value;
+                return comments;
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Crear y enviar formulario dinámicamente
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = "{{ route('direct-purchase-orders.approve', $directPurchaseOrder->id) }}";
+                
+                const csrf = document.createElement('input');
+                csrf.type = 'hidden';
+                csrf.name = '_token';
+                csrf.value = "{{ csrf_token() }}";
+                form.appendChild(csrf);
+                
+                const commentsInput = document.createElement('input');
+                commentsInput.type = 'hidden';
+                commentsInput.name = 'comments';
+                commentsInput.value = result.value;
+                form.appendChild(commentsInput);
+                
+                document.body.appendChild(form);
+                
+                // Mostrar cargando mientras se procesa en el servidor
+                Swal.fire({
+                    title: 'Procesando...',
+                    text: 'Validando presupuesto y notificando al proveedor',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                        form.submit();
+                    }
+                });
+            }
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Flujo de Devolución con SweetAlert (1 paso)
+    // ──────────────────────────────────────────────────────────────
+    function confirmReturn() {
+        Swal.fire({
+            title: '<span class="fw-bold" style="color:#0dcaf0">↩️ Devolver OC para correcciones</span>',
+            icon: 'info',
+            html: `
+                <div class="text-start">
+                    <p class="text-muted small mb-3">
+                        <strong>{{ $directPurchaseOrder->folio }}</strong>
+                    </p>
+                    <label class="form-label fw-bold small text-uppercase">
+                        Indica al solicitante qué debe corregir:
+                    </label>
+                    <textarea id="swal-return-instructions" class="form-control" rows="5" maxlength="500"
+                        placeholder="Ejemplo: Favor de corregir el centro de costos, debe ser 'Administración' no 'Operaciones'..."
+                    ></textarea>
+                    <div class="d-flex justify-content-end mt-1">
+                        <span class="text-muted small" id="swal-return-char-count">0/500</span>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'DEVOLVER A SOLICITANTE',
+            cancelButtonText: 'CANCELAR',
+            confirmButtonColor: '#0dcaf0',
+            cancelButtonColor: '#6c757d',
+            reverseButtons: true,
+            customClass: {
+                confirmButton: 'text-dark',
+            },
+            didOpen: () => {
+                const textarea   = document.getElementById('swal-return-instructions');
+                const charCount  = document.getElementById('swal-return-char-count');
+                const confirmBtn = Swal.getConfirmButton();
+
+                confirmBtn.disabled = true;
+
+                textarea.addEventListener('input', () => {
+                    const len = textarea.value.length;
+                    charCount.textContent = `${len}/500`;
+                    confirmBtn.disabled = len === 0;
+                });
+            },
+            preConfirm: () => {
+                const instructions = document.getElementById('swal-return-instructions').value.trim();
+                if (!instructions) {
+                    Swal.showValidationMessage('Las instrucciones de corrección son obligatorias');
+                    return false;
+                }
+                return instructions;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('return-comments-input').value = result.value;
+                Swal.fire({
+                    title: 'Procesando...',
+                    text: 'Notificando al solicitante con las instrucciones',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                        document.getElementById('form-return').submit();
+                    }
+                });
+            }
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Flujo de Rechazo con SweetAlert (2 pasos)
+    // ──────────────────────────────────────────────────────────────
+    function confirmReject(previousReason = '') {
+        Swal.fire({
+            title: '<span class="fw-bold text-danger">Rechazar Orden de Compra</span>',
+            icon: 'warning',
+            html: `
+                <div class="text-start">
+                    <label class="form-label fw-bold small text-uppercase text-danger">
+                        Motivo del rechazo <span class="text-muted fw-normal">(mínimo 50 caracteres)</span>:
+                    </label>
+                    <textarea id="swal-reject-reason" class="form-control" rows="5" maxlength="500"
+                        placeholder="Ejemplo: El proveedor no cumple con las especificaciones técnicas requeridas para el servicio de mantenimiento..."
+                    ></textarea>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span id="swal-min-msg" class="text-danger small" style="display:none">
+                            Mínimo 50 caracteres requeridos
+                        </span>
+                        <span class="ms-auto text-muted small" id="swal-char-count">0/500</span>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'RECHAZAR OC',
+            cancelButtonText: 'CANCELAR',
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            reverseButtons: true,
+            didOpen: () => {
+                const textarea   = document.getElementById('swal-reject-reason');
+                const charCount  = document.getElementById('swal-char-count');
+                const minMsg     = document.getElementById('swal-min-msg');
+                const confirmBtn = Swal.getConfirmButton();
+
+                // Restaurar texto previo si viene del botón VOLVER
+                if (previousReason) {
+                    textarea.value = previousReason;
+                }
+
+                const update = () => {
+                    const len = textarea.value.length;
+                    charCount.textContent = `${len}/500`;
+                    const valid = len >= 50;
+                    confirmBtn.disabled = !valid;
+                    minMsg.style.display = valid ? 'none' : 'block';
+                };
+
+                update(); // estado inicial
+                textarea.addEventListener('input', update);
+            },
+            preConfirm: () => {
+                const reason = document.getElementById('swal-reject-reason').value;
+                if (reason.length < 50) {
+                    Swal.showValidationMessage('Mínimo 50 caracteres requeridos');
+                    return false;
+                }
+                return reason;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                showRejectConfirmation(result.value);
+            }
+        });
+    }
+
+    function showRejectConfirmation(reason) {
+        const preview = reason.length > 80 ? reason.substring(0, 80) + '...' : reason;
+
+        Swal.fire({
+            title: '<span class="fw-bold">⚠️ ¿Confirmar rechazo?</span>',
+            html: `
+                <div class="text-start">
+                    <p class="fw-bold text-danger mb-2">Esta acción:</p>
+                    <ul class="text-muted small mb-3">
+                        <li>Liberará el presupuesto comprometido</li>
+                        <li>Notificará al solicitante</li>
+                        <li>La OC quedará bloqueada permanentemente</li>
+                    </ul>
+                    <div class="p-2 bg-light rounded border">
+                        <p class="mb-1 small text-muted fw-bold">Motivo registrado:</p>
+                        <p class="mb-0 fst-italic small">"${preview}"</p>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '<i class="ti ti-x me-1"></i>SÍ, RECHAZAR',
+            cancelButtonText: 'VOLVER',
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            reverseButtons: true,
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('reject-comments-input').value = reason;
+                Swal.fire({
+                    title: 'Procesando...',
+                    text: 'Registrando rechazo y notificando al solicitante',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                        document.getElementById('form-reject').submit();
+                    }
+                });
+            } else if (result.dismiss === Swal.DismissReason.cancel) {
+                // VOLVER → regresa al paso 1 con el texto preservado
+                confirmReject(reason);
+            }
+        });
+    }
+
     function confirmAction(formId, message) {
         Swal.fire({
             title: message,
