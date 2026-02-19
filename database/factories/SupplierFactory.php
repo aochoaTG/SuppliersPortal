@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Supplier;
 use App\Models\User;
+use App\Enum\PaymentTerm;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -34,6 +35,7 @@ class SupplierFactory extends Factory
             'account_number' => $this->faker->unique()->numerify('##########'),
             'clabe' => $this->faker->numerify('##################'),
             'currency' => 'MXN',
+            'default_payment_terms' => $this->faker->randomElement(array_column(PaymentTerm::cases(), 'value')),
             'status' => 'approved',
             'provides_specialized_services' => false,
             'economic_activity' => $this->faker->jobTitle(),

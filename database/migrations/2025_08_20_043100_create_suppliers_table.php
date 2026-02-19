@@ -31,6 +31,7 @@ return new class extends Migration
             $table->string('account_number', 20)->nullable();
             $table->string('clabe', 18)->nullable();
             $table->string('currency', 3)->default('MXN')->nullable();
+            $table->string('default_payment_terms', 30)->default('CASH'); // Condiciones de pago por defecto (PaymentTerm enum)
             // 🔹 Nuevos campos internacionales
             $table->string('swift_bic', 11)->nullable();        // código SWIFT (8 o 11 chars)
             $table->string('iban', 34)->nullable();             // máximo 34 caracteres (ISO 13616)

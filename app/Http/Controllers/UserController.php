@@ -632,9 +632,81 @@ class UserController extends Controller
         $user->load('supplier');
         $supplierId = optional($user->supplier)->id;
 
-        // ... (tus validaciones actuales) ...
+        // =====================================================================
+        // VALIDACIONES
+        // =====================================================================
+        $request->validate([
+            // --- Usuario ---
+            'user.name'      => ['required', 'string', 'max:150'],
+            'user.email'     => ['required', 'email', 'max:150',
+                                  Rule::unique('users', 'email')->ignore($user->id)],
+            'user.job_title' => ['nullable', 'string', 'max:100'],
+            'user.is_active' => ['nullable', 'boolean'],
+            'user.avatar'    => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 
-        // === Guardar USER (nombre, email, etc.) ===
+            // --- Empresa / Contacto ---
+            'supplier.company_name'    => ['required', 'string', 'max:255'],
+            'supplier.rfc'             => ['required', 'string', 'max:13',
+                                           Rule::unique('suppliers', 'rfc')->ignore($supplierId)],
+            'supplier.phone_number'    => ['nullable', 'string', 'max:15'],
+            'supplier.contact_person'  => ['nullable', 'string', 'max:100'],
+            'supplier.contact_phone'   => ['nullable', 'string', 'max:10'],
+            'supplier.email'           => ['nullable', 'email', 'max:150'],
+            'supplier.address'         => ['nullable', 'string', 'max:500'],
+            'supplier.supplier_type'   => ['nullable', 'in:product,service,product_service'],
+            'supplier.currency'        => ['nullable', 'string', 'max:3'],
+            'supplier.tax_regime'      => ['nullable', 'in:individual,corporation,resico'],
+            'supplier.status'          => ['nullable', 'in:pending_docs,approved,rejected'],
+            'supplier.economic_activity'     => ['nullable', 'string', 'max:150'],
+            'supplier.default_payment_terms' => ['nullable', Rule::in(array_column(\App\Enum\PaymentTerm::cases(), 'value'))],
+
+            // --- Bancario MX ---
+            'supplier.bank_name'       => ['nullable', 'string', 'max:100'],
+            'supplier.account_number'  => ['nullable', 'string', 'max:20'],
+            'supplier.clabe'           => ['nullable', 'digits:18'],
+
+            // --- Bancario Internacional ---
+            'supplier.us_bank_name'    => ['nullable', 'string', 'max:100'],
+            'supplier.swift_bic'       => ['nullable', 'string', 'min:8', 'max:11'],
+            'supplier.aba_routing'     => ['nullable', 'digits:9'],
+            'supplier.iban'            => ['nullable', 'string', 'max:34'],
+            'supplier.bank_address'    => ['nullable', 'string', 'max:255'],
+
+            // --- REPSE ---
+            'supplier.provides_specialized_services' => ['nullable', 'boolean'],
+            'supplier.repse_registration_number'     => [
+                'nullable', 'string',
+                Rule::requiredIf(fn () => (bool) $request->input('supplier.provides_specialized_services')),
+            ],
+            'supplier.repse_expiry_date'             => [
+                'nullable', 'date',
+                Rule::requiredIf(fn () => (bool) $request->input('supplier.provides_specialized_services')),
+            ],
+            'supplier.specialized_services_types'    => ['nullable', 'array'],
+            'supplier.specialized_services_types.*'  => ['string'],
+        ], [
+            // Mensajes personalizados
+            'user.name.required'              => 'El nombre del usuario es obligatorio.',
+            'user.email.required'             => 'El correo electrónico es obligatorio.',
+            'user.email.unique'               => 'Este correo ya está registrado en otro usuario.',
+            'user.avatar.image'               => 'El avatar debe ser una imagen.',
+            'user.avatar.max'                 => 'El avatar no debe superar 2 MB.',
+            'supplier.company_name.required'  => 'La razón social es obligatoria.',
+            'supplier.rfc.required'           => 'El RFC es obligatorio.',
+            'supplier.rfc.unique'             => 'Este RFC ya está registrado en otro proveedor.',
+            'supplier.email.email'            => 'El correo del proveedor no tiene un formato válido.',
+            'supplier.clabe.digits'           => 'La CLABE debe tener exactamente 18 dígitos.',
+            'supplier.aba_routing.digits'     => 'El ABA/Routing Number debe tener exactamente 9 dígitos.',
+            'supplier.swift_bic.min'          => 'El código SWIFT/BIC debe tener entre 8 y 11 caracteres.',
+            'supplier.swift_bic.max'          => 'El código SWIFT/BIC debe tener entre 8 y 11 caracteres.',
+            'supplier.default_payment_terms.in' => 'Las condiciones de pago seleccionadas no son válidas.',
+            'supplier.repse_registration_number.required' => 'El número de registro REPSE es obligatorio cuando el proveedor presta servicios especializados.',
+            'supplier.repse_expiry_date.required'         => 'La vigencia REPSE es obligatoria cuando el proveedor presta servicios especializados.',
+        ]);
+
+        // =====================================================================
+        // GUARDAR USUARIO
+        // =====================================================================
         $user->fill([
             'name'      => $request->input('user.name'),
             'email'     => $request->input('user.email'),
@@ -642,7 +714,7 @@ class UserController extends Controller
         ]);
         $user->is_active = (bool) $request->input('user.is_active', false);
 
-        // === Avatar ===
+        // --- Avatar ---
         $remove = (bool) $request->input('user.remove_avatar', false);
 
         if ($remove && $user->avatar) {
@@ -654,9 +726,8 @@ class UserController extends Controller
             /** @var UploadedFile $avatar */
             $avatar = $request->file('user.avatar');
 
-            // (opcional) validación defensiva extra:
             if ($avatar->isValid()) {
-                $path = $avatar->store('avatars', 'public'); // storage/app/public/avatars
+                $path = $avatar->store('avatars', 'public');
                 if ($user->avatar && $user->avatar !== $path) {
                     Storage::disk('public')->delete($user->avatar);
                 }
@@ -666,18 +737,55 @@ class UserController extends Controller
 
         $user->save();
 
-        // === Guardar SUPPLIER (lo que ya tienes) ===
+        // =====================================================================
+        // GUARDAR PROVEEDOR
+        // =====================================================================
+        $providesSpecialized = (bool) $request->input('supplier.provides_specialized_services', false);
+
         $supplierData = [
-            'company_name'   => $request->input('supplier.company_name'),
-            'rfc'            => strtoupper((string) $request->input('supplier.rfc')),
-            'contact_person' => $request->input('supplier.contact_person'),
-            'contact_phone'  => $request->input('supplier.contact_phone'),
-            'email'          => $request->input('supplier.email'),
-            'address'        => $request->input('supplier.address'),
-            'supplier_type'  => $request->input('supplier.supplier_type'),
-            'currency'       => $request->input('supplier.currency'),
-            'tax_regime'     => $request->input('supplier.tax_regime'),
-            'status'         => $request->input('supplier.status', $user->supplier->status ?? 'Pending_docs'),
+            // Empresa / Contacto
+            'company_name'     => $request->input('supplier.company_name'),
+            'rfc'              => strtoupper((string) $request->input('supplier.rfc')),
+            'phone_number'     => $request->input('supplier.phone_number'),
+            'contact_person'   => $request->input('supplier.contact_person'),
+            'contact_phone'    => $request->input('supplier.contact_phone'),
+            'email'            => $request->input('supplier.email'),
+            'address'          => $request->input('supplier.address'),
+            'supplier_type'    => $request->input('supplier.supplier_type'),
+            'currency'         => $request->input('supplier.currency', 'MXN'),
+            'tax_regime'       => $request->input('supplier.tax_regime'),
+            'status'           => $request->input('supplier.status', $user->supplier->status ?? 'pending_docs'),
+            'economic_activity'     => $request->input('supplier.economic_activity'),
+            'default_payment_terms' => $request->input('supplier.default_payment_terms', 'CASH'),
+
+            // Bancario MX
+            'bank_name'        => $request->input('supplier.bank_name'),
+            'account_number'   => $request->input('supplier.account_number') ?: null,
+            'clabe'            => $request->input('supplier.clabe') ?: null,
+
+            // Bancario Internacional
+            'us_bank_name'     => $request->input('supplier.us_bank_name'),
+            'swift_bic'        => $request->input('supplier.swift_bic')
+                                    ? strtoupper($request->input('supplier.swift_bic'))
+                                    : null,
+            'aba_routing'      => $request->input('supplier.aba_routing') ?: null,
+            'iban'             => $request->input('supplier.iban')
+                                    ? strtoupper($request->input('supplier.iban'))
+                                    : null,
+            'bank_address'     => $request->input('supplier.bank_address'),
+
+            // REPSE (los campos condicionales se limpian cuando el toggle está desactivado)
+            'provides_specialized_services' => $providesSpecialized,
+            'repse_registration_number'     => $providesSpecialized
+                                                ? $request->input('supplier.repse_registration_number')
+                                                : null,
+            'repse_expiry_date'             => $providesSpecialized
+                                                ? $request->input('supplier.repse_expiry_date')
+                                                : null,
+            // El modelo tiene cast 'array', Laravel serializa el array a JSON automáticamente
+            'specialized_services_types'    => $providesSpecialized
+                                                ? ($request->input('supplier.specialized_services_types') ?? [])
+                                                : [],
         ];
 
         $user->supplier

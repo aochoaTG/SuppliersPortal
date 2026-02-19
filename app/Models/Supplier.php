@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Notifications\Notifiable;
 use \App\Models\SupplierDocument;
+use App\Enum\PaymentTerm;
 use Illuminate\Database\Eloquent\Factories\HasFactory; // 1. Importar el trait
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,6 +37,7 @@ class Supplier extends Model
         'bank_address',
         'aba_routing',
         'us_bank_name',
+        'default_payment_terms',
         // Nuevos campos REPSE
         'provides_specialized_services',
         'repse_registration_number',
@@ -46,9 +48,21 @@ class Supplier extends Model
 
     protected $casts = [
         'provides_specialized_services' => 'boolean',
-        'repse_expiry_date' => 'date',
-        'specialized_services_types' => 'array', // Para almacenar JSON
+        'repse_expiry_date'             => 'date',
+        'specialized_services_types'    => 'array',
     ];
+
+    /**
+     * Devuelve el enum PaymentTerm correspondiente al valor almacenado,
+     * o null si el valor es inválido o nulo.
+     * Úsalo cuando necesites el label o comportamiento del enum.
+     */
+    public function getDefaultPaymentTermEnumAttribute(): ?\App\Enum\PaymentTerm
+    {
+        return $this->default_payment_terms
+            ? \App\Enum\PaymentTerm::tryFrom($this->default_payment_terms)
+            : null;
+    }
 
     public function user(): BelongsTo
     {

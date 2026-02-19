@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use App\Rules\EfosNotListed;
 use App\Rules\ValidRfc;
+use App\Enum\PaymentTerm;
 use Illuminate\Validation\Rule;
 
 class RegisterSupplierRequest extends FormRequest
@@ -48,7 +49,8 @@ class RegisterSupplierRequest extends FormRequest
                 'otros'
             ])],
             'otros_descripcion' => ['nullable', 'string', 'max:255', 'required_if:specialized_services_types.*,otros'],
-            'economic_activity' => ['nullable', 'string', 'max:150'],
+            'economic_activity'     => ['nullable', 'string', 'max:150'],
+            'default_payment_terms' => ['required', Rule::in(array_column(PaymentTerm::cases(), 'value'))],
         ];
     }
 
@@ -97,7 +99,9 @@ class RegisterSupplierRequest extends FormRequest
 
             'otros_descripcion.required_if' => 'Debe especificar qué otros servicios ofrece.',
             'otros_descripcion.max'         => 'La descripción de otros servicios no puede exceder 255 caracteres.',
-            'economic_activity.max' => 'La actividad económica no puede exceder 150 caracteres.',
+            'economic_activity.max'          => 'La actividad económica no puede exceder 150 caracteres.',
+            'default_payment_terms.required' => 'Las condiciones de pago son obligatorias.',
+            'default_payment_terms.in'       => 'Las condiciones de pago seleccionadas no son válidas.',
         ];
     }
 
@@ -122,7 +126,7 @@ class RegisterSupplierRequest extends FormRequest
             'specialized_services_types'    => 'tipos de servicios especializados',
             'otros_descripcion'             => 'descripción de otros servicios',
             'economic_activity'             => 'actividad económica',
-
+            'default_payment_terms'         => 'condiciones de pago',
         ];
     }
 

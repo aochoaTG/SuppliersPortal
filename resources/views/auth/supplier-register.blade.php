@@ -1069,6 +1069,21 @@
                             <x-input-error :messages="$errors->get('economic_activity')" class="input-error" />
                         </div>
 
+                        <!-- Default Payment Terms -->
+                        <div class="form-group full-width">
+                            <x-input-label for="default_payment_terms" :value="__('Condiciones de pago')" class="form-label" />
+                            <select id="default_payment_terms"
+                                    name="default_payment_terms"
+                                    class="professional-input professional-select"
+                                    data-required="1">
+                                @foreach(\App\Enum\PaymentTerm::options() as $value => $label)
+                                    <option value="{{ $value }}" {{ old('default_payment_terms', 'CASH') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <div class="input-hint">Condiciones de pago por defecto para OC y cotizaciones.</div>
+                            <x-input-error :messages="$errors->get('default_payment_terms')" class="input-error" />
+                        </div>
+
                         <!-- ===== NUEVOS CAMPOS REPSE ===== -->
 
                         <!-- REPSE Question -->

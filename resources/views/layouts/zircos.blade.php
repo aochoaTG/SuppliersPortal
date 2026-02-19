@@ -110,10 +110,15 @@
 
             .modal-content {
                 border-radius: 15px;
+            }
+
+            /* overflow:hidden solo en modales NO scrollables (para que border-radius recorte bien los hijos) */
+            .modal-dialog:not(.modal-dialog-scrollable) .modal-content {
                 overflow: hidden;
             }
 
-            .modal-dialog {
+            /* Ancho por defecto solo cuando no hay clase de tamaño explícita de Bootstrap */
+            .modal-dialog:not(.modal-sm):not(.modal-lg):not(.modal-xl):not(.modal-fullscreen) {
                 max-width: 600px;
             }
         </style>

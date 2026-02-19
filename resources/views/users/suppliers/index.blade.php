@@ -6,6 +6,26 @@
 {{-- CSS ADICIONAL (opcional)  --}}
 @push('styles')
 <style>
+/*
+ * Fix scroll modal proveedor.
+ * El <form> queda entre .modal-content y .modal-body, rompiendo la cadena
+ * flex que Bootstrap necesita para modal-dialog-scrollable.
+ * Lo convertimos en un eslabón flex que propaga la altura acotada.
+ */
+#userModal #userForm {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;       /* permite que el flex-item se encoja por debajo de su contenido */
+    overflow: hidden;
+}
+
+#userModal #userForm .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;       /* idem — sin esto el body nunca activa scroll */
+    overflow-y: auto;
+}
+
 /* Estilos para mejorar el preview del avatar */
 #avatarPreview {
     transition: opacity 0.3s ease;

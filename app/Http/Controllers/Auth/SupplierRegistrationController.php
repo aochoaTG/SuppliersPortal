@@ -60,6 +60,9 @@ class SupplierRegistrationController extends Controller
                 'repse_expiry_date'            => $repseData['repse_expiry_date'],
                 'specialized_services_types'   => $repseData['specialized_services_types'],
 
+                // Condiciones de pago por defecto
+                'default_payment_terms' => $data['default_payment_terms'],
+
                 // Bancarios: null hasta activación
                 'bank_name'     => null,
                 'account_number' => null,
