@@ -9,6 +9,9 @@ class PurchaseOrder extends Model
 {
     use SoftDeletes;
 
+    // Días naturales antes de cierre automático por inactividad
+    const INACTIVITY_DAYS = 10;
+
     protected $fillable = [
         'folio',
         'requisition_id',
@@ -21,7 +24,16 @@ class PurchaseOrder extends Model
         'payment_terms',
         'estimated_delivery_days',
         'status',
-        'created_by'
+        'created_by',
+        'approved_at',
+        'closed_at',
+        'inactivity_warning_sent_at',
+    ];
+
+    protected $casts = [
+        'approved_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'inactivity_warning_sent_at' => 'datetime',
     ];
 
     // Relación con el creador (el Superadmin que autorizó)
@@ -46,5 +58,56 @@ class PurchaseOrder extends Model
     public function items()
     {
         return $this->hasMany(PurchaseOrderItem::class);
+    }
+
+    public function isOpen(): bool
+    {
+        return $this->status === 'OPEN';
+    }
+
+    public function isClosedByInactivity(): bool
+    {
+        return $this->status === 'CLOSED_BY_INACTIVITY';
+    }
+
+    public function getStatusLabel(): string
+    {
+        return match ($this->status) {
+            'OPEN' => 'Abierta',
+            'RECEIVED' => 'Recibida',
+            'CANCELLED' => 'Cancelada',
+            'PAID' => 'Pagada',
+            'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
+            default => 'Desconocido',
+        };
+    }
+
+    public function getStatusBadgeClass(): string
+    {
+        return match ($this->status) {
+            'OPEN' => 'warning',
+            'RECEIVED' => 'success',
+            'CANCELLED' => 'danger',
+            'PAID' => 'primary',
+            'CLOSED_BY_INACTIVITY' => 'dark',
+            default => 'secondary',
+        };
+    }
+
+    /**
+     * Fecha límite de aprobación (created_at + 10 días naturales).
+     */
+    public function getAutoCloseDeadline(): \Carbon\Carbon
+    {
+        return $this->created_at->copy()->addDays(self::INACTIVITY_DAYS);
+    }
+
+    /**
+     * Días naturales restantes antes del cierre automático.
+     * Negativo si ya venció.
+     */
+    public function getDaysUntilAutoClose(): int
+    {
+        return (int) now()->diffInDays($this->getAutoCloseDeadline(), false);
     }
 }

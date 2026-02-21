@@ -192,6 +192,10 @@ class DirectPurchaseOrderController extends Controller
      */
     public function approve(Request $request, DirectPurchaseOrder $directPurchaseOrder)
     {
+        if (!$directPurchaseOrder->canBeApproved()) {
+            return back()->withErrors(['error' => 'Esta OCD no puede ser aprobada. Estado actual: ' . $directPurchaseOrder->getStatusLabel()]);
+        }
+
         try {
             DB::beginTransaction();
 

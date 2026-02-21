@@ -15,6 +15,9 @@ class DirectPurchaseOrder extends Model
 
     protected $table = 'odc_direct_purchase_orders';
 
+    // Días naturales antes de cierre automático por inactividad
+    const INACTIVITY_DAYS = 7;
+
     protected $fillable = [
         'folio',
         'supplier_id',
@@ -43,6 +46,8 @@ class DirectPurchaseOrder extends Model
         'returned_at',
         'issued_at',
         'received_at',
+        'closed_at',
+        'inactivity_warning_sent_at',
     ];
 
     protected $casts = [
@@ -55,6 +60,8 @@ class DirectPurchaseOrder extends Model
         'returned_at' => 'datetime',
         'issued_at' => 'datetime',
         'received_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'inactivity_warning_sent_at' => 'datetime',
     ];
 
     /**
@@ -222,6 +229,35 @@ class DirectPurchaseOrder extends Model
         return $this->status === 'CANCELLED';
     }
 
+    public function isClosedByInactivity(): bool
+    {
+        return $this->status === 'CLOSED_BY_INACTIVITY';
+    }
+
+    /**
+     * Fecha límite de aprobación (submitted_at + 7 días naturales).
+     * Retorna null si aún no ha sido enviada a aprobación.
+     */
+    public function getAutoCloseDeadline(): ?\Carbon\Carbon
+    {
+        return $this->submitted_at
+            ? $this->submitted_at->copy()->addDays(self::INACTIVITY_DAYS)
+            : null;
+    }
+
+    /**
+     * Días naturales restantes antes del cierre automático.
+     * Retorna null si no aplica, negativo si ya venció.
+     */
+    public function getDaysUntilAutoClose(): ?int
+    {
+        $deadline = $this->getAutoCloseDeadline();
+        if (!$deadline) {
+            return null;
+        }
+        return (int) now()->diffInDays($deadline, false);
+    }
+
     /**
      * =========================================
      * VALIDACIONES DE PERMISOS Y ACCIONES
@@ -269,6 +305,7 @@ class DirectPurchaseOrder extends Model
             'ISSUED' => 'primary',
             'RECEIVED' => 'success',
             'CANCELLED' => 'dark',
+            'CLOSED_BY_INACTIVITY' => 'dark',
             default => 'secondary'
         };
     }
@@ -284,6 +321,7 @@ class DirectPurchaseOrder extends Model
             'ISSUED' => 'Emitida',
             'RECEIVED' => 'Recibida',
             'CANCELLED' => 'Cancelada',
+            'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
             default => 'Desconocido'
         };
     }
