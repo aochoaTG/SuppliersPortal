@@ -149,11 +149,18 @@ class PurchaseOrderController extends Controller
                         </a>
                     ';
 
-                    // Si está en DRAFT o RETURNED, puede editar
-                    if (in_array($ocd->status, ['DRAFT', 'RETURNED']) && $ocd->created_by === Auth::id()) {
+                    $canEdit = $ocd->status === 'RETURNED' && (int) $ocd->created_by === (int) Auth::id();
+
+                    if ($canEdit) {
                         $editUrl = route('direct-purchase-orders.edit', $ocd->id);
                         $buttons .= '
                             <a href="' . $editUrl . '" class="btn btn-sm btn-outline-warning ms-1" title="Editar">
+                                <i class="ti ti-edit"></i>
+                            </a>
+                        ';
+                    } else {
+                        $buttons .= '
+                            <a class="btn btn-sm btn-outline-warning ms-1 disabled" aria-disabled="true" title="Editar (solo disponible cuando la OCD está Devuelta)">
                                 <i class="ti ti-edit"></i>
                             </a>
                         ';

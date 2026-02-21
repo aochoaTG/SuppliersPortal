@@ -393,26 +393,41 @@ class DirectPurchaseOrderController extends Controller
         }
 
         // Verificar que es el creador
-        if ($directPurchaseOrder->created_by !== Auth::id()) {
+        if ((int) $directPurchaseOrder->created_by !== (int) Auth::id()) {
             return redirect()
                 ->route('purchase-orders.index')
                 ->withErrors(['error' => 'Solo puede editar sus propias OCD.']);
         }
 
         // Cargar relaciones
-        $directPurchaseOrder->load(['items', 'documents']);
+        $directPurchaseOrder->load(['items', 'documents', 'costCenter.company']);
 
         // Cargar datos para el formulario
-        $suppliers = Supplier::where('status', 'ACTIVE')
+        $companies = Auth::user()->companies()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $suppliers = Supplier::active()
             ->orderBy('company_name')
             ->get();
 
-        $costCenters = CostCenter::orderBy('name')->get();
+        $costCenters = Auth::user()->costCenters()
+            ->with('company')
+            ->whereHas('company', function ($query) {
+                $query->where('is_active', true);
+            })
+            ->where('cost_center_user.is_active', true)
+            ->orderBy('name')
+            ->get();
 
-        $expenseCategories = ExpenseCategory::orderBy('name')->get();
+        $expenseCategories = ExpenseCategory::active()
+            ->orderBy('name')
+            ->get();
 
         return view('direct-purchase-orders.edit', compact(
             'directPurchaseOrder',
+            'companies',
             'suppliers',
             'costCenters',
             'expenseCategories'
@@ -427,6 +442,8 @@ class DirectPurchaseOrderController extends Controller
         try {
             DB::beginTransaction();
 
+            $wasReturned = $directPurchaseOrder->isReturned();
+
             // 1. Calcular nuevos totales
             $totals = $this->calculateTotals($request->items);
 
@@ -434,12 +451,25 @@ class DirectPurchaseOrderController extends Controller
             $supplier = Supplier::active()->find($request->supplier_id);
 
             // Calcular días de entrega y el mes de aplicación dinámico
-            $estimatedDays = $request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30;
+            $estimatedDays = (int) ($request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30);
             $applicationMonth = now()->addDays($estimatedDays)->format('Y-m');
 
-            // 3. Actualizar la OCD
-            $directPurchaseOrder->update([
-                'folio' => null,
+            // 3. Si venía de RETURNED, recalcular nivel de aprobación y enviar a PENDING_APPROVAL
+            $newStatus = 'DRAFT';
+            $approvalLevel = null;
+            if ($wasReturned) {
+                $totalAmount = $totals['total'];
+                $approvalLevel = ApprovalLevel::where('min_amount', '<=', $totalAmount)
+                    ->where(function ($query) use ($totalAmount) {
+                        $query->where('max_amount', '>=', $totalAmount)
+                            ->orWhereNull('max_amount');
+                    })
+                    ->first();
+                $newStatus = 'PENDING_APPROVAL';
+            }
+
+            // 4. Actualizar la OCD
+            $updateData = [
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
                 'application_month' => $applicationMonth,
@@ -450,9 +480,16 @@ class DirectPurchaseOrderController extends Controller
                 'currency' => 'MXN',
                 'payment_terms' => $request->payment_terms ?? $supplier->default_payment_terms ?? 'Contado',
                 'estimated_delivery_days' => $estimatedDays,
-                'status' => 'DRAFT',
+                'status' => $newStatus,
                 'created_by' => Auth::id(),
-            ]);
+            ];
+
+            if ($wasReturned) {
+                $updateData['required_approval_level'] = $approvalLevel ? $approvalLevel->level_number : 1;
+                $updateData['submitted_at'] = now();
+            }
+
+            $directPurchaseOrder->update($updateData);
 
             // 4. Eliminar items anteriores y crear nuevos
             $directPurchaseOrder->items()->delete();
@@ -488,6 +525,19 @@ class DirectPurchaseOrderController extends Controller
             }
 
             DB::commit();
+
+            // Si venía de RETURNED, notificar al aprobador asignado
+            if ($wasReturned) {
+                $directPurchaseOrder->refresh();
+                $approver = User::find($directPurchaseOrder->assigned_approver_id);
+                if ($approver) {
+                    $approver->notify(new NewDirectPurchaseOrderNotification($directPurchaseOrder));
+                }
+
+                return redirect()
+                    ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
+                    ->with('success', 'OCD actualizada y reenviada a aprobación exitosamente.');
+            }
 
             return redirect()
                 ->route('direct-purchase-orders.show', $directPurchaseOrder->id)

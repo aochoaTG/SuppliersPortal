@@ -179,7 +179,7 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
                 abort(403, 'Solo se pueden editar OCD en estado Borrador o Devueltas.');
             }
 
-            if ($ocd->created_by !== Auth::id()) {
+            if ((int) $ocd->created_by !== (int) Auth::id()) {
                 abort(403, 'Solo puede editar sus propias OCD.');
             }
         }
