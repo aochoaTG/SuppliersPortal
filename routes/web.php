@@ -38,6 +38,7 @@ use App\Http\Controllers\{
     QuotationApprovalController,
     PurchaseOrderController,
     DirectPurchaseOrderController,
+    ReceivingLocationController,
 };
 
 // ============================================================================
@@ -487,6 +488,12 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
     Route::get('/purchase-orders/datatable/regular', [PurchaseOrderController::class, 'datatableRegular'])->name('purchase-orders.datatable.regular');
     Route::get('/purchase-orders/datatable/direct', [PurchaseOrderController::class, 'datatableDirect'])->name('purchase-orders.datatable.direct');
     Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
+
+    // Receiving Locations (rutas específicas ANTES del resource para evitar conflictos con {id})
+    Route::get('receiving-locations/data', [ReceivingLocationController::class, 'getData'])->name('receiving-locations.data');
+    Route::post('receiving-locations/{receiving_location}/block-portal', [ReceivingLocationController::class, 'blockPortal'])->name('receiving-locations.block-portal');
+    Route::post('receiving-locations/{receiving_location}/unblock-portal', [ReceivingLocationController::class, 'unblockPortal'])->name('receiving-locations.unblock-portal');
+    Route::resource('receiving-locations', ReceivingLocationController::class);
 });
 
 // ============================================================================

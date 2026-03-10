@@ -22,6 +22,7 @@ class RequisitionItem extends Model
         'quantity',
         'unit',
         'suggested_vendor_id',
+        'receiving_location_id',
         'notes',
     ];
 
@@ -75,6 +76,11 @@ class RequisitionItem extends Model
     public function suggestedVendor(): BelongsTo
     {
         return $this->belongsTo(Supplier::class, 'suggested_vendor_id');
+    }
+
+    public function receivingLocation(): BelongsTo
+    {
+        return $this->belongsTo(ReceivingLocation::class);
     }
 
     // =========================================================================

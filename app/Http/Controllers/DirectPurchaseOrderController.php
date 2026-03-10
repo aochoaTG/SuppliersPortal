@@ -10,6 +10,7 @@ use App\Models\Supplier;
 use App\Models\CostCenter;
 use App\Models\ExpenseCategory;
 use App\Models\ApprovalLevel;
+use App\Models\ReceivingLocation;
 use App\Models\User;
 use App\Notifications\NewDirectPurchaseOrderNotification;
 use App\Http\Requests\SaveDirectPurchaseOrderRequest;
@@ -52,11 +53,18 @@ class DirectPurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Ubicaciones de recepción activas
+        $receivingLocations = ReceivingLocation::active()
+            ->where('portal_blocked', false)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'type', 'city']);
+
         return view('direct-purchase-orders.create', compact(
             'companies',
             'costCenters',
             'suppliers',
-            'expenseCategories'
+            'expenseCategories',
+            'receivingLocations'
         ));
     }
 
@@ -93,6 +101,7 @@ class DirectPurchaseOrderController extends Controller
                 'folio' => DirectPurchaseOrder::generateNextFolio(), // ✅ CORREGIDO: Generar folio de inmediato
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
+                'receiving_location_id' => $request->receiving_location_id,
                 'application_month' => $applicationMonth,
                 'justification' => $request->justification,
                 'subtotal' => $totals['subtotal'],
@@ -429,12 +438,18 @@ class DirectPurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
+        $receivingLocations = ReceivingLocation::active()
+            ->where('portal_blocked', false)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'type', 'city']);
+
         return view('direct-purchase-orders.edit', compact(
             'directPurchaseOrder',
             'companies',
             'suppliers',
             'costCenters',
-            'expenseCategories'
+            'expenseCategories',
+            'receivingLocations'
         ));
     }
 
@@ -476,6 +491,7 @@ class DirectPurchaseOrderController extends Controller
             $updateData = [
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
+                'receiving_location_id' => $request->receiving_location_id,
                 'application_month' => $applicationMonth,
                 'justification' => $request->justification,
                 'subtotal' => $totals['subtotal'],

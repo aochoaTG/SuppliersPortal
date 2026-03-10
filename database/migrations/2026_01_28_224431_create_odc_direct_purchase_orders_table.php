@@ -20,6 +20,7 @@ return new class extends Migration
             // Relaciones principales
             $table->foreignId('supplier_id')->constrained()->noActionOnDelete();
             $table->foreignId('cost_center_id')->constrained()->noActionOnDelete();
+            $table->foreignId('receiving_location_id')->constrained('receiving_locations')->noActionOnDelete();
 
             // Datos de la solicitud
             $table->string('application_month', 7); // YYYY-MM (ej: 2026-03)
@@ -81,6 +82,7 @@ return new class extends Migration
             $table->index(['cost_center_id', 'application_month']);
             $table->index('created_by');
             $table->index('assigned_approver_id');
+            $table->index('receiving_location_id');
         });
     }
 

@@ -22,6 +22,7 @@ class DirectPurchaseOrder extends Model
         'folio',
         'supplier_id',
         'cost_center_id',
+        'receiving_location_id',
         'application_month',
         'justification',
         'subtotal',
@@ -78,6 +79,11 @@ class DirectPurchaseOrder extends Model
     public function costCenter(): BelongsTo
     {
         return $this->belongsTo(CostCenter::class);
+    }
+
+    public function receivingLocation(): BelongsTo
+    {
+        return $this->belongsTo(ReceivingLocation::class);
     }
 
     public function creator(): BelongsTo

@@ -209,25 +209,51 @@
 
 <hr>
 
+{{-- SELECTOR DE UBICACIÓN: aplicar a todas las partidas --}}
+<div class="row g-2 mb-2 align-items-end">
+    <div class="col-md-6">
+        <label class="form-label form-label-sm fw-bold">
+            <i class="ti ti-map-pin me-1 text-primary"></i>Ubicación de recepción por defecto
+            <span class="text-muted fw-normal small ms-1">(se aplica a todas las partidas)</span>
+        </label>
+        <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="ti ti-map-pin"></i></span>
+            <select id="default_receiving_location" class="form-select form-select-sm">
+                <option value="">Seleccionar ubicación para todas las partidas...</option>
+                @foreach($receivingLocations as $loc)
+                    <option value="{{ $loc->id }}">[{{ $loc->code }}] {{ $loc->name }}{{ $loc->city ? ' — '.$loc->city : '' }}</option>
+                @endforeach
+            </select>
+        </div>
+    </div>
+    <div class="col-auto">
+        <button type="button" class="btn btn-sm btn-outline-primary" id="btnApplyLocationToAll">
+            <i class="ti ti-copy me-1"></i>Aplicar a todas
+        </button>
+    </div>
+</div>
+
 {{-- Tabla de partidas --}}
 <div class="table-responsive">
     <table class="table-bordered table align-middle" id="itemsTable">
         <colgroup>
-            <col style="width:70px;"> {{-- # --}}
-            <col style="width:200px;"> {{-- Categoría / Código --}}
-            <col> {{-- Descripción (Proveedor/Notas) --}}
-            <col style="width:180px;"> {{-- Cantidad / Unidad --}}
-            <col style="width:140px;"> {{-- Precio unit. --}}
-            <col style="width:160px;"> {{-- IVA % (más ancho) --}}
-            <col style="width:140px;"> {{-- Subtotal --}}
-            <col style="width:140px;"> {{-- Total --}}
-            <col style="width:60px;"> {{-- Acción --}}
+            <col style="width:50px;">  {{-- # --}}
+            <col style="width:180px;"> {{-- Categoría / Código --}}
+            <col>                      {{-- Descripción (Proveedor/Notas) --}}
+            <col style="width:160px;"> {{-- Ubicación de recepción --}}
+            <col style="width:160px;"> {{-- Cantidad / Unidad --}}
+            <col style="width:120px;"> {{-- Precio unit. --}}
+            <col style="width:150px;"> {{-- IVA % --}}
+            <col style="width:120px;"> {{-- Subtotal --}}
+            <col style="width:120px;"> {{-- Total --}}
+            <col style="width:50px;">  {{-- Acción --}}
         </colgroup>
         <thead class="table-light">
             <tr>
                 <th>#</th>
                 <th>Categoría / Código</th>
                 <th>Descripción (Proveedor/Notas)</th>
+                <th>Ubicación <span class="text-danger">*</span></th>
                 <th>Cantidad / Unidad</th>
                 <th>Precio unit.</th>
                 <th>IVA %</th>
@@ -250,7 +276,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="9" class="text-end"> {{-- 👈 antes 10 --}}
+                <td colspan="10" class="text-end">
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddRow">
                         <i class="ti ti-plus"></i> Agregar partida
                     </button>
@@ -496,6 +522,18 @@
             $(document).ready(function() {
                 initVendorSelect(document);
             });
+
+        // ---- Aplicar ubicación de recepción a todas las partidas ----
+        document.getElementById('btnApplyLocationToAll')?.addEventListener('click', function() {
+            const locId = document.getElementById('default_receiving_location').value;
+            if (!locId) {
+                Swal.fire({ icon: 'warning', title: 'Sin ubicación', text: 'Selecciona una ubicación primero.', confirmButtonText: 'OK' });
+                return;
+            }
+            document.querySelectorAll('#itemsTable tbody .location-select').forEach(function(sel) {
+                sel.value = locId;
+            });
+        });
 
             // Si en tu código de agregar fila usas addRow(), llama initVendorSelect en la nueva fila:
             // Busca tu función addRow y añade esta línea al final.

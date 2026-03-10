@@ -9,6 +9,7 @@ use App\Models\ProductService;
 use App\Models\Requisition;
 use App\Models\RequisitionItem;
 use App\Models\ExpenseCategory;
+use App\Models\ReceivingLocation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -114,6 +115,8 @@ class QuotationPlannerTestSeeder extends Seeder
         // ====================================================================
         // 5. PARTIDAS (Siguiendo su migración SIN PRECIOS)
         // ====================================================================
+        $defaultLocation = ReceivingLocation::where('is_active', true)->first();
+
         $products = ProductService::all();
         foreach ($products as $index => $product) {
             RequisitionItem::create([
@@ -126,6 +129,7 @@ class QuotationPlannerTestSeeder extends Seeder
                 'expense_category_id' => $expenseCat->id,
                 'quantity' => 5,
                 'unit' => 'PZA',
+                'receiving_location_id' => $defaultLocation->id,
                 'notes' => 'Partida generada para validación del Portal de Proveedores.',
             ]);
         }

@@ -86,9 +86,9 @@
                         </div>
                     </div>
 
-                    {{-- FILA 2: EMPRESA Y CENTRO DE COSTO --}}
+                    {{-- FILA 2: EMPRESA, CENTRO DE COSTO Y UBICACIÓN DE RECEPCIÓN --}}
                     <div class="row g-2 mb-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label small fw-bold">Empresa <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-building-store"></i></span>
@@ -103,7 +103,7 @@
                             </div>
                             @error('company_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label small fw-bold">Centro de Costo <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-chart-pie"></i></span>
@@ -119,6 +119,21 @@
                                 </select>
                             </div>
                             @error('cost_center_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Ubicación de Recepción <span class="text-danger">*</span></label>
+                            <div class="input-group input-group-sm input-group-select2">
+                                <span class="input-group-text"><i class="ti ti-map-pin"></i></span>
+                                <select name="receiving_location_id" id="receiving_location_id" class="form-select form-select-sm @error('receiving_location_id') is-invalid @enderror" required>
+                                    <option value="">Seleccione...</option>
+                                    @foreach($receivingLocations as $loc)
+                                        <option value="{{ $loc->id }}" {{ old('receiving_location_id') == $loc->id ? 'selected' : '' }}>
+                                            {{ $loc->name }}{{ $loc->city ? ' — '.$loc->city : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('receiving_location_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
                     </div>
 
@@ -471,7 +486,7 @@ $(document).ready(function() {
     // INICIALIZACIÓN SELECT2
     // ============================================
 
-    $('#supplier_id, #cost_center_id, #company_id').select2({
+    $('#supplier_id, #cost_center_id, #company_id, #receiving_location_id').select2({
         theme: 'bootstrap-5',
         width: '100%',
         placeholder: 'Seleccione...',

@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Gate; // 👈 AGREGAR ESTA LÍNEA
 use App\Models\SupplierDocument;
+use App\Models\ReceivingLocation; // 👈 AGREGAR ESTA LÍNEA
+use App\Policies\ReceivingLocationPolicy; // 👈 AGREGAR ESTA LÍNEA
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // 👇 REGISTRAR LA POLICY PARA RECEIVINGLOCATION
+        Gate::policy(ReceivingLocation::class, ReceivingLocationPolicy::class);
+
         // Inyectar el número de documentos pendientes en el sidebar
         View::composer('layouts.partials.sidebar', function ($view) {
             try {

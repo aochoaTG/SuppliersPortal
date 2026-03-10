@@ -35,6 +35,9 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
             // Datos Presupuestales
             'cost_center_id' => ['required', 'integer', 'exists:cost_centers,id'],
 
+            // Ubicación de recepción (obligatoria)
+            'receiving_location_id' => ['required', 'integer', 'exists:receiving_locations,id'],
+
             // Justificación
             'justification' => ['required', 'string', 'min:100', 'max:2000'],
 
@@ -72,6 +75,10 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
             // Datos Presupuestales
             'cost_center_id.required' => 'Debe seleccionar un centro de costo.',
             'cost_center_id.exists' => 'El centro de costo seleccionado no existe.',
+
+            // Ubicación de recepción
+            'receiving_location_id.required' => 'Debe seleccionar una ubicación de recepción.',
+            'receiving_location_id.exists' => 'La ubicación de recepción seleccionada no existe o está inactiva.',
 
             // Justificación
             'justification.required' => 'La justificación es obligatoria.',

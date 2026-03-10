@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             ExpenseCategorySeeder::class,
             BudgetMonthlyDistributionSeeder::class,
             SupplierSeeder::class,
+            ReceivingLocationSeeder::class,
             QuotationPlannerTestSeeder::class,
             ApprovalLevelSeeder::class,
         ]);

@@ -11,6 +11,7 @@ use App\Models\Company;
 use App\Models\Department;
 use App\Models\ExpenseCategory;
 use App\Models\ProductService;
+use App\Models\ReceivingLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -417,6 +418,7 @@ class RequisitionController extends Controller
             'departments' => Department::active()->orderBy('name')->get(['id', 'name']),
             'statusOptions' => RequisitionStatus::options(),
             'expenseCategories' => ExpenseCategory::active()->orderBy('name')->get(['id', 'name']),
+            'receivingLocations' => ReceivingLocation::active()->where('portal_blocked', false)->orderBy('name')->get(['id', 'code', 'name', 'city']),
             'selectedCompanyId' => $selectedCompanyId,
             'currentMonth' => (int) date('n'),
             'months' => $this->getMonthsOptions(),
@@ -538,6 +540,9 @@ class RequisitionController extends Controller
             // === Datos definidos por el requisitor ===
             // RN-010A, RN-010B: Categoría de gasto OBLIGATORIA, definida por REQUISITOR
             'expense_category_id' => $itemData['expense_category_id'],
+
+            // Ubicación de recepción (obligatoria por partida)
+            'receiving_location_id' => $itemData['receiving_location_id'],
 
             // Cantidad solicitada (mínimo 0.001)
             'quantity' => max(0.001, (float) ($itemData['quantity'] ?? 1)),

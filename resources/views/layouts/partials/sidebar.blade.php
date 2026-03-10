@@ -429,6 +429,13 @@
                         </li>
 
                         <li class="side-nav-item">
+                            <a href="{{ route('receiving-locations.index') }}"
+                                class="side-nav-link {{ request()->routeIs('receiving-locations.*') ? 'active' : '' }}">
+                                <span class="menu-text">Ubicaciones de Recepción</span>
+                            </a>
+                        </li>
+
+                        <li class="side-nav-item">
                             <a href="{{ route('taxes.index') }}"
                                 class="side-nav-link {{ request()->routeIs('taxes.index') ? 'active' : '' }}">
                                 <span class="menu-text">IVA</span>
