@@ -82,6 +82,17 @@
                     <span>{{ $requisition->costCenter->code }} - {{ $requisition->costCenter->name }}</span>
                 </div>
             </div>
+            @if ($requisition->receivingLocation)
+            <div class="col-md-4">
+                <label class="form-label text-muted text-uppercase fs-11 fw-bold">Punto de Entrega</label>
+                <div class="d-flex align-items-center bg-light p-2 rounded border">
+                    <i class="ti ti-map-pin me-2 text-primary"></i>
+                    <span class="fw-medium text-dark text-truncate">
+                        {{ $requisition->receivingLocation->code }} - {{ $requisition->receivingLocation->name }}
+                    </span>
+                </div>
+            </div>
+            @endif
         </div>
 
         {{-- Notas del Requisitor --}}

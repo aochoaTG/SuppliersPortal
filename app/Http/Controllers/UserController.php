@@ -279,6 +279,8 @@ class UserController extends Controller
 
     public function show(User $user)
     {
+        $user->load(['roles.permissions', 'companies', 'costCenters', 'employee']);
+
         return view('users.staff.show', compact('user'));
     }
 

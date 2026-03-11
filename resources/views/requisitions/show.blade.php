@@ -59,8 +59,7 @@
 <div class="card">
     <div class="card-header">
         <h5 class="mb-0">
-            <i class="ti ti-info-circle me-2"></i>Información General
-        </h5>
+            <i class="ti ti-info-circle me-2"></i>Información General</h5>
     </div>
 
     <div class="card-body">
@@ -94,6 +93,13 @@
                     </dt>
                     <dd class="col-sm-7 fw-semibold">
                         {{ $requisition->department?->name ?? '—' }}
+                    </dd>
+
+                    <dt class="col-sm-5 text-muted">
+                        <i class="ti ti-map-pin me-1"></i> Punto de entrega
+                    </dt>
+                    <dd class="col-sm-7 fw-semibold">
+                        {{ $requisition->receivingLocation ? $requisition->receivingLocation->code . ' - ' . $requisition->receivingLocation->name : '—' }}
                     </dd>
 
                     <dt class="col-sm-5 text-muted">

@@ -30,6 +30,13 @@
             <p class="mb-0 small">
                 <strong>Centro de Costos:</strong> {{ $requisition->costCenter->name ?? 'N/A' }} {{-- --}}
             </p>
+            @if($requisition->receivingLocation)
+            <p class="mb-0 small mt-1">
+                <strong>Punto de Entrega:</strong>
+                <i class="ti ti-map-pin text-primary me-1"></i>
+                {{ $requisition->receivingLocation->code }} - {{ $requisition->receivingLocation->name }}
+            </p>
+            @endif
         </div>
 
         {{-- COLUMNA DERECHA: Tiempos y Estado --}}

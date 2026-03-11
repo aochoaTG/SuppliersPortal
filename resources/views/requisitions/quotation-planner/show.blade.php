@@ -68,7 +68,16 @@
                         </div>
                     </div>
                     <div class="row mt-3">
-                        <div class="col-12">
+                        @if ($requisition->receivingLocation)
+                        <div class="col-md-3">
+                            <h6 class="text-muted mb-1">Punto de Entrega</h6>
+                            <p class="mb-0">
+                                <i class="ti ti-map-pin me-1 text-primary"></i>
+                                {{ $requisition->receivingLocation->code }} - {{ $requisition->receivingLocation->name }}
+                            </p>
+                        </div>
+                        @endif
+                        <div class="col-12 col-md-9">
                             <h6 class="text-muted mb-1">Descripción</h6>
                             <p class="mb-0">{{ $requisition->description ?? 'Sin descripción' }}</p>
                         </div>
