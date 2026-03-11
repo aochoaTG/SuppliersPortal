@@ -135,7 +135,7 @@ class RequisitionWorkflowController extends Controller
      * (especificaciones claras, tiempos de entrega viables, etc.) y la marca
      * como lista para iniciar el proceso de cotización.
      */
-    public function validate(Request $request, Requisition $requisition)
+    public function approveForQuotation(Request $request, Requisition $requisition)
     {
         // Idempotencia: si ya está en cotización, no hacer nada
         if ($requisition->status === RequisitionStatus::IN_QUOTATION) {
