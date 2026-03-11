@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\Log;
 use App\Models\QuotationGroup;
+use App\Models\ReceivingLocation;
 use App\Models\Rfq;
 use App\Models\QuotationSummary;
 
@@ -24,6 +25,7 @@ class Requisition extends Model
     protected $fillable = [
         'company_id',
         'cost_center_id',
+        'receiving_location_id',
         'department_id',
         'folio',
         'requested_by',
@@ -110,6 +112,14 @@ class Requisition extends Model
     public function items(): HasMany
     {
         return $this->hasMany(RequisitionItem::class, 'requisition_id');
+    }
+
+    /**
+     * Ubicación de recepción donde se recibirán los bienes/servicios.
+     */
+    public function receivingLocation(): BelongsTo
+    {
+        return $this->belongsTo(ReceivingLocation::class);
     }
 
     /**

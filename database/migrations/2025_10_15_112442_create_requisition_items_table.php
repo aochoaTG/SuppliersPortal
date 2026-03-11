@@ -45,11 +45,6 @@ return new class extends Migration
                 ->constrained('suppliers')
                 ->onDelete('set null');
 
-            // Ubicación de recepción (obligatoria por partida)
-            $table->foreignId('receiving_location_id')
-                ->constrained('receiving_locations')
-                ->noActionOnDelete();
-
             // Notas adicionales (opcional)
             $table->text('notes')->nullable();
 
@@ -59,7 +54,6 @@ return new class extends Migration
             $table->index('requisition_id');
             $table->index('product_service_id');
             $table->index('expense_category_id');
-            $table->index('receiving_location_id');
 
             // Asegurar que line_number sea único dentro de cada requisición
             $table->unique(['requisition_id', 'line_number']);

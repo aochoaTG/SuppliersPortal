@@ -22,6 +22,11 @@ return new class extends Migration {
                 ->onUpdate('NO ACTION')
                 ->onDelete('NO ACTION');
 
+            $table->foreignId('receiving_location_id')
+                ->constrained('receiving_locations')
+                ->onUpdate('NO ACTION')
+                ->onDelete('NO ACTION');
+
             $table->foreignId('department_id')
                 ->nullable()
                 ->constrained('departments')

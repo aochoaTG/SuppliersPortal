@@ -5,6 +5,7 @@ namespace App\Livewire;
 use Livewire\Component;
 use App\Models\Company;
 use App\Models\CostCenter;
+use App\Models\ReceivingLocation;
 use App\Models\Requisition;
 use App\Models\RequisitionItem;
 use App\Enum\RequisitionStatus;
@@ -28,6 +29,10 @@ class RequisitionForm extends Component
     // ===== COLECCIONES =====
     public $companies = [];
     public $costCenters = [];
+    public $receivingLocations = [];
+
+    // ===== UBICACIÓN DE RECEPCIÓN =====
+    public $receiving_location_id;
 
     // ===== CONTADOR DE CARACTERES =====
     public $descriptionMaxLength = 500;
@@ -45,6 +50,9 @@ class RequisitionForm extends Component
     {
         // Cargar solo las compañías del usuario autenticado
         $this->companies = Auth::user()->companies()->orderBy('name')->get();
+
+        // Cargar ubicaciones de recepción activas
+        $this->receivingLocations = ReceivingLocation::active()->orderBy('name')->get();
 
         if ($requisition && $requisition->exists) {
             // ===== MODO EDICIÓN =====
@@ -68,6 +76,9 @@ class RequisitionForm extends Component
             // Cargar centros de costo de la compañía
             $this->loadCostCenters($this->company_id);
             $this->cost_center_id = $requisition->cost_center_id;
+
+            // Cargar ubicación de recepción de la cabecera
+            $this->receiving_location_id = $requisition->receiving_location_id;
 
             // Cargar partidas existentes
             $this->items = $requisition->items->map(function ($item) {
@@ -122,11 +133,13 @@ class RequisitionForm extends Component
         $this->validate([
             'company_id' => 'required|exists:companies,id',
             'cost_center_id' => 'required|exists:cost_centers,id',
+            'receiving_location_id' => 'required|exists:receiving_locations,id',
             'required_date' => 'nullable|date|after_or_equal:today',
             'description' => 'nullable|string|max:500',
         ], [
             'company_id.required' => 'La compañía es obligatoria.',
             'cost_center_id.required' => 'El centro de costos es obligatorio.',
+            'receiving_location_id.required' => 'La ubicación de recepción es obligatoria.',
             'required_date.after_or_equal' => 'La fecha requerida no puede ser anterior a hoy.',
         ]);
 
@@ -147,6 +160,7 @@ class RequisitionForm extends Component
                 $requisition->update([
                     'company_id' => $this->company_id,
                     'cost_center_id' => $this->cost_center_id,
+                    'receiving_location_id' => $this->receiving_location_id,
                     'required_date' => $this->required_date,
                     'description' => $this->description,
                     'status' => $status === 'pending' ? 'draft' : $status, // Se cambiará después si es pending
@@ -178,15 +192,16 @@ class RequisitionForm extends Component
             } else {
                 // ===== MODO CREACIÓN =====
                 $requisition = Requisition::create([
-                    'company_id' => $this->company_id,
-                    'cost_center_id' => $this->cost_center_id,
-                    'folio' => Requisition::nextFolio(),
-                    'requested_by' => Auth::id(),
-                    'required_date' => $this->required_date,
-                    'description' => $this->description,
-                    'status' => 'draft',
-                    'created_by' => Auth::id(),
-                    'fiscal_year' => now()->year,
+                    'company_id'           => $this->company_id,
+                    'cost_center_id'       => $this->cost_center_id,
+                    'receiving_location_id' => $this->receiving_location_id,
+                    'folio'                => Requisition::nextFolio(),
+                    'requested_by'         => Auth::id(),
+                    'required_date'        => $this->required_date,
+                    'description'          => $this->description,
+                    'status'               => 'draft',
+                    'created_by'           => Auth::id(),
+                    'fiscal_year'          => now()->year,
                 ]);
 
                 // Crear partidas
@@ -201,9 +216,9 @@ class RequisitionForm extends Component
                         'expense_category_id' => $item['expense_category_id'],
                         'item_category'       => $product->product_type,
                         'quantity'            => $item['quantity'],
-                        'unit'                => $item['unit'],
+                        'unit'               => $item['unit'],
                         'suggested_vendor_id' => $product->default_vendor_id ?? null,
-                        'notes'               => $item['notes'] ?? null,
+                        'notes'              => $item['notes'] ?? null,
                     ]);
                 }
 

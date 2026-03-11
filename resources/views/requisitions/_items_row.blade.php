@@ -32,16 +32,6 @@
         </div>
     </td>
 
-    {{-- Ubicación de Recepción --}}
-    <td>
-        <select name="items[__INDEX__][receiving_location_id]" class="form-select form-select-sm location-select" required>
-            <option value="">-- Ubicación --</option>
-            @foreach ($receivingLocations as $loc)
-                <option value="{{ $loc->id }}">[{{ $loc->code }}] {{ $loc->name }}</option>
-            @endforeach
-        </select>
-    </td>
-
     {{-- Cantidad / Unidad --}}
     <td>
         <div class="d-flex flex-column gap-1">

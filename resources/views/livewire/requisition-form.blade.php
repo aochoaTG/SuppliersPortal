@@ -52,7 +52,7 @@
                     </div>
 
                     {{-- Centro de costo --}}
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label for="cost_center_id" class="form-label">Centro de costo <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">
@@ -85,6 +85,30 @@
                         </div>
                     </div>
 
+                    {{-- Ubicación de recepción --}}
+                    <div class="col-md-3">
+                        <label for="receiving_location_id" class="form-label">Ubicación recepción <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="ti ti-map-pin"></i>
+                            </span>
+                            <select wire:model.live="receiving_location_id"
+                                    id="receiving_location_id"
+                                    class="form-select @error('receiving_location_id') is-invalid @enderror"
+                                    required>
+                                <option value="">Seleccionar...</option>
+                                @foreach ($receivingLocations as $loc)
+                                    <option value="{{ $loc->id }}">
+                                        {{ $loc->name }}{{ $loc->city ? ' — ' . $loc->city : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @error('receiving_location_id')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     {{-- Fecha requerida --}}
                     <div class="col-md-2">
                         <label for="required_date" class="form-label">Fecha requerida</label>
@@ -103,7 +127,7 @@
                     </div>
 
                     {{-- Descripción con contador de caracteres --}}
-                    <div class="col-md-5">
+                    <div class="col-md-3">
                         <label for="description" class="form-label">
                             Descripción
                             <span class="ms-2 badge {{ $descriptionRemainingChars < 50 ? 'bg-danger' : 'bg-secondary' }}">

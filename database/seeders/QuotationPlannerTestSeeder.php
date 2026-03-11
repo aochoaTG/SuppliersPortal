@@ -97,9 +97,12 @@ class QuotationPlannerTestSeeder extends Seeder
         // ====================================================================
         // 4. REQUISICIÓN MAESTRA (Ajustado a su modelo Requisition)
         // ====================================================================
+        $defaultLocation = ReceivingLocation::where('is_active', true)->first();
+
         $requisition = Requisition::create([
             'company_id' => 1,
             'cost_center_id' => 1,
+            'receiving_location_id' => $defaultLocation->id,
             'department_id' => 1,
             'folio' => Requisition::nextFolio(),
             'requested_by' => $admin->id,
@@ -115,8 +118,6 @@ class QuotationPlannerTestSeeder extends Seeder
         // ====================================================================
         // 5. PARTIDAS (Siguiendo su migración SIN PRECIOS)
         // ====================================================================
-        $defaultLocation = ReceivingLocation::where('is_active', true)->first();
-
         $products = ProductService::all();
         foreach ($products as $index => $product) {
             RequisitionItem::create([
@@ -129,7 +130,6 @@ class QuotationPlannerTestSeeder extends Seeder
                 'expense_category_id' => $expenseCat->id,
                 'quantity' => 5,
                 'unit' => 'PZA',
-                'receiving_location_id' => $defaultLocation->id,
                 'notes' => 'Partida generada para validación del Portal de Proveedores.',
             ]);
         }

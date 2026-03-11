@@ -388,6 +388,7 @@ class RequisitionController extends Controller
         $requisition->load([
             'company',
             'costCenter',
+            'receivingLocation',
             'department',
             'items.productService',
             'items.expenseCategory',
@@ -433,6 +434,7 @@ class RequisitionController extends Controller
         return Requisition::create([
             'company_id' => $data['company_id'],
             'cost_center_id' => $data['cost_center_id'],
+            'receiving_location_id' => $data['receiving_location_id'],
             'department_id' => $data['department_id'],
             'fiscal_year' => $data['fiscal_year'],
             'folio' => Requisition::nextFolio($data['fiscal_year']),
@@ -455,10 +457,11 @@ class RequisitionController extends Controller
             'updated_by' => Auth::id(),
         ];
 
-        // Solo permitir cambiar cost_center y department si está en draft
+        // Solo permitir cambiar cost_center, department y receiving_location si está en draft
         if ($requisition->isDraft()) {
             $updateData['cost_center_id'] = $data['cost_center_id'];
             $updateData['department_id'] = $data['department_id'];
+            $updateData['receiving_location_id'] = $data['receiving_location_id'];
         }
 
         $requisition->update($updateData);
@@ -540,9 +543,6 @@ class RequisitionController extends Controller
             // === Datos definidos por el requisitor ===
             // RN-010A, RN-010B: Categoría de gasto OBLIGATORIA, definida por REQUISITOR
             'expense_category_id' => $itemData['expense_category_id'],
-
-            // Ubicación de recepción (obligatoria por partida)
-            'receiving_location_id' => $itemData['receiving_location_id'],
 
             // Cantidad solicitada (mínimo 0.001)
             'quantity' => max(0.001, (float) ($itemData['quantity'] ?? 1)),

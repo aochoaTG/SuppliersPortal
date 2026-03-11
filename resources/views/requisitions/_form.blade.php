@@ -186,6 +186,28 @@
                 </div>
 
                 <div class="col-md-3">
+                    <label for="receiving_location_id" class="form-label form-label-sm">
+                        Ubicación de recepción <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="ti ti-map-pin"></i></span>
+                        <select id="receiving_location_id" name="receiving_location_id"
+                            class="form-select-sm @error('receiving_location_id') is-invalid @enderror form-select" required>
+                            <option value="">-- Selecciona --</option>
+                            @foreach ($receivingLocations as $loc)
+                                <option value="{{ $loc->id }}"
+                                    {{ (int) old('receiving_location_id', $requisition->receiving_location_id ?? 0) === (int) $loc->id ? 'selected' : '' }}>
+                                    [{{ $loc->code }}] {{ $loc->name }}{{ $loc->city ? ' — ' . $loc->city : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('receiving_location_id')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="col-md-3">
                     <label for="description" class="form-label form-label-sm">
                         Descripción <span class="text-danger">*</span>
                     </label>
@@ -207,32 +229,6 @@
     </div>
 </div>
 
-<hr>
-
-{{-- SELECTOR DE UBICACIÓN: aplicar a todas las partidas --}}
-<div class="row g-2 mb-2 align-items-end">
-    <div class="col-md-6">
-        <label class="form-label form-label-sm fw-bold">
-            <i class="ti ti-map-pin me-1 text-primary"></i>Ubicación de recepción por defecto
-            <span class="text-muted fw-normal small ms-1">(se aplica a todas las partidas)</span>
-        </label>
-        <div class="input-group input-group-sm">
-            <span class="input-group-text"><i class="ti ti-map-pin"></i></span>
-            <select id="default_receiving_location" class="form-select form-select-sm">
-                <option value="">Seleccionar ubicación para todas las partidas...</option>
-                @foreach($receivingLocations as $loc)
-                    <option value="{{ $loc->id }}">[{{ $loc->code }}] {{ $loc->name }}{{ $loc->city ? ' — '.$loc->city : '' }}</option>
-                @endforeach
-            </select>
-        </div>
-    </div>
-    <div class="col-auto">
-        <button type="button" class="btn btn-sm btn-outline-primary" id="btnApplyLocationToAll">
-            <i class="ti ti-copy me-1"></i>Aplicar a todas
-        </button>
-    </div>
-</div>
-
 {{-- Tabla de partidas --}}
 <div class="table-responsive">
     <table class="table-bordered table align-middle" id="itemsTable">
@@ -240,7 +236,6 @@
             <col style="width:50px;">  {{-- # --}}
             <col style="width:180px;"> {{-- Categoría / Código --}}
             <col>                      {{-- Descripción (Proveedor/Notas) --}}
-            <col style="width:160px;"> {{-- Ubicación de recepción --}}
             <col style="width:160px;"> {{-- Cantidad / Unidad --}}
             <col style="width:120px;"> {{-- Precio unit. --}}
             <col style="width:150px;"> {{-- IVA % --}}
@@ -253,7 +248,6 @@
                 <th>#</th>
                 <th>Categoría / Código</th>
                 <th>Descripción (Proveedor/Notas)</th>
-                <th>Ubicación <span class="text-danger">*</span></th>
                 <th>Cantidad / Unidad</th>
                 <th>Precio unit.</th>
                 <th>IVA %</th>
@@ -276,7 +270,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="10" class="text-end">
+                <td colspan="9" class="text-end">
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddRow">
                         <i class="ti ti-plus"></i> Agregar partida
                     </button>
@@ -523,17 +517,6 @@
                 initVendorSelect(document);
             });
 
-        // ---- Aplicar ubicación de recepción a todas las partidas ----
-        document.getElementById('btnApplyLocationToAll')?.addEventListener('click', function() {
-            const locId = document.getElementById('default_receiving_location').value;
-            if (!locId) {
-                Swal.fire({ icon: 'warning', title: 'Sin ubicación', text: 'Selecciona una ubicación primero.', confirmButtonText: 'OK' });
-                return;
-            }
-            document.querySelectorAll('#itemsTable tbody .location-select').forEach(function(sel) {
-                sel.value = locId;
-            });
-        });
 
             // Si en tu código de agregar fila usas addRow(), llama initVendorSelect en la nueva fila:
             // Busca tu función addRow y añade esta línea al final.

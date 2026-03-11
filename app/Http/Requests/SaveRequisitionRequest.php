@@ -44,6 +44,13 @@ class SaveRequisitionRequest extends FormRequest
                 'exists:departments,id',
             ],
 
+            'receiving_location_id' => [
+                $isUpdate ? 'sometimes' : 'required',
+                'required',
+                'integer',
+                'exists:receiving_locations,id',
+            ],
+
             'required_date' => [
                 'nullable',
                 'date',
@@ -119,12 +126,6 @@ class SaveRequisitionRequest extends FormRequest
                 }),
             ],
 
-            'items.*.receiving_location_id' => [
-                'required',
-                'integer',
-                'exists:receiving_locations,id',
-            ],
-
             'items.*.notes' => [
                 'nullable',
                 'string',
@@ -170,6 +171,9 @@ class SaveRequisitionRequest extends FormRequest
             'department_id.required' => 'El departamento es obligatorio.',
             'department_id.exists' => 'El departamento seleccionado no existe.',
 
+            'receiving_location_id.required' => 'La ubicación de recepción es obligatoria.',
+            'receiving_location_id.exists' => 'La ubicación de recepción seleccionada no existe.',
+
             'required_date.after_or_equal' => 'La fecha requerida no puede ser anterior a hoy.',
 
             'description.max' => 'La descripción no puede exceder 500 caracteres.',
@@ -194,9 +198,6 @@ class SaveRequisitionRequest extends FormRequest
             'items.*.notes.max' => 'Las observaciones no pueden exceder 1000 caracteres.',
 
             'items.*.suggested_vendor_id.exists' => 'El proveedor seleccionado no es válido o está listado como EFOS (empresas que facturan operaciones simuladas).',
-
-            'items.*.receiving_location_id.required' => 'Debe seleccionar una ubicación de recepción para la partida :position.',
-            'items.*.receiving_location_id.exists' => 'La ubicación de recepción de la partida :position no existe.',
 
             'items.*.id.exists' => 'La partida seleccionada no existe.',
             'items.*.line_number.min' => 'El número de línea debe ser mayor a cero.',
