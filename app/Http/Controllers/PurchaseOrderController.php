@@ -178,7 +178,16 @@ class PurchaseOrderController extends Controller
      */
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['items', 'supplier', 'requisition.department']);
+        $purchaseOrder->load([
+            'items.requisitionItem',
+            'supplier',
+            'creator',
+            'requisition.department',
+            'requisition.costCenter',
+            'requisition.company',
+            'requisition.receivingLocation',
+            'requisition.requester',
+        ]);
         return view('purchase-orders.show', compact('purchaseOrder'));
     }
 

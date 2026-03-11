@@ -416,13 +416,21 @@ class RfqController extends Controller
     public function show(Rfq $rfq): View
     {
         $rfq->load([
-            'requisition',
+            'requisition.requester',
+            'requisition.company',
+            'requisition.costCenter',
+            'requisition.receivingLocation',
             'quotationGroup.items.expenseCategory',
-            'requisitionItem',
+            'quotationGroup.items.productService',
+            'requisitionItem.expenseCategory',
+            'requisitionItem.productService',
             'suppliers',
+            'rfqResponses.supplier',
             'rfqResponses.requisitionItem',
+            'rfqResponses.evaluator',
             'creator',
-            'updater'
+            'updater',
+            'canceller',
         ]);
 
         return view('rfq.show', compact('rfq'));

@@ -58,8 +58,11 @@
                         <div>
                             <h5 class="mb-1 fw-bold text-success">✓ CONTROL PRESUPUESTAL ACTIVO</h5>
                             <p class="text-muted mb-0 small">
-                                Centro de Costos: <strong>{{ $rfq->requisition->costCenter->name }}</strong> | 
+                                Centro de Costos: <strong>{{ $rfq->requisition->costCenter->name }}</strong> |
                                 Periodo: <strong>{{ now()->translatedFormat('F Y') }}</strong>
+                                @if($rfq->requisition->required_date)
+                                    | Fecha requerida: <strong class="text-danger">{{ \Carbon\Carbon::parse($rfq->requisition->required_date)->format('d/m/Y') }}</strong>
+                                @endif
                             </p>
                         </div>
                         <div class="ms-auto text-end">
@@ -95,21 +98,53 @@
                                     });
                                 @endphp
                                 
-                                <th class="text-center {{ $hasResponded ? 'bg-soft-light' : 'bg-soft-secondary' }}" style="min-width: 250px;">
-                                    <div class="fw-bold fs-14 {{ $hasResponded ? 'text-primary' : 'text-muted' }}">
+                                @php
+                                    // Vigencia: tomamos la respuesta con menor validity_days (la que vence antes)
+                                    $supplierResponses = $rfq->rfqResponses->where('supplier_id', $supplier->id);
+                                    $minValidity = $supplierResponses->whereNotNull('validity_days')->min('validity_days');
+                                    $quotationDate = $supplierResponses->whereNotNull('quotation_date')->min('quotation_date');
+                                    $expiryDate = ($quotationDate && $minValidity)
+                                        ? \Carbon\Carbon::parse($quotationDate)->addDays($minValidity)
+                                        : null;
+                                    $isExpired = $expiryDate && $expiryDate->isPast();
+                                    $expiresSoon = $expiryDate && !$isExpired && $expiryDate->diffInDays(now()) <= 3;
+
+                                    // Monedas usadas por este proveedor
+                                    $currencies = $supplierResponses->pluck('currency')->unique()->filter()->values();
+                                    $hasMixedCurrency = $currencies->count() > 1;
+                                @endphp
+                                <th class="text-center {{ $hasResponded ? 'bg-soft-light' : 'bg-soft-secondary' }} {{ $isExpired ? 'border-danger border-2' : '' }}" style="min-width: 250px;">
+                                    <div class="fw-bold fs-14 {{ $hasResponded ? 'text-primary' : 'text-muted' }} {{ $isExpired ? 'text-danger' : '' }}">
                                         {{ $supplier->company_name }}
                                     </div>
-                                    
+
                                     @if($hasResponded)
-                                        @if($nivelAsignado)
-                                            <div class="mt-1">
-                                                <span class="badge bg-soft-{{ $nivelAsignado->color_tag }} text-{{ $nivelAsignado->color_tag }} border border-{{ $nivelAsignado->color_tag }} border-opacity-25 fs-10" 
+                                        <div class="d-flex flex-wrap justify-content-center gap-1 mt-1">
+                                            @if($nivelAsignado)
+                                                <span class="badge bg-soft-{{ $nivelAsignado->color_tag }} text-{{ $nivelAsignado->color_tag }} border border-{{ $nivelAsignado->color_tag }} border-opacity-25 fs-10"
                                                       title="{{ $nivelAsignado->description }}">
                                                     <i class="ti ti-shield-check me-1"></i>{{ strtoupper($nivelAsignado->label) }}
                                                 </span>
-                                            </div>
-                                        @endif
-                                        <span class="badge bg-success fs-9 mt-1 shadow-sm">OFERTA RECIBIDA</span>
+                                            @endif
+
+                                            @foreach($currencies as $cur)
+                                                <span class="badge {{ $cur === 'USD' ? 'bg-warning text-dark' : 'bg-soft-secondary text-secondary' }} fs-9 border">
+                                                    {{ $cur }}
+                                                </span>
+                                            @endforeach
+
+                                            @if($isExpired)
+                                                <span class="badge bg-danger fs-9" title="La cotización venció el {{ $expiryDate->format('d/m/Y') }}">
+                                                    <i class="ti ti-alert-triangle me-1"></i>OFERTA VENCIDA
+                                                </span>
+                                            @elseif($expiresSoon)
+                                                <span class="badge bg-warning text-dark fs-9" title="Vence el {{ $expiryDate->format('d/m/Y') }}">
+                                                    <i class="ti ti-clock me-1"></i>VENCE EN {{ $expiryDate->diffInDays(now()) }}d
+                                                </span>
+                                            @else
+                                                <span class="badge bg-success fs-9 shadow-sm">OFERTA VIGENTE</span>
+                                            @endif
+                                        </div>
                                     @else
                                         <span class="badge bg-warning fs-9 mt-1">SIN RESPUESTA</span>
                                     @endif
@@ -130,13 +165,37 @@
                                     @endphp
                                     <td class="{{ $resp ? '' : 'bg-soft-danger text-center' }}">
                                         @if($resp)
-                                            {{-- 💰 PRECIO Y MARCA --}}
+                                            {{-- 💰 PRECIO, MARCA Y MONEDA --}}
                                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                                <span class="fs-15 fw-bold text-dark">${{ number_format($resp->unit_price, 2) }}</span>
+                                                <span class="fs-15 fw-bold text-dark">
+                                                    {{ $resp->currency === 'USD' ? 'US$' : '$' }}{{ number_format($resp->unit_price, 2) }}
+                                                    @if($resp->currency && $resp->currency !== 'MXN')
+                                                        <span class="badge bg-warning text-dark fs-9 ms-1">{{ $resp->currency }}</span>
+                                                    @endif
+                                                </span>
                                                 <span class="badge bg-soft-info text-info fs-9 border border-info border-opacity-10">
                                                     {{ $resp->brand ?? 'Sin marca' }}
                                                 </span>
                                             </div>
+
+                                            {{-- 🚚 DÍAS DE ENTREGA --}}
+                                            @if($resp->delivery_days)
+                                                @php
+                                                    $reqDate = $rfq->requisition->required_date
+                                                        ? \Carbon\Carbon::parse($rfq->requisition->required_date)
+                                                        : null;
+                                                    $deliveryDate = now()->addDays($resp->delivery_days);
+                                                    $meetsDeadline = !$reqDate || $deliveryDate->lte($reqDate);
+                                                @endphp
+                                                <div class="mb-1">
+                                                    <span class="badge {{ $meetsDeadline ? 'bg-soft-success text-success border border-success border-opacity-25' : 'bg-danger text-white' }} fs-9">
+                                                        <i class="ti ti-truck me-1"></i>{{ $resp->delivery_days }} días
+                                                        @if(!$meetsDeadline)
+                                                            <i class="ti ti-alert-triangle ms-1" title="No llega para la fecha requerida"></i>
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            @endif
 
                                             {{-- 🛠️ ESPECIFICACIONES TÉCNICAS (NUEVO) --}}
                                             @if($resp->specifications)
@@ -184,7 +243,39 @@
                             <td class="ps-3"><i class="ti ti-wallet me-1 text-primary"></i>Condiciones de Pago</td>
                             @foreach($rfq->suppliers as $supplier)
                                 @php $fResp = $rfq->rfqResponses->where('supplier_id', $supplier->id)->first(); @endphp
-                                <td class="text-center">{{ $fResp->payment_terms ?? 'Crédito' }}</td>
+                                <td class="text-center">{{ $fResp->payment_terms ?? '—' }}</td>
+                            @endforeach
+                        </tr>
+
+                        {{-- DÍAS DE ENTREGA MÁXIMO --}}
+                        <tr class="table-secondary text-dark fw-bold small">
+                            <td class="ps-3">
+                                <i class="ti ti-truck me-1 text-warning"></i>Entrega Máx. (días)
+                                @if($rfq->requisition->required_date)
+                                    <br><small class="text-muted fw-normal">Requerido: {{ \Carbon\Carbon::parse($rfq->requisition->required_date)->format('d/m/Y') }}</small>
+                                @endif
+                            </td>
+                            @foreach($rfq->suppliers as $supplier)
+                                @php
+                                    $maxDays = $rfq->rfqResponses->where('supplier_id', $supplier->id)->whereNotNull('delivery_days')->max('delivery_days');
+                                    $reqDate2 = $rfq->requisition->required_date ? \Carbon\Carbon::parse($rfq->requisition->required_date) : null;
+                                    $arrivalDate = $maxDays ? now()->addDays($maxDays) : null;
+                                    $onTime = !$reqDate2 || !$arrivalDate || $arrivalDate->lte($reqDate2);
+                                @endphp
+                                <td class="text-center">
+                                    @if($maxDays)
+                                        <span class="{{ $onTime ? 'text-success' : 'text-danger' }} fw-bold">
+                                            {{ $maxDays }} días
+                                        </span>
+                                        @if(!$onTime)
+                                            <br><small class="text-danger">
+                                                <i class="ti ti-alert-triangle me-1"></i>No cumple fecha
+                                            </small>
+                                        @endif
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                             @endforeach
                         </tr>
 
@@ -227,12 +318,26 @@
                                 @endphp
                                 <td class="text-center py-3 border-0">
                                     @if($hasResponded)
-                                        <button type="button" 
-                                                class="btn btn-primary btn-sm btn-select-winner shadow-sm px-4 rounded-pill" 
+                                        @php
+                                            $maxDelivery = $rfq->rfqResponses->where('supplier_id', $supplier->id)->whereNotNull('delivery_days')->max('delivery_days');
+                                            $supplierCurrencies = $rfq->rfqResponses->where('supplier_id', $supplier->id)->pluck('currency')->unique()->filter()->implode(', ');
+                                            $supplierExpired = false;
+                                            $sResps = $rfq->rfqResponses->where('supplier_id', $supplier->id);
+                                            $sMinVal = $sResps->whereNotNull('validity_days')->min('validity_days');
+                                            $sQDate  = $sResps->whereNotNull('quotation_date')->min('quotation_date');
+                                            if ($sMinVal && $sQDate) {
+                                                $supplierExpired = \Carbon\Carbon::parse($sQDate)->addDays($sMinVal)->isPast();
+                                            }
+                                        @endphp
+                                        <button type="button"
+                                                class="btn btn-primary btn-sm btn-select-winner shadow-sm px-4 rounded-pill"
                                                 data-supplier-id="{{ $supplier->id }}"
                                                 data-supplier-name="{{ $supplier->company_name }}"
                                                 data-total="{{ number_format($totalFinal, 2) }}"
-                                                {{ ($totalFinal > $presupuestoDisponible) ? 'disabled' : '' }}>
+                                                data-delivery="{{ $maxDelivery ?? '—' }}"
+                                                data-currency="{{ $supplierCurrencies ?: 'MXN' }}"
+                                                {{ ($totalFinal > $presupuestoDisponible || $supplierExpired) ? 'disabled' : '' }}
+                                                title="{{ $supplierExpired ? 'No se puede adjudicar: la oferta está vencida' : '' }}">
                                             <i class="ti ti-trophy me-1"></i>Adjudicar
                                         </button>
                                     @else
@@ -262,9 +367,19 @@
                 <div class="card bg-light border-0 mb-3 shadow-none">
                     <div class="card-body">
                         <p class="mb-1 text-muted small">Proveedor Ganador Seleccionado:</p>
-                        <h5 class="fw-bold text-primary mb-0" id="winner_name"></h5>
-                        <hr class="my-2 opacity-10">
-                        <p class="mb-0 small text-dark">Monto Total a Comprometer: <strong id="winner_total" class="fs-15"></strong></p>
+                        <h5 class="fw-bold text-primary mb-2" id="winner_name"></h5>
+                        <hr class="my-2">
+                        <div class="row g-2 text-center">
+                            <div class="col-6">
+                                <small class="text-muted d-block">Monto Total (IVA inc.)</small>
+                                <strong class="fs-15 text-dark" id="winner_total"></strong>
+                                <small class="text-muted d-block" id="winner_currency_label"></small>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Días de Entrega Máx.</small>
+                                <strong class="fs-15 text-dark" id="winner_delivery"></strong>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -295,13 +410,17 @@
 <script>
     $(document).ready(function() {
         $('.btn-select-winner').on('click', function() {
-            const id = $(this).data('supplier-id');
-            const name = $(this).data('supplier-name');
-            const total = $(this).data('total');
-            
+            const id       = $(this).data('supplier-id');
+            const name     = $(this).data('supplier-name');
+            const total    = $(this).data('total');
+            const delivery = $(this).data('delivery');
+            const currency = $(this).data('currency');
+
             $('#winner_id').val(id);
             $('#winner_name').text(name);
             $('#winner_total').text('$' + total);
+            $('#winner_delivery').text(delivery !== '—' ? delivery + ' días' : '—');
+            $('#winner_currency_label').text(currency !== 'MXN' ? '⚠ Cotización en ' + currency : '');
             $('#modalAdjudicar').modal('show');
         });
     });

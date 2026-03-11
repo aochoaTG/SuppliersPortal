@@ -77,9 +77,12 @@ class SupplierPortalController extends Controller
 
         // Cargar relaciones
         $rfq->load([
-            'requisition',
+            'requisition.company',
+            'requisition.receivingLocation',
             'quotationGroup.items.expenseCategory',
-            'requisitionItem',
+            'quotationGroup.items.productService',
+            'requisitionItem.expenseCategory',
+            'requisitionItem.productService',
         ]);
 
         // Obtener respuestas existentes de este proveedor

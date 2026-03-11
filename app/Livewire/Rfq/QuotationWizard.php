@@ -46,9 +46,12 @@ class QuotationWizard extends Component
             'rfqs.suppliers',
         ]);
 
-        // Determinar el paso inicial basado en el estado de la requisición
-        // Si la URL no trae un paso (es 1 por defecto), calculamos el paso lógico
-        if ($this->currentStep == 1) {
+        // Si la URL trae ?step=X, respetar ese valor (ej: al recargar desde paso 2 tras crear grupos)
+        $urlStep = request()->integer('step', 0);
+        if ($urlStep >= 1 && $urlStep <= 5) {
+            $this->currentStep = $urlStep;
+        } elseif ($this->currentStep == 1) {
+            // Si no hay paso en la URL, determinarlo automáticamente
             $this->currentStep = $this->determineCurrentStep();
         }
 

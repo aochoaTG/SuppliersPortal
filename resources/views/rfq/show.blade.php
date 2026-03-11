@@ -1,6 +1,6 @@
 @extends('layouts.zircos')
 
-@section('title', 'Detalle RFQ - ' . $rfq->folio)
+@section('title', 'RFQ - ' . $rfq->folio)
 
 @section('page.title', 'Detalle RFQ')
 
@@ -10,531 +10,886 @@
     <li class="breadcrumb-item active">{{ $rfq->folio }}</li>
 @endsection
 
+@push('styles')
+<style>
+    .stat-icon {
+        width: 48px; height: 48px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 12px; font-size: 1.4rem;
+    }
+    .supplier-avatar {
+        width: 38px; height: 38px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; font-weight: 700; font-size: 1rem;
+    }
+    .timeline-item { position: relative; padding-left: 2rem; }
+    .timeline-item::before {
+        content: ''; position: absolute; left: 0.5rem; top: 1.5rem;
+        bottom: -1rem; width: 2px; background: #dee2e6;
+    }
+    .timeline-item:last-child::before { display: none; }
+    .timeline-dot {
+        position: absolute; left: 0; top: 0.25rem;
+        width: 1rem; height: 1rem; border-radius: 50%;
+        border: 2px solid; background: #fff;
+    }
+</style>
+@endpush
+
 @section('content')
-<div class="container-fluid">
-    {{-- HEADER --}}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-1">
-                        <i class="ti ti-file-invoice me-2"></i>
-                        {{ $rfq->folio }}
-                    </h2>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb mb-0">
-                            <li class="breadcrumb-item">
-                                <a href="{{ route('rfq.index') }}">RFQs</a>
-                            </li>
-                            <li class="breadcrumb-item active">{{ $rfq->folio }}</li>
-                        </ol>
-                    </nav>
+
+@php
+    $statusConfig = [
+        'DRAFT'              => ['class' => 'secondary', 'icon' => 'ti-pencil',       'label' => 'Borrador'],
+        'SENT'               => ['class' => 'info',      'icon' => 'ti-send',         'label' => 'Enviada'],
+        'RECEIVED'           => ['class' => 'primary',   'icon' => 'ti-inbox',        'label' => 'Recibida'],
+        'RESPONSES_RECEIVED' => ['class' => 'success',   'icon' => 'ti-check',        'label' => 'Con Respuestas'],
+        'EVALUATED'          => ['class' => 'primary',   'icon' => 'ti-check-circle', 'label' => 'Evaluada'],
+        'CANCELLED'          => ['class' => 'danger',    'icon' => 'ti-ban',          'label' => 'Cancelada'],
+    ];
+    $status = $statusConfig[$rfq->status] ?? ['class' => 'secondary', 'icon' => 'ti-help', 'label' => $rfq->status];
+
+    $totalSuppliers  = $rfq->suppliers->count();
+    $responded       = $rfq->suppliers->filter(fn($s) => $s->pivot->responded_at)->count();
+    $pending         = $totalSuppliers - $responded;
+
+    $deadline        = $rfq->response_deadline;
+    $daysRemaining   = $deadline ? now()->diffInDays($deadline, false) : null;
+@endphp
+
+{{-- ================================================================
+     HEADER
+================================================================ --}}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1 fw-bold">
+            <i class="ti ti-file-invoice me-2"></i>{{ $rfq->folio }}
+        </h2>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge bg-{{ $status['class'] }} fs-6">
+                <i class="ti {{ $status['icon'] }} me-1"></i>{{ $status['label'] }}
+            </span>
+            @if($rfq->source === 'external')
+                <span class="badge bg-warning text-dark">
+                    <i class="ti ti-world me-1"></i>Cotización Externa
+                </span>
+            @else
+                <span class="badge bg-light text-dark border">
+                    <i class="ti ti-layout-grid me-1"></i>Portal
+                </span>
+            @endif
+            @if($rfq->isExpired() && $rfq->status === 'SENT')
+                <span class="badge bg-danger">
+                    <i class="ti ti-clock-x me-1"></i>Plazo Vencido
+                </span>
+            @endif
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        @if($rfq->status === 'DRAFT')
+            <button type="button" class="btn btn-success" id="sendRfqBtn">
+                <i class="ti ti-send me-1"></i>Enviar a Proveedores
+            </button>
+        @endif
+        @if($rfq->status !== 'CANCELLED')
+            <button type="button" class="btn btn-outline-danger" id="cancelRfqBtn">
+                <i class="ti ti-ban me-1"></i>Cancelar RFQ
+            </button>
+        @endif
+        <a href="{{ route('rfq.index') }}" class="btn btn-outline-secondary">
+            <i class="ti ti-arrow-left me-1"></i>Volver
+        </a>
+    </div>
+</div>
+
+{{-- ================================================================
+     TARJETAS DE RESUMEN
+================================================================ --}}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                    <i class="ti ti-building-store"></i>
                 </div>
                 <div>
-                    <a href="{{ route('rfq.index') }}" class="btn btn-outline-secondary">
-                        <i class="ti ti-arrow-left"></i> Volver al Listado
-                    </a>
+                    <div class="text-muted small">Proveedores</div>
+                    <div class="fw-bold fs-4">{{ $totalSuppliers }}</div>
                 </div>
             </div>
         </div>
     </div>
-
-    {{-- INFORMACIÓN PRINCIPAL --}}
-    <div class="row mb-4">
-        {{-- COLUMNA IZQUIERDA: Información General --}}
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">
-                        <i class="ti ti-info-circle me-2"></i>
-                        Información General
-                    </h5>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                    <i class="ti ti-check-circle"></i>
                 </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted small">Folio</label>
-                            <p class="mb-0 fw-bold fs-5">{{ $rfq->folio }}</p>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted small">Estado</label>
-                            <p class="mb-0">
-                                @php
-                                    $statusConfig = [
-                                        'DRAFT' => ['class' => 'secondary', 'icon' => 'ti-pencil', 'label' => 'Borrador'],
-                                        'SENT' => ['class' => 'info', 'icon' => 'ti-send', 'label' => 'Enviada'],
-                                        'RESPONSES_RECEIVED' => ['class' => 'success', 'icon' => 'ti-check', 'label' => 'Con Respuestas'],
-                                        'EVALUATED' => ['class' => 'primary', 'icon' => 'ti-check-circle', 'label' => 'Evaluada'],
-                                        'CANCELLED' => ['class' => 'danger', 'icon' => 'ti-x', 'label' => 'Cancelada'],
-                                    ];
-                                    $status = $statusConfig[$rfq->status] ?? ['class' => 'secondary', 'icon' => 'ti-help', 'label' => $rfq->status];
-                                @endphp
-                                <span class="badge bg-{{ $status['class'] }} fs-6">
-                                    <i class="ti {{ $status['icon'] }}"></i> {{ $status['label'] }}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted small">Requisición</label>
-                            <p class="mb-0">
-                                <a href="{{ route('requisitions.show', $rfq->requisition) }}" class="text-decoration-none">
-                                    <i class="ti ti-file-text"></i> {{ $rfq->requisition->folio }}
-                                </a>
-                            </p>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted small">Tipo</label>
-                            <p class="mb-0">
-                                @if($rfq->quotation_group_id)
-                                    <span class="badge bg-primary">
-                                        <i class="ti ti-folder"></i> Grupo: {{ $rfq->quotationGroup->name }}
-                                    </span>
-                                @else
-                                    <span class="badge bg-secondary">
-                                        <i class="ti ti-file"></i> Partida Individual
-                                    </span>
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted small">Fecha de Envío</label>
-                            <p class="mb-0">
-                                @if($rfq->sent_at)
-                                    <i class="ti ti-calendar"></i> {{ $rfq->sent_at->format('d/m/Y H:i') }}
-                                @else
-                                    <span class="text-muted">Aún no enviada</span>
-                                @endif
-                            </p>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted small">Fecha Límite de Respuesta</label>
-                            <p class="mb-0">
-                                @if($rfq->response_deadline)
-                                    @php
-                                        $deadline = \Carbon\Carbon::parse($rfq->response_deadline);
-                                        $today = \Carbon\Carbon::today();
-                                        $daysRemaining = $today->diffInDays($deadline, false);
-                                    @endphp
-                                    <i class="ti ti-calendar-event"></i> {{ $deadline->format('d/m/Y') }}
-                                    @if($daysRemaining < 0)
-                                        <span class="badge bg-danger ms-2">Vencida</span>
-                                    @elseif($daysRemaining === 0)
-                                        <span class="badge bg-warning ms-2">Vence Hoy</span>
-                                    @elseif($daysRemaining <= 3)
-                                        <span class="badge bg-warning ms-2">{{ $daysRemaining }} día(s)</span>
-                                    @else
-                                        <span class="badge bg-success ms-2">{{ $daysRemaining }} días</span>
-                                    @endif
-                                @else
-                                    <span class="text-muted">No definida</span>
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-
-                    @if($rfq->notes)
-                    <div class="row">
-                        <div class="col-12">
-                            <label class="text-muted small">Notas / Instrucciones</label>
-                            <div class="alert alert-info mb-0">
-                                <i class="ti ti-notes"></i> {{ $rfq->notes }}
-                            </div>
-                        </div>
-                    </div>
-                    @endif
-
-                    @if($rfq->message)
-                    <div class="row mt-3">
-                        <div class="col-12">
-                            <label class="text-muted small">Mensaje para Proveedores</label>
-                            <div class="border rounded p-3 bg-light">
-                                {{ $rfq->message }}
-                            </div>
-                        </div>
-                    </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        {{-- COLUMNA DERECHA: Proveedores Invitados --}}
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">
-                        <i class="ti ti-building-store me-2"></i>
-                        Proveedores Invitados
-                    </h5>
-                </div>
-                <div class="card-body">
-                    @forelse($rfq->suppliers as $supplier)
-                        <div class="d-flex align-items-start mb-3 pb-3 border-bottom">
-                            <div class="flex-shrink-0">
-                                <div class="avatar avatar-sm bg-primary text-white rounded-circle">
-                                    {{ substr($supplier->company_name, 0, 1) }}
-                                </div>
-                            </div>
-                            <div class="flex-grow-1 ms-3">
-                                <h6 class="mb-1">{{ $supplier->company_name }}</h6>
-                                <p class="text-muted small mb-1">
-                                    <i class="ti ti-mail"></i> {{ $supplier->email }}
-                                </p>
-                                @if($supplier->pivot->invited_at)
-                                    <p class="text-muted small mb-1">
-                                        <i class="ti ti-calendar"></i> Invitado: {{ \Carbon\Carbon::parse($supplier->pivot->invited_at)->format('d/m/Y H:i') }}
-                                    </p>
-                                @endif
-                                @if($supplier->pivot->responded_at)
-                                    <span class="badge bg-success">
-                                        <i class="ti ti-check"></i> Respondió
-                                    </span>
-                                @else
-                                    <span class="badge bg-warning">
-                                        <i class="ti ti-clock"></i> Pendiente
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    @empty
-                        <div class="text-center text-muted py-4">
-                            <i class="ti ti-user-off fs-2"></i>
-                            <p class="mb-0 mt-2">No hay proveedores invitados</p>
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
-            {{-- Auditoría --}}
-            <div class="card mt-3">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">
-                        <i class="ti ti-clock-hour-4 me-2"></i>
-                        Auditoría
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-2">
-                        <strong>Creado por:</strong><br>
-                        {{ $rfq->creator->name ?? 'N/A' }}<br>
-                        <span class="text-muted">{{ $rfq->created_at->format('d/m/Y H:i') }}</span>
-                    </p>
-                    @if($rfq->updated_at != $rfq->created_at)
-                        <p class="text-muted small mb-0">
-                            <strong>Última actualización:</strong><br>
-                            {{ $rfq->updated_at->format('d/m/Y H:i') }}
-                        </p>
-                    @endif
+                <div>
+                    <div class="text-muted small">Respondieron</div>
+                    <div class="fw-bold fs-4 text-success">{{ $responded }}</div>
                 </div>
             </div>
         </div>
     </div>
-
-    {{-- PARTIDAS / ITEMS DEL GRUPO --}}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">
-                        <i class="ti ti-package me-2"></i>
-                        Partidas Incluidas
-                    </h5>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="ti ti-clock-hour-4"></i>
                 </div>
-                <div class="card-body">
-                    @if($rfq->quotation_group_id && $rfq->quotationGroup)
-                        {{-- ESCENARIO A: Grupo de partidas --}}
-                        <div class="table-responsive">
-                            <table class="table table-hover table-bordered">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th width="5%">#</th>
-                                        <th width="40%">Descripción</th>
-                                        <th width="15%">Cantidad</th>
-                                        <th width="10%">Unidad</th>
-                                        <th width="20%">Categoría</th>
-                                        <th width="10%">Notas</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse($rfq->quotationGroup->items as $index => $item)
-                                        <tr>
-                                            <td class="text-center">{{ $index + 1 }}</td>
-                                            <td>
-                                                <strong>{{ $item->description }}</strong>
-                                                @if($item->product_code)
-                                                    <br>
-                                                    <small class="text-muted">
-                                                        Código: {{ $item->product_code }}
-                                                    </small>
-                                                @endif
-                                            </td>
-                                            <td class="text-end">{{ number_format($item->quantity, 2) }}</td>
-                                            <td>{{ $item->unit }}</td>
-                                            <td>
-                                                <span class="badge bg-secondary">
-                                                    {{ $item->expenseCategory->name ?? 'N/A' }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                @if($item->notes)
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-outline-info" 
-                                                            data-bs-toggle="tooltip" 
-                                                            title="{{ $item->notes }}">
-                                                        <i class="ti ti-notes"></i>
-                                                    </button>
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="6" class="text-center text-muted">
-                                                No hay partidas en este grupo
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    @elseif($rfq->requisition_item_id && $rfq->requisitionItem)
-                        {{-- ESCENARIO B: Partida individual --}}
-                        <div class="alert alert-info">
-                            <h6 class="alert-heading">Partida Individual</h6>
-                            <p class="mb-0">
-                                <strong>Descripción:</strong> {{ $rfq->requisitionItem->description }}<br>
-                                <strong>Cantidad:</strong> {{ number_format($rfq->requisitionItem->quantity, 2) }} {{ $rfq->requisitionItem->unit }}<br>
-                                @if($rfq->requisitionItem->notes)
-                                    <strong>Notas:</strong> {{ $rfq->requisitionItem->notes }}
-                                @endif
-                            </p>
-                        </div>
+                <div>
+                    <div class="text-muted small">Pendientes</div>
+                    <div class="fw-bold fs-4 text-warning">{{ $pending }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon {{ $daysRemaining !== null && $daysRemaining < 0 ? 'bg-danger bg-opacity-10 text-danger' : ($daysRemaining <= 3 ? 'bg-warning bg-opacity-10 text-warning' : 'bg-info bg-opacity-10 text-info') }}">
+                    <i class="ti ti-calendar-due"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Días restantes</div>
+                    @if($daysRemaining !== null)
+                        @if($daysRemaining < 0)
+                            <div class="fw-bold fs-4 text-danger">Vencida</div>
+                        @elseif($daysRemaining === 0)
+                            <div class="fw-bold fs-4 text-warning">Hoy</div>
+                        @else
+                            <div class="fw-bold fs-4 text-info">{{ $daysRemaining }}</div>
+                        @endif
                     @else
-                        <div class="alert alert-warning mb-0">
-                            <i class="ti ti-alert-triangle"></i>
-                            No se encontraron partidas asociadas a esta RFQ
-                        </div>
+                        <div class="fw-bold fs-4 text-muted">—</div>
                     @endif
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- RESPUESTAS DE PROVEEDORES --}}
-    @if($rfq->responses && $rfq->responses->count() > 0)
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-success">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">
-                        <i class="ti ti-message-check me-2"></i>
-                        Respuestas de Proveedores
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Proveedor</th>
-                                    <th>Partida</th>
-                                    <th>Precio Unitario</th>
-                                    <th>Cantidad</th>
-                                    <th>Subtotal</th>
-                                    <th>Plazo Entrega</th>
-                                    <th>Fecha Respuesta</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($rfq->responses as $response)
-                                    <tr>
-                                        <td>{{ $response->rfq->supplier->company_name ?? 'N/A' }}</td>
-                                        <td>{{ $response->requisitionItem->description ?? 'N/A' }}</td>
-                                        <td class="text-end">${{ number_format($response->unit_price, 2) }}</td>
-                                        <td class="text-center">{{ $response->quantity }}</td>
-                                        <td class="text-end">${{ number_format($response->subtotal, 2) }}</td>
-                                        <td>{{ $response->delivery_days }} días</td>
-                                        <td>{{ $response->created_at->format('d/m/Y H:i') }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    {{-- ACCIONES --}}
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <a href="{{ route('rfq.index') }}" class="btn btn-outline-secondary">
-                                <i class="ti ti-arrow-left"></i> Volver al Listado
-                            </a>
-                        </div>
-                        <div>
-                            @if($rfq->status === 'DRAFT')
-                                <button type="button" class="btn btn-success" id="sendRfqBtn">
-                                    <i class="ti ti-send"></i> Enviar a Proveedores
-                                </button>
-                            @endif
-
-                            @if($rfq->status !== 'CANCELLED')
-                                <button type="button" class="btn btn-danger" id="cancelRfqBtn">
-                                    <i class="ti ti-x"></i> Cancelar RFQ
-                                </button>
-                            @endif
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+{{-- ================================================================
+     FILA PRINCIPAL
+================================================================ --}}
+<div class="row g-4 mb-4">
+
+    {{-- COLUMNA IZQUIERDA --}}
+    <div class="col-lg-8">
+
+        {{-- Información General de la RFQ --}}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="ti ti-info-circle text-primary me-2"></i>Información General</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Folio</label>
+                        <p class="mb-0 fw-bold fs-5">{{ $rfq->folio }}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Estado</label>
+                        <p class="mb-0">
+                            <span class="badge bg-{{ $status['class'] }} fs-6">
+                                <i class="ti {{ $status['icon'] }} me-1"></i>{{ $status['label'] }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Tipo de Agrupación</label>
+                        <p class="mb-0">
+                            @if($rfq->quotation_group_id)
+                                <span class="badge bg-primary">
+                                    <i class="ti ti-folder me-1"></i>Grupo: {{ $rfq->quotationGroup?->name }}
+                                </span>
+                            @else
+                                <span class="badge bg-secondary">
+                                    <i class="ti ti-file me-1"></i>Partida Individual
+                                </span>
+                            @endif
+                        </p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Origen</label>
+                        <p class="mb-0">
+                            @if($rfq->source === 'external')
+                                <span class="badge bg-warning text-dark"><i class="ti ti-world me-1"></i>Cotización Externa</span>
+                            @else
+                                <span class="badge bg-light text-dark border"><i class="ti ti-layout-grid me-1"></i>Portal de Proveedores</span>
+                            @endif
+                        </p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Fecha de Envío</label>
+                        <p class="mb-0 fw-semibold">
+                            @if($rfq->sent_at)
+                                <i class="ti ti-send text-info me-1"></i>{{ $rfq->sent_at->format('d/m/Y H:i') }}
+                                <small class="text-muted d-block">{{ $rfq->sent_at->diffForHumans() }}</small>
+                            @else
+                                <span class="text-muted">Aún no enviada</span>
+                            @endif
+                        </p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Fecha Límite de Respuesta</label>
+                        <p class="mb-0 fw-semibold">
+                            @if($deadline)
+                                <i class="ti ti-calendar-event me-1
+                                    {{ $daysRemaining < 0 ? 'text-danger' : ($daysRemaining <= 3 ? 'text-warning' : 'text-success') }}"></i>
+                                {{ $deadline->format('d/m/Y') }}
+                                @if($daysRemaining < 0)
+                                    <span class="badge bg-danger ms-1">Vencida hace {{ abs($daysRemaining) }} día(s)</span>
+                                @elseif($daysRemaining === 0)
+                                    <span class="badge bg-warning ms-1">Vence hoy</span>
+                                @elseif($daysRemaining <= 3)
+                                    <span class="badge bg-warning ms-1">{{ $daysRemaining }} día(s)</span>
+                                @else
+                                    <span class="badge bg-success ms-1">{{ $daysRemaining }} días</span>
+                                @endif
+                            @else
+                                <span class="text-muted">No definida</span>
+                            @endif
+                        </p>
+                    </div>
+
+                    @if($rfq->message)
+                    <div class="col-12">
+                        <label class="form-label text-muted mb-1">Mensaje para Proveedores</label>
+                        <div class="border rounded p-3 bg-light">
+                            <i class="ti ti-message text-info me-1"></i>{{ $rfq->message }}
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($rfq->requirements)
+                    <div class="col-12">
+                        <label class="form-label text-muted mb-1">Requisitos Especiales</label>
+                        <div class="border rounded p-3 bg-light">
+                            <i class="ti ti-clipboard-check text-warning me-1"></i>{{ $rfq->requirements }}
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($rfq->notes)
+                    <div class="col-12">
+                        <label class="form-label text-muted mb-1">Notas Internas</label>
+                        <div class="alert alert-info mb-0 py-2">
+                            <i class="ti ti-notes me-1"></i>{{ $rfq->notes }}
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($rfq->source === 'external' && $rfq->external_notes)
+                    <div class="col-12">
+                        <label class="form-label text-muted mb-1">Notas de Cotización Externa</label>
+                        <div class="alert alert-warning mb-0 py-2">
+                            <i class="ti ti-world me-1"></i>{{ $rfq->external_notes }}
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- Requisición de Origen --}}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="ti ti-file-text text-success me-2"></i>Requisición de Origen</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Folio</label>
+                        <p class="mb-0">
+                            <a href="{{ route('requisitions.show', $rfq->requisition) }}" class="fw-bold text-decoration-none">
+                                <i class="ti ti-external-link me-1"></i>{{ $rfq->requisition->folio }}
+                            </a>
+                        </p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Solicitado por</label>
+                        <p class="mb-0 fw-semibold">
+                            <i class="ti ti-user text-primary me-1"></i>
+                            {{ $rfq->requisition->requester?->name ?? '—' }}
+                        </p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Compañía</label>
+                        <p class="mb-0 fw-semibold">
+                            <i class="ti ti-building-bank text-primary me-1"></i>
+                            {{ $rfq->requisition->company?->name ?? '—' }}
+                        </p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Centro de Costo</label>
+                        <p class="mb-0 fw-semibold">
+                            <i class="ti ti-hierarchy-3 text-primary me-1"></i>
+                            {{ $rfq->requisition->costCenter ? $rfq->requisition->costCenter->code . ' - ' . $rfq->requisition->costCenter->name : '—' }}
+                        </p>
+                    </div>
+                    @if($rfq->requisition->receivingLocation)
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Punto de Entrega</label>
+                        <p class="mb-0 fw-semibold">
+                            <i class="ti ti-map-pin text-primary me-1"></i>
+                            {{ $rfq->requisition->receivingLocation->code }} - {{ $rfq->requisition->receivingLocation->name }}
+                        </p>
+                    </div>
+                    @endif
+                    @if($rfq->requisition->required_date)
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Fecha Requerida</label>
+                        <p class="mb-0 fw-semibold">
+                            <i class="ti ti-calendar-due text-warning me-1"></i>
+                            {{ $rfq->requisition->required_date->format('d/m/Y') }}
+                        </p>
+                    </div>
+                    @endif
+                    @if($rfq->requisition->description)
+                    <div class="col-12">
+                        <label class="form-label text-muted mb-1">Descripción / Justificación</label>
+                        <div class="border rounded p-2 bg-light">
+                            {{ $rfq->requisition->description }}
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- Partidas Incluidas --}}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="ti ti-package text-warning me-2"></i>Partidas Incluidas</h5>
+                @if($rfq->quotationGroup)
+                    <span class="badge bg-primary">{{ $rfq->quotationGroup->items->count() }} partida(s)</span>
+                @endif
+            </div>
+            <div class="card-body p-0">
+                @if($rfq->quotation_group_id && $rfq->quotationGroup)
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="40" class="text-center">#</th>
+                                    <th>Producto / Código</th>
+                                    <th>Descripción</th>
+                                    <th width="100" class="text-end">Cantidad</th>
+                                    <th width="80" class="text-center">Unidad</th>
+                                    <th width="160">Categoría</th>
+                                    <th width="60" class="text-center">Notas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($rfq->quotationGroup->items as $i => $item)
+                                <tr>
+                                    <td class="text-center text-muted">{{ $i + 1 }}</td>
+                                    <td>
+                                        @if($item->productService)
+                                            <span class="fw-semibold">{{ $item->productService->code }}</span>
+                                            @if($item->productService->product_type)
+                                                <br>
+                                                <span class="badge bg-{{ $item->productService->product_type === 'SERVICIO' ? 'info' : 'primary' }} badge-sm">
+                                                    {{ $item->productService->product_type }}
+                                                </span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        {{ $item->description }}
+                                        @if($item->productService?->brand || $item->productService?->model)
+                                            <br><small class="text-muted">
+                                                <i class="ti ti-tag me-1"></i>
+                                                {{ collect([$item->productService->brand, $item->productService->model])->filter()->join(' / ') }}
+                                            </small>
+                                        @endif
+                                    </td>
+                                    <td class="text-end fw-semibold">{{ number_format($item->quantity, 3) }}</td>
+                                    <td class="text-center"><span class="badge bg-secondary">{{ $item->unit }}</span></td>
+                                    <td><span class="badge bg-info">{{ $item->expenseCategory?->name ?? '—' }}</span></td>
+                                    <td class="text-center">
+                                        @if($item->notes)
+                                            <i class="ti ti-note text-info" data-bs-toggle="tooltip" title="{{ $item->notes }}"></i>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">Sin partidas en este grupo</td>
+                                </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                @elseif($rfq->requisition_item_id && $rfq->requisitionItem)
+                    <div class="p-3">
+                        <div class="alert alert-light border mb-0">
+                            <div class="row g-3">
+                                <div class="col-sm-6">
+                                    <small class="text-muted d-block">Producto</small>
+                                    <strong>{{ $rfq->requisitionItem->productService?->code ?? '—' }}</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <small class="text-muted d-block">Descripción</small>
+                                    <span>{{ $rfq->requisitionItem->description }}</span>
+                                </div>
+                                <div class="col-sm-4">
+                                    <small class="text-muted d-block">Cantidad</small>
+                                    <strong>{{ number_format($rfq->requisitionItem->quantity, 3) }} {{ $rfq->requisitionItem->unit }}</strong>
+                                </div>
+                                <div class="col-sm-4">
+                                    <small class="text-muted d-block">Categoría</small>
+                                    <span class="badge bg-info">{{ $rfq->requisitionItem->expenseCategory?->name ?? '—' }}</span>
+                                </div>
+                                @if($rfq->requisitionItem->notes)
+                                <div class="col-12">
+                                    <small class="text-muted d-block">Notas</small>
+                                    <span>{{ $rfq->requisitionItem->notes }}</span>
+                                </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="p-4 text-center text-muted">
+                        <i class="ti ti-alert-triangle text-warning fs-2 d-block mb-2"></i>
+                        No se encontraron partidas asociadas a esta RFQ
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- Respuestas de Proveedores --}}
+        @if($rfq->rfqResponses->isNotEmpty())
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="ti ti-message-check text-success me-2"></i>Respuestas de Proveedores
+                </h5>
+                <span class="badge bg-success">{{ $rfq->rfqResponses->count() }} respuesta(s)</span>
+            </div>
+            <div class="card-body p-0">
+                {{-- Agrupar por proveedor --}}
+                @foreach($rfq->rfqResponses->groupBy('supplier_id') as $supplierId => $responses)
+                @php $firstResp = $responses->first(); @endphp
+                <div class="border-bottom">
+                    <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="supplier-avatar bg-primary text-white">
+                                {{ substr($firstResp->supplier?->company_name ?? '?', 0, 1) }}
+                            </div>
+                            <div>
+                                <strong>{{ $firstResp->supplier?->company_name ?? 'Proveedor #'.$supplierId }}</strong>
+                                @if($firstResp->supplier_quotation_number)
+                                    <br><small class="text-muted">Cot. # {{ $firstResp->supplier_quotation_number }}</small>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            @if($firstResp->submitted_at)
+                                <small class="text-muted">Recibida: {{ $firstResp->submitted_at->format('d/m/Y H:i') }}</small>
+                            @endif
+                            <br>
+                            @php
+                                $respStatus = match($firstResp->status) {
+                                    'SUBMITTED' => ['bg-success','Enviada'],
+                                    'APPROVED'  => ['bg-primary','Aprobada'],
+                                    'REJECTED'  => ['bg-danger','Rechazada'],
+                                    default     => ['bg-secondary','Borrador'],
+                                };
+                            @endphp
+                            <span class="badge {{ $respStatus[0] }}">{{ $respStatus[1] }}</span>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Partida</th>
+                                    <th class="text-center">Marca / Modelo</th>
+                                    <th class="text-end">Precio Unit.</th>
+                                    <th class="text-end">Desc.</th>
+                                    <th class="text-end">Subtotal</th>
+                                    <th class="text-end">IVA ({{ $firstResp->iva_rate ?? 16 }}%)</th>
+                                    <th class="text-end fw-bold">Total</th>
+                                    <th class="text-center">Entrega</th>
+                                    <th class="text-center">Moneda</th>
+                                    <th class="text-center">Adjunto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($responses as $resp)
+                                <tr>
+                                    <td>
+                                        <small>{{ $resp->requisitionItem?->description ?? '—' }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        @if($resp->brand || $resp->model)
+                                            <small>{{ collect([$resp->brand, $resp->model])->filter()->join(' / ') }}</small>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">${{ number_format($resp->unit_price, 2) }}</td>
+                                    <td class="text-end">
+                                        @if($resp->discount_percentage)
+                                            <span class="badge bg-warning text-dark">{{ $resp->discount_percentage }}%</span>
+                                        @elseif($resp->discount_amount)
+                                            ${{ number_format($resp->discount_amount, 2) }}
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">${{ number_format($resp->subtotal, 2) }}</td>
+                                    <td class="text-end">${{ number_format($resp->iva_amount, 2) }}</td>
+                                    <td class="text-end fw-bold text-success">${{ number_format($resp->total, 2) }}</td>
+                                    <td class="text-center">
+                                        @if($resp->delivery_days)
+                                            <span class="badge bg-light text-dark border">{{ $resp->delivery_days }} días</span>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">{{ $resp->currency ?? 'MXN' }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        @if($resp->attachment_path)
+                                            <a href="{{ asset('storage/' . $resp->attachment_path) }}" target="_blank"
+                                               class="btn btn-sm btn-outline-primary" title="Ver cotización">
+                                                <i class="ti ti-file-type-pdf"></i>
+                                            </a>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @if($resp->payment_terms || $resp->warranty_terms || $resp->specifications || $resp->notes)
+                                <tr class="table-light">
+                                    <td colspan="10" class="py-2 px-3">
+                                        <div class="row g-2">
+                                            @if($resp->payment_terms)
+                                            <div class="col-sm-4">
+                                                <small class="text-muted d-block">Condiciones de pago</small>
+                                                <small>{{ $resp->payment_terms }}</small>
+                                            </div>
+                                            @endif
+                                            @if($resp->warranty_terms)
+                                            <div class="col-sm-4">
+                                                <small class="text-muted d-block">Garantía</small>
+                                                <small>{{ $resp->warranty_terms }}</small>
+                                            </div>
+                                            @endif
+                                            @if($resp->specifications)
+                                            <div class="col-sm-4">
+                                                <small class="text-muted d-block">Especificaciones</small>
+                                                <small>{{ $resp->specifications }}</small>
+                                            </div>
+                                            @endif
+                                            @if($resp->notes)
+                                            <div class="col-12">
+                                                <small class="text-muted d-block">Notas del proveedor</small>
+                                                <small>{{ $resp->notes }}</small>
+                                            </div>
+                                            @endif
+                                            @if($resp->meets_specs !== null)
+                                            <div class="col-sm-4">
+                                                <small class="text-muted d-block">Cumple especificaciones</small>
+                                                @if($resp->meets_specs)
+                                                    <span class="badge bg-success"><i class="ti ti-check me-1"></i>Sí</span>
+                                                @else
+                                                    <span class="badge bg-danger"><i class="ti ti-x me-1"></i>No</span>
+                                                @endif
+                                            </div>
+                                            @endif
+                                            @if($resp->score)
+                                            <div class="col-sm-4">
+                                                <small class="text-muted d-block">Puntaje de evaluación</small>
+                                                <span class="badge bg-primary">{{ $resp->score }} / 100</span>
+                                            </div>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                                @endif
+                                @endforeach
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td colspan="6" class="text-end">Total de la oferta:</td>
+                                    <td class="text-end text-success">
+                                        ${{ number_format($responses->sum('total'), 2) }}
+                                    </td>
+                                    <td colspan="3"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    @if($firstResp->evaluator && $firstResp->evaluated_at)
+                    <div class="p-2 px-3 bg-light border-top">
+                        <small class="text-muted">
+                            <i class="ti ti-user-check me-1"></i>
+                            Evaluado por <strong>{{ $firstResp->evaluator->name }}</strong>
+                            el {{ $firstResp->evaluated_at->format('d/m/Y H:i') }}
+                            @if($firstResp->evaluation_notes)
+                                — {{ $firstResp->evaluation_notes }}
+                            @endif
+                        </small>
+                    </div>
+                    @endif
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
+        {{-- Cancelación --}}
+        @if($rfq->status === 'CANCELLED')
+        <div class="card border-danger mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="ti ti-ban me-2"></i>Información de Cancelación</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Cancelada por</label>
+                        <p class="mb-0 fw-semibold">{{ $rfq->canceller?->name ?? '—' }}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted mb-1">Fecha de cancelación</label>
+                        <p class="mb-0 fw-semibold">
+                            {{ $rfq->cancelled_at?->format('d/m/Y H:i') ?? '—' }}
+                        </p>
+                    </div>
+                    @if($rfq->cancellation_reason)
+                    <div class="col-12">
+                        <label class="form-label text-muted mb-1">Motivo</label>
+                        <div class="alert alert-danger mb-0 py-2">
+                            <i class="ti ti-message-2 me-1"></i>{{ $rfq->cancellation_reason }}
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+        @endif
+
+    </div>
+
+    {{-- COLUMNA DERECHA --}}
+    <div class="col-lg-4">
+
+        {{-- Proveedores Invitados --}}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="ti ti-building-store text-primary me-2"></i>Proveedores</h5>
+                <span class="badge bg-primary">{{ $totalSuppliers }}</span>
+            </div>
+            <div class="card-body p-0">
+                @forelse($rfq->suppliers as $supplier)
+                @php $hasResponse = $supplier->pivot->responded_at !== null; @endphp
+                <div class="d-flex align-items-start gap-3 p-3 border-bottom">
+                    <div class="supplier-avatar {{ $hasResponse ? 'bg-success' : 'bg-warning' }} text-white">
+                        {{ substr($supplier->company_name, 0, 1) }}
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold text-truncate">{{ $supplier->company_name }}</div>
+                        <small class="text-muted d-block text-truncate">
+                            <i class="ti ti-mail me-1"></i>{{ $supplier->email ?? '—' }}
+                        </small>
+                        @if($supplier->phone)
+                            <small class="text-muted d-block">
+                                <i class="ti ti-phone me-1"></i>{{ $supplier->phone }}
+                            </small>
+                        @endif
+                        <div class="mt-1 d-flex flex-wrap gap-1">
+                            @if($hasResponse)
+                                <span class="badge bg-success">
+                                    <i class="ti ti-check me-1"></i>Respondió
+                                </span>
+                                <small class="text-muted d-block w-100">
+                                    {{ \Carbon\Carbon::parse($supplier->pivot->responded_at)->format('d/m/Y H:i') }}
+                                </small>
+                            @else
+                                <span class="badge bg-warning text-dark">
+                                    <i class="ti ti-clock me-1"></i>Pendiente
+                                </span>
+                            @endif
+                            @if($supplier->pivot->quotation_pdf_path)
+                                <a href="{{ asset('storage/' . $supplier->pivot->quotation_pdf_path) }}"
+                                   target="_blank" class="badge bg-light text-dark border text-decoration-none">
+                                    <i class="ti ti-file-type-pdf me-1 text-danger"></i>PDF
+                                </a>
+                            @endif
+                        </div>
+                        @if($supplier->pivot->invited_at)
+                        <small class="text-muted d-block mt-1">
+                            <i class="ti ti-calendar me-1"></i>Invitado: {{ \Carbon\Carbon::parse($supplier->pivot->invited_at)->format('d/m/Y') }}
+                        </small>
+                        @endif
+                    </div>
+                </div>
+                @empty
+                <div class="text-center text-muted py-4">
+                    <i class="ti ti-user-off fs-2 d-block mb-2"></i>
+                    Sin proveedores invitados
+                </div>
+                @endforelse
+            </div>
+        </div>
+
+        {{-- Auditoría --}}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="ti ti-history text-secondary me-2"></i>Auditoría</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline-item mb-3">
+                    <div class="timeline-dot" style="border-color:#0d6efd;background:#e7f1ff;"></div>
+                    <div class="ps-1">
+                        <small class="text-muted d-block">Creada</small>
+                        <span class="fw-semibold">{{ $rfq->creator?->name ?? '—' }}</span>
+                        <small class="text-muted d-block">{{ $rfq->created_at->format('d/m/Y H:i') }}</small>
+                        <small class="text-muted">{{ $rfq->created_at->diffForHumans() }}</small>
+                    </div>
+                </div>
+
+                @if($rfq->sent_at)
+                <div class="timeline-item mb-3">
+                    <div class="timeline-dot" style="border-color:#0dcaf0;background:#e7f9fc;"></div>
+                    <div class="ps-1">
+                        <small class="text-muted d-block">Enviada a proveedores</small>
+                        <small class="text-muted d-block">{{ $rfq->sent_at->format('d/m/Y H:i') }}</small>
+                    </div>
+                </div>
+                @endif
+
+                @if($rfq->cancelled_at)
+                <div class="timeline-item mb-3">
+                    <div class="timeline-dot" style="border-color:#dc3545;background:#fde8ea;"></div>
+                    <div class="ps-1">
+                        <small class="text-muted d-block">Cancelada</small>
+                        <span class="fw-semibold text-danger">{{ $rfq->canceller?->name ?? '—' }}</span>
+                        <small class="text-muted d-block">{{ $rfq->cancelled_at->format('d/m/Y H:i') }}</small>
+                    </div>
+                </div>
+                @endif
+
+                @if($rfq->updated_at->gt($rfq->created_at))
+                <div class="timeline-item">
+                    <div class="timeline-dot" style="border-color:#6c757d;background:#f8f9fa;"></div>
+                    <div class="ps-1">
+                        <small class="text-muted d-block">Última actualización</small>
+                        <span class="fw-semibold">{{ $rfq->updater?->name ?? '—' }}</span>
+                        <small class="text-muted d-block">{{ $rfq->updated_at->format('d/m/Y H:i') }}</small>
+                        <small class="text-muted">{{ $rfq->updated_at->diffForHumans() }}</small>
+                    </div>
+                </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- Acciones --}}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="ti ti-bolt text-warning me-2"></i>Acciones</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    @if($rfq->status === 'DRAFT')
+                        <button type="button" class="btn btn-success" id="sendRfqBtn2">
+                            <i class="ti ti-send me-1"></i>Enviar a Proveedores
+                        </button>
+                    @endif
+                    <a href="{{ route('requisitions.show', $rfq->requisition) }}" class="btn btn-outline-primary">
+                        <i class="ti ti-file-text me-1"></i>Ver Requisición
+                    </a>
+                    @if($rfq->status !== 'CANCELLED')
+                        <button type="button" class="btn btn-outline-danger" id="cancelRfqBtn2">
+                            <i class="ti ti-ban me-1"></i>Cancelar RFQ
+                        </button>
+                    @endif
+                    <a href="{{ route('rfq.index') }}" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left me-1"></i>Volver al Listado
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
 @endsection
-
-@push('styles')
-<style>
-.avatar {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 1.2rem;
-}
-
-.badge {
-    font-weight: 500;
-}
-</style>
-@endpush
 
 @push('scripts')
 <script>
 $(document).ready(function() {
-    // Activar tooltips
     $('[data-bs-toggle="tooltip"]').tooltip();
 
-    // Enviar RFQ
-    $('#sendRfqBtn').on('click', function() {
+    function confirmSend() {
         Swal.fire({
             icon: 'question',
             title: '¿Enviar RFQ?',
-            html: '¿Estás seguro de enviar esta solicitud a los proveedores?<br><br>' +
+            html: '¿Confirmas el envío a los <strong>{{ $totalSuppliers }}</strong> proveedores invitados?<br>' +
                   '<small class="text-muted">Se enviarán notificaciones por correo electrónico.</small>',
             showCancelButton: true,
-            confirmButtonText: '<i class="ti ti-send me-2"></i>Sí, enviar',
+            confirmButtonText: '<i class="ti ti-send me-1"></i>Sí, enviar',
             cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#0d6efd'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                sendRFQ();
-            }
-        });
-    });
-
-    function sendRFQ() {
-        Swal.fire({
-            title: 'Enviando...',
-            html: 'Por favor espera un momento',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-
-        $.ajax({
-            url: '{{ route("rfq.send", $rfq) }}',
-            method: 'POST',
-            data: {
-                _token: '{{ csrf_token() }}'
-            },
-            success: function(response) {
-                if (response.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡Enviado!',
-                        text: response.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    }).then(() => {
-                        location.reload();
-                    });
-                }
-            },
-            error: function(xhr) {
-                console.error('Error:', xhr);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: xhr.responseJSON?.message || 'No se pudo enviar la RFQ'
-                });
-            }
-        });
+            confirmButtonColor: '#198754'
+        }).then(r => { if (r.isConfirmed) sendRFQ(); });
     }
 
-    // Cancelar RFQ
-    $('#cancelRfqBtn').on('click', function() {
+    function confirmCancel() {
         Swal.fire({
             icon: 'warning',
             title: '¿Cancelar RFQ?',
-            html: '¿Estás seguro de cancelar esta solicitud?<br><br>' +
-                  '<small class="text-muted">Esta acción no se puede deshacer.</small>',
+            html: '<small class="text-muted">Esta acción no se puede deshacer.</small>',
             input: 'textarea',
             inputPlaceholder: 'Motivo de cancelación (opcional)',
             showCancelButton: true,
             confirmButtonText: 'Sí, cancelar',
             cancelButtonText: 'No',
             confirmButtonColor: '#dc3545'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                cancelRFQ(result.value);
-            }
+        }).then(r => { if (r.isConfirmed) cancelRFQ(r.value); });
+    }
+
+    $('#sendRfqBtn, #sendRfqBtn2').on('click', confirmSend);
+    $('#cancelRfqBtn, #cancelRfqBtn2').on('click', confirmCancel);
+
+    function sendRFQ() {
+        Swal.fire({ title: 'Enviando...', html: 'Por favor espera', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        $.ajax({
+            url: '{{ route("rfq.send", $rfq) }}',
+            method: 'POST',
+            data: { _token: '{{ csrf_token() }}' },
+            success: r => {
+                if (r.success) {
+                    Swal.fire({ icon: 'success', title: '¡Enviada!', text: r.message, timer: 2000, showConfirmButton: false })
+                        .then(() => location.reload());
+                }
+            },
+            error: xhr => Swal.fire({ icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'No se pudo enviar' })
         });
-    });
+    }
 
     function cancelRFQ(reason) {
         $.ajax({
             url: '{{ route("rfq.cancel", $rfq) }}',
             method: 'POST',
-            data: {
-                _token: '{{ csrf_token() }}',
-                reason: reason
-            },
-            success: function(response) {
-                if (response.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Cancelada',
-                        text: response.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    }).then(() => {
-                        location.reload();
-                    });
+            data: { _token: '{{ csrf_token() }}', reason: reason },
+            success: r => {
+                if (r.success) {
+                    Swal.fire({ icon: 'success', title: 'Cancelada', text: r.message, timer: 2000, showConfirmButton: false })
+                        .then(() => location.reload());
                 }
             },
-            error: function(xhr) {
-                console.error('Error:', xhr);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: xhr.responseJSON?.message || 'No se pudo cancelar la RFQ'
-                });
-            }
+            error: xhr => Swal.fire({ icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'No se pudo cancelar' })
         });
     }
 });

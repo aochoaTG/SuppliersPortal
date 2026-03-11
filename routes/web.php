@@ -332,6 +332,7 @@ Route::middleware(['auth', 'lock'])->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/datatable', 'datatable')->name('datatable');
         Route::get('/wizard/{requisition}/summary', 'wizardSummary')->name('wizard.summary');
+        Route::get('/wizard/{requisition}/datatable', 'wizardDatatable')->name('wizard.datatable');
         Route::get('/summary', 'summary')->name('summary');
         Route::get('/inbox/received', 'receivedInbox')->name('inbox.received');
 

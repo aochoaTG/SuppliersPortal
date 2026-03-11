@@ -42,15 +42,14 @@
                             <strong class="d-block">{{ $rfq->folio }}</strong>
                         </div>
                         
+                        @if($rfq->quotationGroup)
                         <div class="mb-3">
-                            <small class="text-muted d-block">Requisición</small>
-                            <strong class="d-block">{{ $rfq->requisition->folio ?? 'N/A' }}</strong>
+                            <small class="text-muted d-block">Grupo de Cotización</small>
+                            <span class="badge bg-info">
+                                <i class="ti ti-layers me-1"></i>{{ $rfq->quotationGroup->name }}
+                            </span>
                         </div>
-
-                        <div class="mb-3">
-                            <small class="text-muted d-block">Grupo</small>
-                            <span class="badge bg-info">{{ $rfq->quotationGroup->name }}</span>
-                        </div>
+                        @endif
                         
                         <div class="mb-3">
                             <small class="text-muted d-block">Estado</small>
@@ -80,8 +79,15 @@
                             @endswitch
                         </div>
                         
+                        @if($rfq->sent_at)
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Fecha de Envío</small>
+                            <span class="d-block small">{{ $rfq->sent_at->format('d/m/Y H:i') }}</span>
+                        </div>
+                        @endif
+
                         <div class="mb-0">
-                            <small class="text-muted d-block">Fecha Límite</small>
+                            <small class="text-muted d-block">Fecha Límite de Respuesta</small>
                             @if($rfq->response_deadline)
                                 @php
                                     $daysRemaining = now()->diffInDays($rfq->response_deadline, false);
@@ -111,17 +117,96 @@
                     </div>
                 </div>
 
-                {{-- Card: Mensaje/Notas --}}
-                @if($rfq->message)
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-header bg-light py-2">
-                        <h6 class="mb-0">
-                            <i class="ti ti-message-circle me-2"></i>
-                            Mensaje
+                {{-- Card: Instrucciones y Requisitos de Compras --}}
+                @if($rfq->message || $rfq->requirements || $rfq->notes)
+                <div class="card mb-3 shadow-sm border-warning border-2">
+                    <div class="card-header bg-warning bg-opacity-10 py-2">
+                        <h6 class="mb-0 text-warning-emphasis">
+                            <i class="ti ti-alert-circle me-2"></i>
+                            Instrucciones de Compras
                         </h6>
                     </div>
                     <div class="card-body p-3">
-                        <p class="mb-0 small">{{ $rfq->message }}</p>
+                        @if($rfq->message)
+                        <div class="mb-3">
+                            <label class="text-muted d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                                <i class="ti ti-message-circle me-1"></i>Mensaje al Proveedor
+                            </label>
+                            <p class="mb-0 small">{{ $rfq->message }}</p>
+                        </div>
+                        @endif
+
+                        @if($rfq->requirements)
+                        @if($rfq->message)<hr class="my-2">@endif
+                        <div class="mb-3">
+                            <label class="text-muted d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                                <i class="ti ti-list-check me-1"></i>Requisitos / Instrucciones Especiales
+                            </label>
+                            <p class="mb-0 small" style="white-space: pre-line;">{{ $rfq->requirements }}</p>
+                        </div>
+                        @endif
+
+                        @if($rfq->notes)
+                        @if($rfq->message || $rfq->requirements)<hr class="my-2">@endif
+                        <div class="mb-0">
+                            <label class="text-muted d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                                <i class="ti ti-notes me-1"></i>Observaciones de Compras
+                            </label>
+                            <p class="mb-0 small" style="white-space: pre-line;">{{ $rfq->notes }}</p>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
+                {{-- Card: Información de la Requisición --}}
+                @if($rfq->requisition)
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header bg-light py-2">
+                        <h6 class="mb-0">
+                            <i class="ti ti-clipboard-list me-2"></i>
+                            Datos de la Requisición
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Folio Requisición</small>
+                            <strong class="d-block">{{ $rfq->requisition->folio }}</strong>
+                        </div>
+
+                        @if($rfq->requisition->company)
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Empresa</small>
+                            <span class="d-block small fw-semibold">{{ $rfq->requisition->company->name }}</span>
+                        </div>
+                        @endif
+
+                        @if($rfq->requisition->required_date)
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Fecha Requerida</small>
+                            <span class="d-block small fw-semibold">
+                                <i class="ti ti-calendar me-1 text-primary"></i>
+                                {{ \Carbon\Carbon::parse($rfq->requisition->required_date)->format('d/m/Y') }}
+                            </span>
+                        </div>
+                        @endif
+
+                        @if($rfq->requisition->receivingLocation)
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Punto de Entrega</small>
+                            <span class="d-block small fw-semibold">
+                                <i class="ti ti-map-pin me-1 text-danger"></i>
+                                {{ $rfq->requisition->receivingLocation->code }} — {{ $rfq->requisition->receivingLocation->name }}
+                            </span>
+                        </div>
+                        @endif
+
+                        @if($rfq->requisition->description)
+                        <div class="mb-0">
+                            <small class="text-muted d-block">Descripción</small>
+                            <p class="mb-0 small">{{ $rfq->requisition->description }}</p>
+                        </div>
+                        @endif
                     </div>
                 </div>
                 @endif
@@ -354,17 +439,41 @@
                                     <div class="d-flex align-items-start justify-content-between mb-3">
                                         <div class="d-flex align-items-start flex-grow-1">
                                             <span class="badge bg-dark me-2 mt-1">{{ $index + 1 }}</span>
-                                            <div>
+                                            <div class="flex-grow-1">
                                                 <h6 class="mb-1 fw-bold">
                                                     {{ $item->description }}
-                                                    {{-- 3. INDICADOR VISUAL DE BLOQUEO --}}
                                                     @if($isLocked)
                                                         <i class="ti ti-lock text-warning ms-1" title="Partida bloqueada (ya enviada)"></i>
                                                     @endif
                                                 </h6>
-                                                <small class="text-muted">
-                                                    <i class="ti ti-package"></i> {{ $item->quantity }} {{ $item->unit }}
-                                                </small>
+                                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                                    <small class="text-muted">
+                                                        <i class="ti ti-package me-1"></i>{{ $item->quantity }} {{ $item->unit }}
+                                                    </small>
+                                                    @if(!empty($item->brand) || !empty($item->model))
+                                                        <small class="text-muted">
+                                                            <i class="ti ti-tag me-1"></i>
+                                                            {{ implode(' / ', array_filter([$item->brand ?? null, $item->model ?? null])) }}
+                                                        </small>
+                                                    @endif
+                                                    @if($item->expenseCategory)
+                                                        <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">
+                                                            <i class="ti ti-folder me-1"></i>{{ $item->expenseCategory->name }}
+                                                        </span>
+                                                    @endif
+                                                    @if($item->productService)
+                                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size: 0.7rem;">
+                                                            <i class="ti ti-barcode me-1"></i>{{ $item->productService->code ?? $item->productService->name }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                @if(!empty($item->notes))
+                                                    <div class="mt-2 p-2 rounded bg-info bg-opacity-10 border border-info border-opacity-25">
+                                                        <small class="text-info-emphasis">
+                                                            <i class="ti ti-info-circle me-1"></i><strong>Nota de compras:</strong> {{ $item->notes }}
+                                                        </small>
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                         

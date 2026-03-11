@@ -237,6 +237,16 @@
 const REQUISITION_ID = {{ $requisition->id }};
 
 /**
+ * Recarga la página forzando el paso 2, para que Livewire no salte al paso 3
+ * por detectar grupos creados en determineCurrentStep().
+ */
+function reloadStep2() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('step', '2');
+    window.location.href = url.toString();
+}
+
+/**
  * ==========================================================
  * MÓDULO: PASO 2 - PLANIFICADOR (AGRUPACIÓN)
  * ==========================================================
@@ -374,29 +384,34 @@ window.Step2Planner = (function() {
             inputValidator: (value) => !value && 'Debes ingresar un nombre'
         }).then((result) => {
             if (result.isConfirmed) {
-                $.post(`/rfq/${requisitionId}/planning/groups/create`, {
+                $.post(`/requisitions/${requisitionId}/quotation-planner/groups`, {
                     _token: '{{ csrf_token() }}',
                     name: result.value,
                     item_ids: [itemId]
-                }).done(() => location.reload())
+                }).done(() => reloadStep2())
                   .fail(() => Swal.fire('Error', 'No se pudo crear el grupo', 'error'));
             }
         });
     }
 
     function addItemToGroup(requisitionId, groupId, itemId) {
-        $.post(`/rfq/${requisitionId}/planning/groups/${groupId}/add-items`, {
+        $.post(`/requisitions/${requisitionId}/quotation-planner/groups/${groupId}/items`, {
             _token: '{{ csrf_token() }}',
             item_ids: [itemId]
-        }).done(() => setTimeout(() => location.reload(), 500))
+        }).done(() => setTimeout(() => reloadStep2(), 500))
           .fail(() => Swal.fire('Error', 'No se pudo agregar', 'error'));
     }
 
     function removeItemFromGroup(requisitionId, groupId, itemId) {
-        $.post(`/rfq/${requisitionId}/planning/groups/${groupId}/remove-items`, {
-            _token: '{{ csrf_token() }}',
-            item_ids: [itemId]
-        }).done(() => setTimeout(() => location.reload(), 500))
+        $.ajax({
+            url: `/requisitions/${requisitionId}/quotation-planner/groups/${groupId}/items`,
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                _method: 'DELETE',
+                item_ids: [itemId]
+            }
+        }).done(() => setTimeout(() => reloadStep2(), 500))
           .fail(() => Swal.fire('Error', 'No se pudo remover', 'error'));
     }
 
@@ -410,10 +425,10 @@ window.Step2Planner = (function() {
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
-                    url: `/rfq/${requisitionId}/planning/groups/${groupId}`,
-                    method: 'DELETE',
-                    data: { _token: '{{ csrf_token() }}' }
-                }).done(() => location.reload());
+                    url: `/requisitions/${requisitionId}/quotation-planner/groups/${groupId}`,
+                    method: 'POST',
+                    data: { _token: '{{ csrf_token() }}', _method: 'DELETE' }
+                }).done(() => reloadStep2());
             }
         });
     }
@@ -456,18 +471,18 @@ window.Step2Planner = (function() {
     }
 
     function createGroupWithMultipleItems(requisitionId, groupName, itemIds) {
-        $.post(`/rfq/${requisitionId}/planning/groups/create`, {
+        $.post(`/requisitions/${requisitionId}/quotation-planner/groups`, {
             _token: '{{ csrf_token() }}',
             name: groupName,
             item_ids: itemIds
-        }).done(() => location.reload());
+        }).done(() => reloadStep2());
     }
 
     function addMultipleItemsToGroup(requisitionId, groupId, itemIds) {
-        $.post(`/rfq/${requisitionId}/planning/groups/${groupId}/add-items`, {
+        $.post(`/requisitions/${requisitionId}/quotation-planner/groups/${groupId}/items`, {
             _token: '{{ csrf_token() }}',
             item_ids: itemIds
-        }).done(() => location.reload());
+        }).done(() => reloadStep2());
     }
 
     return { init, reset };

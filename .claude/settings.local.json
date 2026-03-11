@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal\" && php artisan migrate:fresh --seed 2>&1)"
+      "Bash(cd \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal\" && php artisan migrate:fresh --seed 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal\" && php artisan route:list --path=rfq 2>&1 | head -60)"
     ]
   }
 }
