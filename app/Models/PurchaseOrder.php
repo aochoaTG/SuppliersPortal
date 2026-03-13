@@ -17,6 +17,7 @@ class PurchaseOrder extends Model
         'requisition_id',
         'supplier_id',
         'quotation_summary_id',
+        'receiving_location_id',
         'subtotal',
         'iva_amount',
         'total',
@@ -25,13 +26,19 @@ class PurchaseOrder extends Model
         'estimated_delivery_days',
         'status',
         'created_by',
+        'received_by',
         'approved_at',
+        'issued_at',
+        'received_at',
         'closed_at',
         'inactivity_warning_sent_at',
+        'reception_notes',
     ];
 
     protected $casts = [
         'approved_at' => 'datetime',
+        'issued_at' => 'datetime',
+        'received_at' => 'datetime',
         'closed_at' => 'datetime',
         'inactivity_warning_sent_at' => 'datetime',
     ];
@@ -60,9 +67,41 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchaseOrderItem::class);
     }
 
+    public function receivingLocation()
+    {
+        return $this->belongsTo(ReceivingLocation::class);
+    }
+
+    public function receiver()
+    {
+        return $this->belongsTo(User::class, 'received_by');
+    }
+
+    // --- Verificadores de estado ---
+
     public function isOpen(): bool
     {
         return $this->status === 'OPEN';
+    }
+
+    public function isIssued(): bool
+    {
+        return $this->status === 'ISSUED';
+    }
+
+    public function isPartiallyReceived(): bool
+    {
+        return $this->status === 'PARTIALLY_RECEIVED';
+    }
+
+    public function isReceived(): bool
+    {
+        return $this->status === 'RECEIVED';
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === 'CANCELLED';
     }
 
     public function isClosedByInactivity(): bool
@@ -70,27 +109,40 @@ class PurchaseOrder extends Model
         return $this->status === 'CLOSED_BY_INACTIVITY';
     }
 
+    /**
+     * Una OC puede recibirse si fue emitida al proveedor (ISSUED)
+     * o si ya tiene una recepción parcial previa (PARTIALLY_RECEIVED).
+     */
+    public function canBeReceived(): bool
+    {
+        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
+    }
+
     public function getStatusLabel(): string
     {
         return match ($this->status) {
-            'OPEN' => 'Abierta',
-            'RECEIVED' => 'Recibida',
-            'CANCELLED' => 'Cancelada',
-            'PAID' => 'Pagada',
+            'OPEN'               => 'Abierta',
+            'ISSUED'             => 'Emitida',
+            'PARTIALLY_RECEIVED' => 'Parcialmente Recibida',
+            'RECEIVED'           => 'Recibida',
+            'CANCELLED'          => 'Cancelada',
+            'PAID'               => 'Pagada',
             'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
-            default => 'Desconocido',
+            default              => 'Desconocido',
         };
     }
 
     public function getStatusBadgeClass(): string
     {
         return match ($this->status) {
-            'OPEN' => 'warning',
-            'RECEIVED' => 'success',
-            'CANCELLED' => 'danger',
-            'PAID' => 'primary',
+            'OPEN'               => 'warning',
+            'ISSUED'             => 'info',
+            'PARTIALLY_RECEIVED' => 'primary',
+            'RECEIVED'           => 'success',
+            'CANCELLED'          => 'danger',
+            'PAID'               => 'success',
             'CLOSED_BY_INACTIVITY' => 'dark',
-            default => 'secondary',
+            default              => 'secondary',
         };
     }
 

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(cd \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal\" && php artisan migrate:fresh --seed 2>&1)",
-      "Bash(cd \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal\" && php artisan route:list --path=rfq 2>&1 | head -60)"
+      "Bash(cd \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal\" && php artisan route:list --path=rfq 2>&1 | head -60)",
+      "Bash(find /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Models -name \"*Budget*\" -o -name \"*Reception*\" -o -name \"*Approval*\" | xargs ls -la)"
     ]
   }
 }
