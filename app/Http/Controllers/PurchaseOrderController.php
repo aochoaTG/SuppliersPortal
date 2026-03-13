@@ -197,12 +197,16 @@ class PurchaseOrderController extends Controller
     public function showDirect(DirectPurchaseOrder $directPurchaseOrder)
     {
         $directPurchaseOrder->load([
-            'items',
+            'items.expenseCategory',
             'supplier',
             'creator',
             'costCenter',
+            'receivingLocation',
+            'assignedApprover',
+            'approver',
+            'rejector',
             'approvals.approver',
-            'documents'
+            'documents',
         ]);
 
         return view('purchase-orders.show-direct', compact('directPurchaseOrder'));
