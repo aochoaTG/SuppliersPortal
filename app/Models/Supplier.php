@@ -103,13 +103,18 @@ class Supplier extends Model
             && $this->repse_expiry_date->isFuture();
     }
 
+    /**
+     * Días restantes antes de que venza el REPSE.
+     * Positivo: días que quedan. 0: vence hoy. Negativo: ya venció.
+     * Retorna null si no hay fecha de vencimiento registrada.
+     */
     public function repseExpiresIn(): ?int
     {
         if (!$this->repse_expiry_date) {
             return null;
         }
 
-        return $this->repse_expiry_date->diffInDays(now(), false);
+        return (int) now()->diffInDays($this->repse_expiry_date, false);
     }
 
     public function sirocs(): HasMany

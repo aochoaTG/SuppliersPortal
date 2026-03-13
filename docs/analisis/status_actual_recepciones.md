@@ -2,8 +2,8 @@
 
 **Fecha:** 2026-03-13
 **Autor:** Análisis generado por Arquitecto de Software (Claude Code)
-**Versión:** 1.7
-**Estado:** Borrador para revisión de equipo — Pasos 1 a 7 implementados
+**Versión:** 1.8
+**Estado:** Borrador para revisión de equipo — Pasos 1 a 8 implementados
 
 ---
 
@@ -434,11 +434,63 @@ $this->update(['status' => 'RECEIVED', 'received_at' => now()]);
 
 `PurchaseOrderController::datatableDirect()` tenía los status hardcodeados como arrays locales (sin `PARTIALLY_RECEIVED` ni `CLOSED_BY_INACTIVITY`). Se actualizó para usar `$ocd->getStatusBadgeClass()` / `$ocd->getStatusLabel()` del modelo (igual que se hizo con el DataTable regular en el Paso 6). También se agregó el botón "Recibir" cuando `$ocd->canBeReceived()` es verdadero.
 
-#### Paso 8 — Validación REPSE en recepción de servicios
+#### ~~Paso 8~~ ✅ COMPLETADO — Validación REPSE en recepción de servicios (2026-03-13)
 
-En `ReceptionService::validateRepseIfService()`:
-- Si el ítem es de categoría "Servicio" y el proveedor `requires_repse`, verificar que `repse_expiry_date` sea futura.
-- Emitir advertencia (no bloqueo) si está próximo a vencer.
+**Archivos modificados:**
+- `app/Models/Supplier.php` — `repseExpiresIn()` corregido
+- `app/Models/ExpenseCategory.php` — nuevo método `isService()`
+- `app/Services/ReceptionService.php` — `validateRepseIfService()` mejorado
+
+**Bug corregido — `Supplier::repseExpiresIn()`:**
+
+El método tenía los operandos de `diffInDays()` invertidos:
+```php
+// ANTES (bug): devuelve negativo cuando el REPSE aún es válido
+return $this->repse_expiry_date->diffInDays(now(), false);
+// expiry=2026-04-01, now=2026-03-13 → retorna -19 (¡negativo!)
+// Consecuencia: -19 <= 30 siempre es true → warning para TODO REPSE válido
+
+// DESPUÉS (correcto): días restantes, positivo = días que quedan
+return (int) now()->diffInDays($this->repse_expiry_date, false);
+// expiry=2026-04-01, now=2026-03-13 → retorna +19
+// 19 <= 30 → warning correctamente activado solo cuando faltan ≤ 30 días
+```
+
+**Semántica de `repseExpiresIn()` después del fix:**
+| Valor retornado | Significado |
+|---|---|
+| Positivo (ej: 45) | REPSE válido, vence en 45 días |
+| ≤ 30 y positivo | REPSE válido pero próximo a vencer → warning |
+| 0 | Vence hoy |
+| Negativo | Ya venció — pero `hasValidRepseRegistration()` lo captura antes |
+| `null` | No hay fecha de vencimiento registrada |
+
+**Nuevo método `ExpenseCategory::isService()`:**
+
+```php
+public function isService(): bool
+{
+    return $this->code === 'SER';
+}
+```
+
+Permite que el servicio consulte semánticamente si un ítem de OCD pertenece a la categoría Servicios, sin acoplar el código del servicio al valor `'SER'` hardcodeado.
+
+**`validateRepseIfService()` — lógica completa:**
+
+```
+1. Si el proveedor no tiene provides_specialized_services → null (sin advertencia)
+2. Si la orden es una OCD:
+      Cargar items con expenseCategory
+      Si ningún ítem tiene código SER → null (productos, no servicios → no aplica REPSE)
+3. Si el REPSE está vencido o sin número → mensaje de ERROR (REPSE inválido)
+4. Si vence en ≤ 30 días → mensaje de ADVERTENCIA (próximo a vencer)
+5. En cualquier otro caso → null
+```
+
+**Diferencia de comportamiento OC vs OCD:**
+- **OC estándar**: los ítems no tienen `expenseCategory`, así que el check se aplica a nivel del proveedor (`provides_specialized_services`). Si el proveedor presta servicios especializados, aplica.
+- **OCD**: los ítems sí tienen `expenseCategory`. El check solo activa la advertencia si al menos un ítem tiene categoría `SER` (Servicios). Una OCD de materiales con un proveedor REPSE-registered no genera advertencia.
 
 #### Paso 9 — Notificaciones
 
@@ -461,10 +513,10 @@ Crear `ReceptionCompletedNotification` para:
 | `ReceptionService` | ✅ Completo | Paso 5 completado el 2026-03-13 |
 | `ReceptionController` + Rutas | ✅ Completo | Paso 6 completado el 2026-03-13 |
 | Integración `BudgetCommitment` | ✅ Completo | Paso 7 completado el 2026-03-13. `received_at` agregado; `PARTIALLY_RECEIVED` en OCD corregido. |
-| Validación REPSE en recepción | ✅ Implementado en `ReceptionService` | `validateRepseIfService()` devuelve `?string` como advertencia (Paso 8 — pendiente de migración) |
+| Validación REPSE en recepción | ✅ Completo | Paso 8 completado el 2026-03-13. Bug en `repseExpiresIn()` corregido. Check item-level para OCD. |
 | Notificaciones de recepción | ❌ No existe | Implementar (Paso 9) |
 
-**Respuesta directa:** Los pasos 1 a 7 están completados. La capa de modelos, lógica de negocio, controlador y vistas están listos. **Antes de usar el sistema, es necesario ejecutar `php artisan migrate` para aplicar las 6 migraciones creadas.** El único paso pendiente de implementar desde cero es el Paso 9: Notificaciones de recepción.
+**Respuesta directa:** Los pasos 1 a 8 están completados. La capa de modelos, lógica de negocio, controlador y vistas están listos. **Antes de usar el sistema, es necesario ejecutar `php artisan migrate` para aplicar las 6 migraciones creadas.** El único paso pendiente de implementar desde cero es el Paso 9: Notificaciones de recepción.
 
 ---
 

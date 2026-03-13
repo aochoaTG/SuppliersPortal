@@ -134,8 +134,12 @@ class ReceptionService
     /**
      * Verifica el estado del REPSE del proveedor cuando la orden involucra servicios.
      *
+     * Para OCD: solo aplica si al menos un ítem tiene categoría "Servicio" (código SER).
+     * Para OC estándar: aplica si el proveedor está marcado como prestador de servicios
+     *                   especializados (los ítems de OC no tienen categoría de gasto).
+     *
      * No lanza excepción — devuelve un mensaje de advertencia o null.
-     * El controlador decide si mostrarlo como alerta o bloquear la acción.
+     * El controlador decide cómo mostrarlo al usuario.
      */
     public function validateRepseIfService(Model $order): ?string
     {
@@ -145,8 +149,20 @@ class ReceptionService
             return null;
         }
 
+        // Para OCD: solo alertar si la orden contiene al menos un ítem de Servicios
+        if ($order instanceof DirectPurchaseOrder) {
+            $order->loadMissing('items.expenseCategory');
+            $hasServiceItems = $order->items->contains(
+                fn($item) => $item->expenseCategory?->isService() ?? false
+            );
+
+            if (! $hasServiceItems) {
+                return null;
+            }
+        }
+
         if (! $supplier->hasValidRepseRegistration()) {
-            return "El proveedor '{$supplier->company_name}' tiene el registro REPSE vencido. "
+            return "El proveedor '{$supplier->company_name}' tiene el registro REPSE vencido o sin número de registro. "
                 . "Consulta con el área de Compras antes de continuar.";
         }
 

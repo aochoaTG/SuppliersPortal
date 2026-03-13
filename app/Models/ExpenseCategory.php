@@ -142,6 +142,15 @@ class ExpenseCategory extends Model
     }
 
     /**
+     * Verificar si esta categoría corresponde a Servicios (código SER).
+     * Usado para determinar si se aplica la validación REPSE en recepciones.
+     */
+    public function isService(): bool
+    {
+        return $this->code === 'SER';
+    }
+
+    /**
      * Verificar si está activa
      */
     public function isActive(): bool
