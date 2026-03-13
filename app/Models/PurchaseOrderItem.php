@@ -11,11 +11,38 @@ class PurchaseOrderItem extends Model
         'requisition_item_id',
         'description',
         'quantity',
+        'quantity_received',
         'unit_price',
         'subtotal',
         'iva_amount',
-        'total'
+        'total',
     ];
+
+    protected $casts = [
+        'quantity'          => 'decimal:3',
+        'quantity_received' => 'decimal:3',
+        'unit_price'        => 'decimal:2',
+        'subtotal'          => 'decimal:2',
+        'iva_amount'        => 'decimal:2',
+        'total'             => 'decimal:2',
+    ];
+
+    // --- Estado de recepción del ítem ---
+
+    public function getQuantityPendingAttribute(): float
+    {
+        return max(0, (float) $this->quantity - (float) $this->quantity_received);
+    }
+
+    public function isFullyReceived(): bool
+    {
+        return (float) $this->quantity_received >= (float) $this->quantity;
+    }
+
+    public function isPartiallyReceived(): bool
+    {
+        return (float) $this->quantity_received > 0 && ! $this->isFullyReceived();
+    }
 
     // Relación con su cabecera
     public function purchaseOrder()

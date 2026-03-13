@@ -2,8 +2,8 @@
 
 **Fecha:** 2026-03-13
 **Autor:** Análisis generado por Arquitecto de Software (Claude Code)
-**Versión:** 1.1
-**Estado:** Borrador para revisión de equipo — Paso 1 implementado
+**Versión:** 1.2
+**Estado:** Borrador para revisión de equipo — Pasos 1 y 2 implementados
 
 ---
 
@@ -120,20 +120,26 @@ La intención no es solo crear un modelo, sino garantizar que el proceso de rece
 - `receiver()` — relación BelongsTo a `User` via `received_by`
 - `getStatusLabel()` y `getStatusBadgeClass()` — actualizados con los nuevos estados
 
-#### `PurchaseOrderItem` — Estado: ⚠️ INCOMPLETO para recepción
+#### `PurchaseOrderItem` — Estado: ✅ COMPLETO para recepción *(actualizado 2026-03-13)*
 
 | Campo Necesario | ¿Existe? | Observación |
 |---|---|---|
-| `quantity_received` | ❌ NO | No se lleva registro de qué cantidad fue recibida por ítem. |
-| `quantity_pending` | ❌ NO | No hay cálculo de pendiente por ítem. |
+| `quantity_received` | ✅ SÍ | Agregado en migración `2026_03_13_000002`. `decimal(10,3)` con default 0. |
+| `quantity_pending` | ✅ SÍ | Accesor `getQuantityPendingAttribute()`. Calculado: `max(0, quantity - quantity_received)`. |
+
+**Métodos agregados:** `isFullyReceived()`, `isPartiallyReceived()`, `getQuantityPendingAttribute()`
+**Casts agregados:** `quantity`, `quantity_received` (`decimal:3`), más todos los monetarios (`decimal:2`).
 
 #### `DirectPurchaseOrder` — Estado: ✅ RELATIVAMENTE COMPLETO (recepción simple)
 
 El modelo OCD tiene: `receiving_location_id`, `received_by`, `received_at`, `reception_notes`, estado `ISSUED` y `RECEIVED`, `canBeReceived()`. Sin embargo, **no tiene granularidad por ítem** (al igual que OC). La recepción es un evento de cabecera, no por línea.
 
-#### `DirectPurchaseOrderItem` — Estado: ⚠️ IGUAL QUE PurchaseOrderItem
+#### `DirectPurchaseOrderItem` — Estado: ✅ COMPLETO para recepción *(actualizado 2026-03-13)*
 
-No tiene `quantity_received`. Asume recepción total del ítem siempre.
+Mismos cambios que `PurchaseOrderItem`. `quantity_received` agregado en la misma migración `2026_03_13_000002`.
+`$casts` de `quantity` actualizado de `decimal:2` a `decimal:3` para consistencia con ambos modelos.
+
+**Métodos agregados:** `isFullyReceived()`, `isPartiallyReceived()`, `getQuantityPendingAttribute()`
 
 #### `ReceivingLocation` — Estado: ✅ COMPLETO como catálogo
 
@@ -214,22 +220,19 @@ Tiene `markAsReceived()` y el estado `RECEIVED`. Solo necesita ser invocado desd
 - Métodos de estado: `isIssued()`, `isPartiallyReceived()`, `isReceived()`, `isCancelled()`, `canBeReceived()`
 - `getStatusLabel()` y `getStatusBadgeClass()` actualizados con los nuevos estados
 
-#### Paso 2 — Agregar `quantity_received` a ítems de ambas órdenes
-**Alcance:** Permitir que cada línea de orden registre cuánto fue recibido.
+#### ~~Paso 2~~ ✅ COMPLETADO — Agregar `quantity_received` a ítems (2026-03-13)
 
-**Migraciones:**
-```php
-// add_received_qty_to_purchase_order_items_table
-$table->decimal('quantity_received', 10, 3)->default(0)->after('quantity');
+**Archivos modificados:**
+- `database/migrations/2026_03_13_000002_add_quantity_received_to_order_items_tables.php` — creado (maneja ambas tablas)
+- `app/Models/PurchaseOrderItem.php` — actualizado
+- `app/Models/DirectPurchaseOrderItem.php` — actualizado
 
-// add_received_qty_to_direct_purchase_order_items_table
-$table->decimal('quantity_received', 10, 3)->default(0)->after('quantity');
-```
-
-**Lógica a agregar en los modelos:**
-- `quantity_pending` como accesor calculado (`quantity - quantity_received`)
+**Lo que se hizo:**
+- `quantity_received decimal(10,3) DEFAULT 0` en `purchase_order_items` y `odc_direct_purchase_order_items`
+- Accesor `getQuantityPendingAttribute()` → `max(0, quantity - quantity_received)`
 - `isFullyReceived()` → `quantity_received >= quantity`
 - `isPartiallyReceived()` → `quantity_received > 0 && !isFullyReceived()`
+- `$casts` completados en ambos modelos (`quantity` y `quantity_received` como `decimal:3`)
 
 #### Paso 3 — Crear el modelo `Reception` y la migración
 
@@ -327,7 +330,7 @@ Crear `ReceptionCompletedNotification` para:
 | `ReceivingLocation` | ✅ Completo | Ninguna |
 | `DirectPurchaseOrder` | ✅ Estructura básica ok | Conectar a `ReceptionService` |
 | `PurchaseOrder` | ✅ Completo | Paso 1 completado el 2026-03-13 |
-| `PurchaseOrderItem` / `DirectPurchaseOrderItem` | ❌ Sin `quantity_received` | **Migración** (Paso 2) |
+| `PurchaseOrderItem` / `DirectPurchaseOrderItem` | ✅ Completo | Paso 2 completado el 2026-03-13 |
 | `Reception` | ❌ No existe | Crear tras pasos 1 y 2 (Paso 3) |
 | `ReceptionItem` | ❌ No existe | Crear tras Reception (Paso 4) |
 | `ReceptionService` | ❌ No existe | Crear (Paso 5) |
@@ -336,7 +339,7 @@ Crear `ReceptionCompletedNotification` para:
 | Validación REPSE en recepción | ❌ No existe | Implementar (Paso 8) |
 | Notificaciones de recepción | ❌ No existe | Implementar (Paso 9) |
 
-**Respuesta directa:** El sistema tiene una base sólida de catálogos (locaciones, proveedores, presupuestos) y el flujo de OCD está más maduro que el de OC estándar. El Paso 1 ya fue completado. **El siguiente prerrequisito es el Paso 2** (agregar `quantity_received` a los ítems). Una vez completado, el sistema estará listo para crear el modelo `Reception`.
+**Respuesta directa:** Los pasos 1 y 2 están completados. Ambos modelos de órdenes y sus ítems tienen ahora la estructura de datos completa para soportar recepciones totales y parciales. **El sistema está listo para el Paso 3: crear el modelo `Reception`.**
 
 ---
 
