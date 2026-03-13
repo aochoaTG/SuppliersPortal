@@ -2,8 +2,8 @@
 
 **Fecha:** 2026-03-13
 **Autor:** Análisis generado por Arquitecto de Software (Claude Code)
-**Versión:** 1.6
-**Estado:** Borrador para revisión de equipo — Pasos 1 a 6 implementados
+**Versión:** 1.7
+**Estado:** Borrador para revisión de equipo — Pasos 1 a 7 implementados
 
 ---
 
@@ -401,12 +401,38 @@ Route::get('/receptions/{reception}', [ReceptionController::class, 'show'])
 - `datatableRegular()`: columna `status` ahora usa `getStatusBadgeClass()` / `getStatusLabel()` del modelo (ya manejan los nuevos estados `ISSUED`, `PARTIALLY_RECEIVED`)
 - Botón "Recibir" (ícono `ti-package-import`) aparece en el DataTable cuando `$po->canBeReceived()` es verdadero
 
-#### Paso 7 — Conectar `BudgetCommitment` al proceso de recepción
+#### ~~Paso 7~~ ✅ COMPLETADO — Conectar `BudgetCommitment` y completar soporte OCD (2026-03-13)
 
-En `ReceptionService::updateOrderStatus()`, cuando la orden quede como `RECEIVED`:
+**Archivos creados/modificados:**
+- `database/migrations/2026_03_13_000005_add_received_at_to_budget_commitments_table.php` — creado
+- `database/migrations/2026_03_13_000006_add_partially_received_to_ocd_status.php` — creado
+- `app/Models/BudgetCommitment.php` — actualizado
+- `app/Models/DirectPurchaseOrder.php` — actualizado
+- `app/Http/Controllers/PurchaseOrderController.php` — DataTable OCD actualizado
+
+**Brecha 1 resuelta — `received_at` en `BudgetCommitment`:**
+
+La tabla `budget_commitments` tenía `committed_at` y `released_at` pero no `received_at`. Se agrega para trazabilidad completa del ciclo de vida del compromiso presupuestal.
+
+- Migración `000005`: agrega `received_at timestamp nullable` a `budget_commitments`
+- `BudgetCommitment::markAsReceived()` ahora registra `received_at = now()` además de cambiar el status:
 ```php
-$order->budgetCommitment?->markAsReceived();
+$this->update(['status' => 'RECEIVED', 'received_at' => now()]);
 ```
+- `$fillable` y `$casts` actualizados
+
+**Brecha 2 resuelta — `PARTIALLY_RECEIVED` faltaba en OCD:**
+
+`ReceptionService::calculateOrderReceptionStatus()` puede retornar `'PARTIALLY_RECEIVED'` para cualquier tipo de orden. Sin este fix, `updateOrderStatus()` intentaría escribir ese valor en una OCD y fallaría por el CHECK CONSTRAINT de SQL Server (valor no permitido).
+
+- Migración `000006`: descubre dinámicamente el CHECK CONSTRAINT existente en `odc_direct_purchase_orders`, lo elimina y lo recrea incluyendo `PARTIALLY_RECEIVED` y `CLOSED_BY_INACTIVITY`
+- `DirectPurchaseOrder::canBeReceived()` ahora acepta `ISSUED` y `PARTIALLY_RECEIVED`
+- `DirectPurchaseOrder::isPartiallyReceived()` — nuevo método verificador
+- `getStatusLabel()` y `getStatusBadgeClass()` actualizados con el nuevo estado
+
+**Mejora adicional — DataTable OCD:**
+
+`PurchaseOrderController::datatableDirect()` tenía los status hardcodeados como arrays locales (sin `PARTIALLY_RECEIVED` ni `CLOSED_BY_INACTIVITY`). Se actualizó para usar `$ocd->getStatusBadgeClass()` / `$ocd->getStatusLabel()` del modelo (igual que se hizo con el DataTable regular en el Paso 6). También se agregó el botón "Recibir" cuando `$ocd->canBeReceived()` es verdadero.
 
 #### Paso 8 — Validación REPSE en recepción de servicios
 
@@ -434,11 +460,11 @@ Crear `ReceptionCompletedNotification` para:
 | `ReceptionItem` | ✅ Completo | Paso 4 completado el 2026-03-13 |
 | `ReceptionService` | ✅ Completo | Paso 5 completado el 2026-03-13 |
 | `ReceptionController` + Rutas | ✅ Completo | Paso 6 completado el 2026-03-13 |
-| Integración `BudgetCommitment` | ✅ Implementado en `ReceptionService` | `markBudgetAsReceived()` ya invoca `BudgetCommitment::markAsReceived()` (Paso 7 — pendiente de migración) |
+| Integración `BudgetCommitment` | ✅ Completo | Paso 7 completado el 2026-03-13. `received_at` agregado; `PARTIALLY_RECEIVED` en OCD corregido. |
 | Validación REPSE en recepción | ✅ Implementado en `ReceptionService` | `validateRepseIfService()` devuelve `?string` como advertencia (Paso 8 — pendiente de migración) |
 | Notificaciones de recepción | ❌ No existe | Implementar (Paso 9) |
 
-**Respuesta directa:** Los pasos 1 a 6 están completados. La capa de modelos, la lógica de negocio, el controlador y las vistas están listos. **Antes de usar el sistema, es necesario ejecutar `php artisan migrate` para aplicar las 4 migraciones creadas.** El único paso pendiente de implementar desde cero es el Paso 9: Notificaciones de recepción.
+**Respuesta directa:** Los pasos 1 a 7 están completados. La capa de modelos, lógica de negocio, controlador y vistas están listos. **Antes de usar el sistema, es necesario ejecutar `php artisan migrate` para aplicar las 6 migraciones creadas.** El único paso pendiente de implementar desde cero es el Paso 9: Notificaciones de recepción.
 
 ---
 

@@ -22,12 +22,14 @@ class BudgetCommitment extends Model
         'status',
         'committed_at',
         'released_at',
+        'received_at',
     ];
 
     protected $casts = [
         'committed_amount' => 'decimal:2',
         'committed_at' => 'datetime',
         'released_at' => 'datetime',
+        'received_at' => 'datetime',
     ];
 
     /**
@@ -104,12 +106,13 @@ class BudgetCommitment extends Model
     }
 
     /**
-     * Marca el compromiso como recibido
+     * Marca el compromiso como recibido registrando la fecha de recepción.
      */
     public function markAsReceived(): void
     {
         $this->update([
-            'status' => 'RECEIVED',
+            'status'      => 'RECEIVED',
+            'received_at' => now(),
         ]);
     }
 

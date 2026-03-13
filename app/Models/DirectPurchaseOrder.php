@@ -304,38 +304,45 @@ class DirectPurchaseOrder extends Model
 
     public function canBeReceived(): bool
     {
-        return $this->status === 'ISSUED';
+        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
+    }
+
+    public function isPartiallyReceived(): bool
+    {
+        return $this->status === 'PARTIALLY_RECEIVED';
     }
 
     public function getStatusBadgeClass(): string
     {
         return match ($this->status) {
-            'DRAFT' => 'secondary',
-            'PENDING_APPROVAL' => 'warning',
-            'APPROVED' => 'success',
-            'REJECTED' => 'danger',
-            'RETURNED' => 'info',
-            'ISSUED' => 'primary',
-            'RECEIVED' => 'success',
-            'CANCELLED' => 'dark',
+            'DRAFT'              => 'secondary',
+            'PENDING_APPROVAL'   => 'warning',
+            'APPROVED'           => 'success',
+            'REJECTED'           => 'danger',
+            'RETURNED'           => 'info',
+            'ISSUED'             => 'primary',
+            'PARTIALLY_RECEIVED' => 'primary',
+            'RECEIVED'           => 'success',
+            'CANCELLED'          => 'dark',
             'CLOSED_BY_INACTIVITY' => 'dark',
-            default => 'secondary'
+            default              => 'secondary',
         };
     }
 
     public function getStatusLabel(): string
     {
         return match ($this->status) {
-            'DRAFT' => 'Borrador',
-            'PENDING_APPROVAL' => 'Pendiente de Aprobación',
-            'APPROVED' => 'Aprobada',
-            'REJECTED' => 'Rechazada',
-            'RETURNED' => 'Devuelta para Corrección',
-            'ISSUED' => 'Emitida',
-            'RECEIVED' => 'Recibida',
-            'CANCELLED' => 'Cancelada',
+            'DRAFT'              => 'Borrador',
+            'PENDING_APPROVAL'   => 'Pendiente de Aprobación',
+            'APPROVED'           => 'Aprobada',
+            'REJECTED'           => 'Rechazada',
+            'RETURNED'           => 'Devuelta para Corrección',
+            'ISSUED'             => 'Emitida',
+            'PARTIALLY_RECEIVED' => 'Parcialmente Recibida',
+            'RECEIVED'           => 'Recibida',
+            'CANCELLED'          => 'Cancelada',
             'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
-            default => 'Desconocido'
+            default              => 'Desconocido',
         };
     }
 

@@ -110,31 +110,8 @@ class PurchaseOrderController extends Controller
                     return '<span class="fw-bold text-primary">$' . number_format($ocd->total, 2) . '</span>';
                 })
                 ->addColumn('status', function ($ocd) {
-                    $statusColors = [
-                        'DRAFT' => 'secondary',
-                        'PENDING_APPROVAL' => 'warning',
-                        'APPROVED' => 'success',
-                        'REJECTED' => 'danger',
-                        'RETURNED' => 'info',
-                        'ISSUED' => 'primary',
-                        'RECEIVED' => 'success',
-                        'CANCELLED' => 'dark'
-                    ];
-                    $color = $statusColors[$ocd->status] ?? 'secondary';
-
-                    $statusLabels = [
-                        'DRAFT' => 'Borrador',
-                        'PENDING_APPROVAL' => 'Pendiente Aprobación',
-                        'APPROVED' => 'Aprobada',
-                        'REJECTED' => 'Rechazada',
-                        'RETURNED' => 'Devuelta',
-                        'ISSUED' => 'Emitida',
-                        'RECEIVED' => 'Recibida',
-                        'CANCELLED' => 'Cancelada'
-                    ];
-                    $label = $statusLabels[$ocd->status] ?? $ocd->status;
-
-                    return '<span class="badge bg-' . $color . '">' . $label . '</span>';
+                    return '<span class="badge bg-' . $ocd->getStatusBadgeClass() . '">'
+                        . $ocd->getStatusLabel() . '</span>';
                 })
                 ->addColumn('actions', function ($ocd) {
                     $showUrl = route('direct-purchase-orders.show', $ocd->id);
@@ -158,6 +135,15 @@ class PurchaseOrderController extends Controller
                         $buttons .= '
                             <a class="btn btn-sm btn-outline-warning ms-1 disabled" aria-disabled="true" title="Editar (solo disponible cuando la OCD está Devuelta)">
                                 <i class="ti ti-edit"></i>
+                            </a>
+                        ';
+                    }
+
+                    if ($ocd->canBeReceived()) {
+                        $receiveUrl = route('receptions.create-direct', $ocd->id);
+                        $buttons .= '
+                            <a href="' . $receiveUrl . '" class="btn btn-sm btn-outline-success ms-1" title="Registrar Recepción">
+                                <i class="ti ti-package-import"></i>
                             </a>
                         ';
                     }
