@@ -2,8 +2,8 @@
 
 **Fecha:** 2026-03-13
 **Autor:** Análisis generado por Arquitecto de Software (Claude Code)
-**Versión:** 1.5
-**Estado:** Borrador para revisión de equipo — Pasos 1 a 5 implementados
+**Versión:** 1.6
+**Estado:** Borrador para revisión de equipo — Pasos 1 a 6 implementados
 
 ---
 
@@ -342,21 +342,64 @@ $directPurchaseOrderItem->receptionItems;  // ídem para OCD
 **Decisión de diseño — REPSE:**
 `validateRepseIfService()` devuelve `?string` en lugar de lanzar excepción, porque un REPSE vencido es un **riesgo legal que debe visibilizarse** pero el negocio puede decidir aceptarlo. El controlador (Paso 6) mostrará el mensaje como alerta roja antes del formulario.
 
-#### Paso 6 — Crear `ReceptionController` y rutas
+#### ~~Paso 6~~ ✅ COMPLETADO — Crear `ReceptionController`, rutas y vistas (2026-03-13)
+
+**Archivos creados/modificados:**
+- `app/Http/Controllers/ReceptionController.php` — creado
+- `routes/web.php` — 6 rutas nuevas agregadas
+- `resources/views/receptions/pending.blade.php` — creado
+- `resources/views/receptions/create.blade.php` — creado (vista compartida OC y OCD)
+- `resources/views/receptions/show.blade.php` — creado
+- `app/Http/Controllers/PurchaseOrderController.php` — botón "Recibir" en DataTable y estados actualizados
+
+**Rutas implementadas:**
 
 ```php
-// Rutas sugeridas:
-Route::get('/receptions/pending', [ReceptionController::class, 'pending']);   // Bandeja del receptor
-Route::get('/purchase-orders/{order}/receive', [ReceptionController::class, 'create']);
-Route::post('/purchase-orders/{order}/receive', [ReceptionController::class, 'store']);
-Route::get('/direct-purchase-orders/{order}/receive', [ReceptionController::class, 'createDirect']);
-Route::post('/direct-purchase-orders/{order}/receive', [ReceptionController::class, 'storeDirect']);
-Route::get('/receptions/{reception}', [ReceptionController::class, 'show']);
+Route::get('/receptions/pending', [ReceptionController::class, 'pending'])
+    ->name('receptions.pending');
+Route::get('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'create'])
+    ->name('receptions.create');
+Route::post('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'store'])
+    ->name('receptions.store');
+Route::get('/direct-purchase-orders/{directPurchaseOrder}/receive', [ReceptionController::class, 'createDirect'])
+    ->name('receptions.create-direct');
+Route::post('/direct-purchase-orders/{directPurchaseOrder}/receive', [ReceptionController::class, 'storeDirect'])
+    ->name('receptions.store-direct');
+Route::get('/receptions/{reception}', [ReceptionController::class, 'show'])
+    ->name('receptions.show');
 ```
 
-**Conectar con la policy existente:**
-- `useMassReception()` → Habilitar recepción masiva desde la bandeja
-- `viewPendingReceptions()` → Filtrar órdenes pendientes de recepción por locación del usuario
+> **Nota de orden de rutas:** `receptions/pending` se define **antes** de `receptions/{reception}` para que Laravel no interprete la cadena literal `"pending"` como un ID de recepción.
+
+**Acciones del controlador:**
+
+| Método | Ruta | Propósito |
+|---|---|---|
+| `pending()` | GET `/receptions/pending` | Bandeja con OC y OCD pendientes de recepción. Filtra por locación si el usuario es receptor. |
+| `create(PurchaseOrder)` | GET `/purchase-orders/{id}/receive` | Formulario de recepción para OC estándar. Autoriza con `useMassReception` policy. |
+| `store(Request, PurchaseOrder)` | POST `/purchase-orders/{id}/receive` | Persiste recepción de OC estándar. Delega a `ReceptionService::receive()`. |
+| `createDirect(DirectPurchaseOrder)` | GET `/direct-purchase-orders/{id}/receive` | Formulario de recepción para OCD. |
+| `storeDirect(Request, DirectPurchaseOrder)` | POST `/direct-purchase-orders/{id}/receive` | Persiste recepción de OCD. |
+| `show(Reception)` | GET `/receptions/{id}` | Vista de solo lectura del comprobante de recepción. |
+
+**Vistas implementadas:**
+
+- **`pending.blade.php`**: Dos tabs (OC Estándar / OC Directas). Muestra folio, proveedor, punto de entrega, total, estado y botón "Recibir". Contador total en la cabecera.
+- **`create.blade.php`**: Vista compartida para OC y OCD. Incluye:
+  - Alerta de advertencia REPSE (si aplica)
+  - Tabla de ítems con columnas: Ordenado, Recibido Prev., Pendiente, A Recibir, Rechazado, Motivo Rechazo
+  - El campo "Motivo Rechazo" se muestra/oculta con JavaScript al ingresar cantidad rechazada
+  - Panel lateral con fecha de recepción, referencia del proveedor (remisión/albarán) y notas
+  - Validación JS al enviar: rechazado no puede superar recibido
+- **`show.blade.php`**: Comprobante de recepción. Muestra folio, receptor, locación, orden de origen, tipo de orden, proveedor, y tabla de ítems con cantidades recibidas/rechazadas/aceptadas. Botón de impresión.
+
+**Policy conectada:**
+- `ReceivingLocationPolicy::useMassReception()` → usado en `create()` y `createDirect()` con `$this->authorize()`
+- `ReceivingLocationPolicy::viewPendingReceptions()` → usado en `pending()` para filtrar órdenes por locación del receptor
+
+**Cambios en `PurchaseOrderController`:**
+- `datatableRegular()`: columna `status` ahora usa `getStatusBadgeClass()` / `getStatusLabel()` del modelo (ya manejan los nuevos estados `ISSUED`, `PARTIALLY_RECEIVED`)
+- Botón "Recibir" (ícono `ti-package-import`) aparece en el DataTable cuando `$po->canBeReceived()` es verdadero
 
 #### Paso 7 — Conectar `BudgetCommitment` al proceso de recepción
 
@@ -390,12 +433,12 @@ Crear `ReceptionCompletedNotification` para:
 | `Reception` | ✅ Completo | Paso 3 completado el 2026-03-13 |
 | `ReceptionItem` | ✅ Completo | Paso 4 completado el 2026-03-13 |
 | `ReceptionService` | ✅ Completo | Paso 5 completado el 2026-03-13 |
-| `ReceptionController` + Rutas | ❌ No existe | Crear (Paso 6) |
-| Integración `BudgetCommitment` | ⚠️ Parcial (método existe) | Conectar (Paso 7) |
-| Validación REPSE en recepción | ❌ No existe | Implementar (Paso 8) |
+| `ReceptionController` + Rutas | ✅ Completo | Paso 6 completado el 2026-03-13 |
+| Integración `BudgetCommitment` | ✅ Implementado en `ReceptionService` | `markBudgetAsReceived()` ya invoca `BudgetCommitment::markAsReceived()` (Paso 7 — pendiente de migración) |
+| Validación REPSE en recepción | ✅ Implementado en `ReceptionService` | `validateRepseIfService()` devuelve `?string` como advertencia (Paso 8 — pendiente de migración) |
 | Notificaciones de recepción | ❌ No existe | Implementar (Paso 9) |
 
-**Respuesta directa:** Los pasos 1 a 5 están completados. La capa de modelos y la lógica de negocio están listas. **El siguiente paso es el Paso 6: `ReceptionController` y rutas**, que es el último componente antes de poder usar el flujo desde la UI.
+**Respuesta directa:** Los pasos 1 a 6 están completados. La capa de modelos, la lógica de negocio, el controlador y las vistas están listos. **Antes de usar el sistema, es necesario ejecutar `php artisan migrate` para aplicar las 4 migraciones creadas.** El único paso pendiente de implementar desde cero es el Paso 9: Notificaciones de recepción.
 
 ---
 

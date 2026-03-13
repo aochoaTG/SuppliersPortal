@@ -51,31 +51,27 @@ class PurchaseOrderController extends Controller
                     return '<span class="fw-bold text-primary">$' . number_format($po->total, 2) . '</span>';
                 })
                 ->addColumn('status', function ($po) {
-                    $statusColors = [
-                        'OPEN' => 'info',
-                        'RECEIVED' => 'success',
-                        'CANCELLED' => 'danger',
-                        'PAID' => 'dark'
-                    ];
-                    $color = $statusColors[$po->status] ?? 'secondary';
-                    $statusLabels = [
-                        'OPEN' => 'Abierta',
-                        'RECEIVED' => 'Recibida',
-                        'CANCELLED' => 'Cancelada',
-                        'PAID' => 'Pagada'
-                    ];
-                    $label = $statusLabels[$po->status] ?? $po->status;
-
-                    return '<span class="badge bg-' . $color . '">' . $label . '</span>';
+                    return '<span class="badge bg-' . $po->getStatusBadgeClass() . '">'
+                        . $po->getStatusLabel() . '</span>';
                 })
                 ->addColumn('actions', function ($po) {
                     $showUrl = route('purchase-orders.show', $po->id);
-
-                    return '
+                    $buttons = '
                         <a href="' . $showUrl . '" class="btn btn-sm btn-outline-primary" title="Ver Detalle">
                             <i class="ti ti-eye"></i>
                         </a>
                     ';
+
+                    if ($po->canBeReceived()) {
+                        $receiveUrl = route('receptions.create', $po->id);
+                        $buttons .= '
+                            <a href="' . $receiveUrl . '" class="btn btn-sm btn-outline-success ms-1" title="Registrar Recepción">
+                                <i class="ti ti-package-import"></i>
+                            </a>
+                        ';
+                    }
+
+                    return $buttons;
                 })
                 ->rawColumns(['folio', 'requisicion', 'total', 'status', 'actions'])
                 ->make(true);

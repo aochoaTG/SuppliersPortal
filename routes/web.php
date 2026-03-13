@@ -39,6 +39,7 @@ use App\Http\Controllers\{
     PurchaseOrderController,
     DirectPurchaseOrderController,
     ReceivingLocationController,
+    ReceptionController,
 };
 
 // ============================================================================
@@ -489,6 +490,14 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
     Route::get('/purchase-orders/datatable/regular', [PurchaseOrderController::class, 'datatableRegular'])->name('purchase-orders.datatable.regular');
     Route::get('/purchase-orders/datatable/direct', [PurchaseOrderController::class, 'datatableDirect'])->name('purchase-orders.datatable.direct');
     Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
+
+    // Recepciones — 'pending' y rutas específicas ANTES de {reception} para evitar conflictos
+    Route::get('/receptions/pending', [ReceptionController::class, 'pending'])->name('receptions.pending');
+    Route::get('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'create'])->name('receptions.create');
+    Route::post('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'store'])->name('receptions.store');
+    Route::get('/direct-purchase-orders/{directPurchaseOrder}/receive', [ReceptionController::class, 'createDirect'])->name('receptions.create-direct');
+    Route::post('/direct-purchase-orders/{directPurchaseOrder}/receive', [ReceptionController::class, 'storeDirect'])->name('receptions.store-direct');
+    Route::get('/receptions/{reception}', [ReceptionController::class, 'show'])->name('receptions.show');
 
     // Receiving Locations (rutas específicas ANTES del resource para evitar conflictos con {id})
     Route::get('receiving-locations/data', [ReceivingLocationController::class, 'getData'])->name('receiving-locations.data');
