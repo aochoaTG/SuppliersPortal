@@ -182,10 +182,11 @@ class PurchaseOrderController extends Controller
             'items.requisitionItem',
             'supplier',
             'creator',
+            'receivingLocation',
+            'receiver',
             'requisition.department',
             'requisition.costCenter',
             'requisition.company',
-            'requisition.receivingLocation',
             'requisition.requester',
         ]);
         return view('purchase-orders.show', compact('purchaseOrder'));

@@ -101,17 +101,18 @@ class QuotationApprovalController extends Controller
 
         // 1. Crear Cabecera
         $po = PurchaseOrder::create([
-            'folio'                => 'OC-' . now()->format('Y') . '-' . str_pad($summary->id, 5, '0', STR_PAD_LEFT),
-            'requisition_id'       => $summary->requisition_id,
-            'supplier_id'          => $summary->selected_supplier_id,
-            'quotation_summary_id' => $summary->id,
-            'subtotal'             => $summary->subtotal,
-            'iva_amount'           => $summary->iva_amount,
-            'total'                => $summary->total,
-            'payment_terms'        => $winningResponses->first()->payment_terms ?? 'Crédito',
-            'estimated_delivery_days' => $winningResponses->max('delivery_days') ?? 0,
-            'status'               => 'OPEN',
-            'created_by'           => Auth::id(),
+            'folio'                    => 'OC-' . now()->format('Y') . '-' . str_pad($summary->id, 5, '0', STR_PAD_LEFT),
+            'requisition_id'           => $summary->requisition_id,
+            'supplier_id'              => $summary->selected_supplier_id,
+            'quotation_summary_id'     => $summary->id,
+            'receiving_location_id'    => $summary->requisition->receiving_location_id,
+            'subtotal'                 => $summary->subtotal,
+            'iva_amount'               => $summary->iva_amount,
+            'total'                    => $summary->total,
+            'payment_terms'            => $winningResponses->first()->payment_terms ?? 'Crédito',
+            'estimated_delivery_days'  => $winningResponses->max('delivery_days') ?? 0,
+            'status'                   => 'OPEN',
+            'created_by'               => Auth::id(),
         ]);
 
         // 2. Crear Partidas

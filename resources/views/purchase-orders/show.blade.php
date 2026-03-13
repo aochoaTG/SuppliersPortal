@@ -154,12 +154,12 @@
                         <h6 class="text-primary text-uppercase fw-bold fs-12 mb-3">
                             <i class="ti ti-truck-delivery me-1"></i>Entrega y Autorización
                         </h6>
-                        @if($purchaseOrder->requisition->receivingLocation)
+                        @if($purchaseOrder->receivingLocation)
                         <div class="mb-2 p-2 rounded bg-warning bg-opacity-10 border border-warning border-opacity-25">
                             <span class="info-label"><i class="ti ti-map-pin me-1 text-warning"></i>Punto de Entrega</span>
                             <div class="info-value fw-semibold">
-                                {{ $purchaseOrder->requisition->receivingLocation->code }}
-                                — {{ $purchaseOrder->requisition->receivingLocation->name }}
+                                {{ $purchaseOrder->receivingLocation->code }}
+                                — {{ $purchaseOrder->receivingLocation->name }}
                             </div>
                         </div>
                         @endif
@@ -249,11 +249,11 @@
                                                 <strong>Moneda:</strong>
                                                 {{ $purchaseOrder->currency ?? 'MXN' }}
                                             </li>
-                                            @if($purchaseOrder->requisition->receivingLocation)
+                                            @if($purchaseOrder->receivingLocation)
                                             <li>
                                                 <strong>Entregar en:</strong>
-                                                {{ $purchaseOrder->requisition->receivingLocation->code }}
-                                                — {{ $purchaseOrder->requisition->receivingLocation->name }}
+                                                {{ $purchaseOrder->receivingLocation->code }}
+                                                — {{ $purchaseOrder->receivingLocation->name }}
                                             </li>
                                             @endif
                                         </ul>
