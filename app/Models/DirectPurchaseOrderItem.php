@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class DirectPurchaseOrderItem extends Model
 {
@@ -103,6 +104,12 @@ class DirectPurchaseOrderItem extends Model
      * RELACIONES
      * =========================================
      */
+
+    // Líneas de recepción registradas contra este ítem
+    public function receptionItems(): MorphMany
+    {
+        return $this->morphMany(ReceptionItem::class, 'receivable_item');
+    }
 
     public function directPurchaseOrder(): BelongsTo
     {

@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrder extends Model
@@ -62,9 +65,20 @@ class PurchaseOrder extends Model
     }
 
     // El corazón de la OC: sus partidas
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(PurchaseOrderItem::class);
+    }
+
+    // Historial de recepciones registradas contra esta OC
+    public function receptions(): MorphMany
+    {
+        return $this->morphMany(Reception::class, 'receivable');
+    }
+
+    public function budgetCommitment(): HasOne
+    {
+        return $this->hasOne(BudgetCommitment::class);
     }
 
     public function receivingLocation()

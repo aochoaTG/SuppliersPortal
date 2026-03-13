@@ -2,8 +2,8 @@
 
 **Fecha:** 2026-03-13
 **Autor:** Análisis generado por Arquitecto de Software (Claude Code)
-**Versión:** 1.2
-**Estado:** Borrador para revisión de equipo — Pasos 1 y 2 implementados
+**Versión:** 1.5
+**Estado:** Borrador para revisión de equipo — Pasos 1 a 5 implementados
 
 ---
 
@@ -234,57 +234,113 @@ Tiene `markAsReceived()` y el estado `RECEIVED`. Solo necesita ser invocado desd
 - `isPartiallyReceived()` → `quantity_received > 0 && !isFullyReceived()`
 - `$casts` completados en ambos modelos (`quantity` y `quantity_received` como `decimal:3`)
 
-#### Paso 3 — Crear el modelo `Reception` y la migración
+#### ~~Paso 3~~ ✅ COMPLETADO — Crear el modelo `Reception` y la migración (2026-03-13)
 
-Solo después de los pasos 1 y 2, crear este modelo que es el registro maestro de cada evento de recepción.
+**Archivos creados/modificados:**
+- `database/migrations/2026_03_13_000003_create_receptions_table.php` — creado
+- `app/Models/Reception.php` — creado
+- `app/Models/PurchaseOrder.php` — relación `receptions()` agregada
+- `app/Models/DirectPurchaseOrder.php` — relación `receptions()` agregada
+- `app/Models/ReceivingLocation.php` — relación `receptions()` agregada (corrige bug: `recepciones()` llamaba a un método inexistente)
 
-**Tabla:** `receptions`
+**Tabla `receptions` — campos implementados:**
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `folio` | `string(50) UNIQUE` | Formato `REC-YYYY-NNNN` |
+| `receivable_type` / `receivable_id` | `morphs()` | Polimórfico: `PurchaseOrder` o `DirectPurchaseOrder` |
+| `receiving_location_id` | FK → `receiving_locations` | Con `noActionOnDelete` |
+| `received_by` | FK → `users` | Con `noActionOnDelete` |
+| `status` | `enum` | `PENDING`, `PARTIAL`, `COMPLETED` |
+| `delivery_reference` | `string(100) nullable` | Número de remisión o albarán del proveedor |
+| `notes` | `text nullable` | Observaciones del receptor |
+| `received_at` | `timestamp` | Momento físico de recepción |
+| Índices | — | `folio`, `status`, `received_by`, `receiving_location_id`, `received_at` |
+
+**Modelo `Reception` — características:**
+- Constantes: `STATUS_PENDING`, `STATUS_PARTIAL`, `STATUS_COMPLETED`
+- Relaciones: `receivable()` (MorphTo), `receivingLocation()`, `receiver()`, `items()` (→ ReceptionItem, Paso 4)
+- `generateNextFolio()` — genera `REC-YYYY-NNNN` automáticamente
+- `isPending()`, `isPartial()`, `isCompleted()`
+- `getStatusLabel()`, `getStatusBadgeClass()`
+- Scopes: `completed()`, `forLocation()`, `receivedBy()`
+
+**Relaciones polimórficas en modelos de órdenes:**
 ```php
-$table->id();
-$table->string('folio')->unique();                          // Ej: REC-2026-0001
-$table->morphs('receivable');                               // Polimórfico: purchase_order o direct_purchase_order
-$table->unsignedBigInteger('receiving_location_id');
-$table->unsignedBigInteger('received_by');
-$table->string('status');                                   // PENDING, COMPLETED, PARTIAL
-$table->text('notes')->nullable();
-$table->string('delivery_reference')->nullable();           // Número de remisión o albarán del proveedor
-$table->timestamp('received_at');
-$table->timestamps();
-$table->softDeletes();
+// Uso desde cualquier orden:
+$purchaseOrder->receptions;           // Todas las recepciones de esta OC
+$directPurchaseOrder->receptions;     // Todas las recepciones de esta OCD
+$receivingLocation->receptions;       // Recepciones hechas en esta locación
 ```
 
-> **Nota de diseño:** Se recomienda usar `morphs()` (relación polimórfica) para que `Reception` pueda pertenecer tanto a `PurchaseOrder` como a `DirectPurchaseOrder` sin duplicar la tabla. Esto unifica el historial de recepciones en un solo lugar.
+#### ~~Paso 4~~ ✅ COMPLETADO — Crear el modelo `ReceptionItem` (2026-03-13)
 
-#### Paso 4 — Crear el modelo `ReceptionItem`
+**Archivos creados/modificados:**
+- `database/migrations/2026_03_13_000004_create_reception_items_table.php` — creado
+- `app/Models/ReceptionItem.php` — creado
+- `app/Models/PurchaseOrderItem.php` — relación `receptionItems()` agregada
+- `app/Models/DirectPurchaseOrderItem.php` — relación `receptionItems()` agregada
 
-Detalle por línea de cada recepción.
+**Tabla `reception_items` — campos implementados:**
 
-**Tabla:** `reception_items`
+| Campo | Tipo | Notas |
+|---|---|---|
+| `reception_id` | FK → `receptions` | `cascadeOnDelete` — si se borra la recepción, se borran sus líneas |
+| `receivable_item_type` / `receivable_item_id` | `morphs()` | Polimórfico: `PurchaseOrderItem` o `DirectPurchaseOrderItem` |
+| `quantity_received` | `decimal(10,3)` | Cantidad recibida en este evento |
+| `quantity_rejected` | `decimal(10,3) DEFAULT 0` | Unidades rechazadas (dañadas, incorrectas) |
+| `rejection_reason` | `string(255) nullable` | Motivo del rechazo |
+
+**Modelo `ReceptionItem` — características:**
+- `getQuantityAcceptedAttribute()` → `quantity_received - quantity_rejected`
+- `hasRejections()` → `quantity_rejected > 0`
+- `isFullyRejected()` → `quantity_rejected >= quantity_received`
+- Relaciones: `reception()` (BelongsTo), `receivableItem()` (MorphTo)
+
+**Relaciones en modelos de ítems:**
 ```php
-$table->id();
-$table->unsignedBigInteger('reception_id');
-$table->morphs('receivable_item');                          // PurchaseOrderItem o DirectPurchaseOrderItem
-$table->decimal('quantity_received', 10, 3);
-$table->decimal('quantity_rejected', 10, 3)->default(0);
-$table->string('rejection_reason')->nullable();
-$table->timestamps();
+// Historial de recepciones parciales/totales de un ítem específico:
+$purchaseOrderItem->receptionItems;        // todas las líneas de recepción de este ítem
+$directPurchaseOrderItem->receptionItems;  // ídem para OCD
 ```
 
-#### Paso 5 — Crear `ReceptionService`
+#### ~~Paso 5~~ ✅ COMPLETADO — Crear `ReceptionService` (2026-03-13)
 
-Centralizar la lógica de negocio de recepciones para evitar código duplicado en controladores.
+**Archivos creados/modificados:**
+- `app/Services/ReceptionService.php` — creado
+- `app/Models/PurchaseOrder.php` — relación `budgetCommitment()` agregada (necesaria para el servicio)
 
-**Métodos sugeridos:**
-```php
-class ReceptionService {
-    public function receive(Model $order, array $items, User $receiver, array $data): Reception
-    public function validateCanReceive(Model $order, ReceivingLocation $location): void
-    public function calculateOrderReceptionStatus(Model $order): string  // PARTIAL o RECEIVED
-    public function updateOrderStatus(Model $order, Reception $reception): void
-    public function notifyReceptionCompleted(Reception $reception): void
-    public function validateRepseIfService(Model $order): void
+**Métodos implementados:**
+
+| Método | Visibilidad | Propósito |
+|---|---|---|
+| `receive($order, $itemsData, $receiver, $data)` | `public` | Orquesta toda la recepción dentro de `DB::transaction`. Punto de entrada único para el controlador. |
+| `validateCanReceive($order)` | `public` | Verifica estado de la orden, locación activa y portal no bloqueado. Lanza `RuntimeException` si falla. |
+| `validateRepseIfService($order)` | `public` | Verifica REPSE del proveedor. **Devuelve `?string`** (advertencia), no lanza excepción. El controlador decide cómo mostrarlo. |
+| `calculateOrderReceptionStatus($order)` | `public` | Recarga ítems desde BD y determina si la orden quedó `RECEIVED` o `PARTIALLY_RECEIVED`. |
+| `updateOrderStatus($order, $status, $receiver)` | `public` | Persiste el nuevo estado y los timestamps de auditoría (`received_by`, `received_at`). |
+| `resolveItemClass($order)` | `private` | Mapea el tipo de orden al modelo de ítem correcto (`PurchaseOrderItem` o `DirectPurchaseOrderItem`). |
+| `markBudgetAsReceived($order)` | `private` | Llama a `BudgetCommitment::markAsReceived()` si la orden tiene un compromiso asociado. |
+
+**Flujo de `receive()` en detalle:**
+```
+1. validateCanReceive()     → lanza si hay impedimento
+2. DB::transaction {
+   3. Crear Reception (PENDING)
+   4. Por cada ítem:
+      a. Crear ReceptionItem
+      b. $item->increment('quantity_received', $accepted)
+         ↑ usa increment() directo para NO disparar eventos 'saved' de DirectPurchaseOrderItem
+   5. calculateOrderReceptionStatus() → recarga ítems frescos de BD
+   6. Reception.status = COMPLETED | PARTIAL
+   7. updateOrderStatus() → orden queda RECEIVED | PARTIALLY_RECEIVED
+   8. Si RECEIVED: markBudgetAsReceived()
 }
+9. Retorna Reception con items cargados
 ```
+
+**Decisión de diseño — REPSE:**
+`validateRepseIfService()` devuelve `?string` en lugar de lanzar excepción, porque un REPSE vencido es un **riesgo legal que debe visibilizarse** pero el negocio puede decidir aceptarlo. El controlador (Paso 6) mostrará el mensaje como alerta roja antes del formulario.
 
 #### Paso 6 — Crear `ReceptionController` y rutas
 
@@ -331,15 +387,15 @@ Crear `ReceptionCompletedNotification` para:
 | `DirectPurchaseOrder` | ✅ Estructura básica ok | Conectar a `ReceptionService` |
 | `PurchaseOrder` | ✅ Completo | Paso 1 completado el 2026-03-13 |
 | `PurchaseOrderItem` / `DirectPurchaseOrderItem` | ✅ Completo | Paso 2 completado el 2026-03-13 |
-| `Reception` | ❌ No existe | Crear tras pasos 1 y 2 (Paso 3) |
-| `ReceptionItem` | ❌ No existe | Crear tras Reception (Paso 4) |
-| `ReceptionService` | ❌ No existe | Crear (Paso 5) |
+| `Reception` | ✅ Completo | Paso 3 completado el 2026-03-13 |
+| `ReceptionItem` | ✅ Completo | Paso 4 completado el 2026-03-13 |
+| `ReceptionService` | ✅ Completo | Paso 5 completado el 2026-03-13 |
 | `ReceptionController` + Rutas | ❌ No existe | Crear (Paso 6) |
 | Integración `BudgetCommitment` | ⚠️ Parcial (método existe) | Conectar (Paso 7) |
 | Validación REPSE en recepción | ❌ No existe | Implementar (Paso 8) |
 | Notificaciones de recepción | ❌ No existe | Implementar (Paso 9) |
 
-**Respuesta directa:** Los pasos 1 y 2 están completados. Ambos modelos de órdenes y sus ítems tienen ahora la estructura de datos completa para soportar recepciones totales y parciales. **El sistema está listo para el Paso 3: crear el modelo `Reception`.**
+**Respuesta directa:** Los pasos 1 a 5 están completados. La capa de modelos y la lógica de negocio están listas. **El siguiente paso es el Paso 6: `ReceptionController` y rutas**, que es el último componente antes de poder usar el flujo desde la UI.
 
 ---
 

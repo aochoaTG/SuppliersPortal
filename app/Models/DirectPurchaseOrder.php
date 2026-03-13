@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DirectPurchaseOrder extends Model
@@ -129,6 +130,12 @@ class DirectPurchaseOrder extends Model
     public function budgetCommitment(): HasOne
     {
         return $this->hasOne(BudgetCommitment::class);
+    }
+
+    // Historial de recepciones registradas contra esta OCD
+    public function receptions(): MorphMany
+    {
+        return $this->morphMany(Reception::class, 'receivable');
     }
 
     /**

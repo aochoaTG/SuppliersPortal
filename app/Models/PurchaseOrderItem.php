@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class PurchaseOrderItem extends Model
 {
@@ -42,6 +43,12 @@ class PurchaseOrderItem extends Model
     public function isPartiallyReceived(): bool
     {
         return (float) $this->quantity_received > 0 && ! $this->isFullyReceived();
+    }
+
+    // Líneas de recepción registradas contra este ítem
+    public function receptionItems(): MorphMany
+    {
+        return $this->morphMany(ReceptionItem::class, 'receivable_item');
     }
 
     // Relación con su cabecera

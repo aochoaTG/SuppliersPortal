@@ -147,6 +147,14 @@ class ReceivingLocation extends Model
     }
 
     /**
+     * Recepciones registradas en esta ubicación
+     */
+    public function receptions(): HasMany
+    {
+        return $this->hasMany(Reception::class);
+    }
+
+    /**
      * Alias de receptions() - Recepciones realizadas en esta ubicación
      */
     public function recepciones(): HasMany
