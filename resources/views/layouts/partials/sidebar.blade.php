@@ -249,6 +249,14 @@
             </li>
 
             <li class="side-nav-item">
+                <a href="{{ route('receptions.overview') }}"
+                    class="side-nav-link {{ request()->routeIs('receptions.*') ? 'active' : '' }}">
+                    <span class="menu-icon"><i class="ti ti-truck-delivery"></i></span>
+                    <span class="menu-text">Recepciones</span>
+                </a>
+            </li>
+
+            <li class="side-nav-item">
                 <a href="{{ route('products-services.index') }}"
                     class="side-nav-link {{ request()->routeIs('products-services.*') ? 'active' : '' }}">
                     <span class="menu-icon"><i class="ti ti-package"></i></span>

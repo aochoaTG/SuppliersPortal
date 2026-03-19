@@ -493,7 +493,10 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
     Route::get('/purchase-orders/datatable/direct', [PurchaseOrderController::class, 'datatableDirect'])->name('purchase-orders.datatable.direct');
     Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
 
-    // Recepciones — 'pending' y rutas específicas ANTES de {reception} para evitar conflictos
+    // Recepciones — rutas estáticas ANTES de {reception} para evitar conflictos de parámetro
+    Route::get('/receptions/overview',                [ReceptionController::class, 'overview'])->name('receptions.overview');
+    Route::get('/receptions/datatable/regular-pending', [ReceptionController::class, 'datatableRegularPending'])->name('receptions.datatable.regular-pending');
+    Route::get('/receptions/datatable/direct-pending',  [ReceptionController::class, 'datatableDirectPending'])->name('receptions.datatable.direct-pending');
     Route::get('/receptions/pending', [ReceptionController::class, 'pending'])->name('receptions.pending');
     Route::get('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'create'])->name('receptions.create');
     Route::post('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'store'])->name('receptions.store');

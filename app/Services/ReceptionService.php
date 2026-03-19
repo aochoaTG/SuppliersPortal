@@ -243,6 +243,35 @@ class ReceptionService
     }
 
     /**
+     * Calcula los días transcurridos desde que la orden fue emitida (issued_at)
+     * y devuelve un badge HTML con semáforo de colores:
+     *   🟢 Verde   → 0–7 días   (en tiempo)
+     *   🟡 Amarillo → 8–15 días  (demorada)
+     *   🔴 Rojo    → 16+ días   (crítica)
+     *
+     * @param  PurchaseOrder|DirectPurchaseOrder  $order
+     */
+    public function getElapsedDaysBadge(Model $order): string
+    {
+        if (! $order->issued_at) {
+            return '<span class="badge bg-secondary">Sin fecha emisión</span>';
+        }
+
+        $days = (int) $order->issued_at->diffInDays(now());
+
+        [$color, $icon] = match (true) {
+            $days <= 7  => ['success', 'ti-circle-check'],
+            $days <= 15 => ['warning', 'ti-alert-triangle'],
+            default     => ['danger',  'ti-circle-x'],
+        };
+
+        return '<span class="badge bg-' . $color . '">'
+            . '<i class="ti ' . $icon . ' me-1"></i>'
+            . $days . ' día(s)'
+            . '</span>';
+    }
+
+    /**
      * Envía la notificación de recepción al creador de la orden y a todos los compradores.
      * Se deduplica por ID para que el creador no reciba la notificación dos veces si
      * él mismo tiene el rol 'buyer'.
