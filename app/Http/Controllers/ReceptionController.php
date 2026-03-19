@@ -9,6 +9,7 @@ use App\Models\ReceivingLocation;
 use App\Services\ReceptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Yajra\DataTables\Facades\DataTables;
 
 class ReceptionController extends Controller
@@ -195,13 +196,15 @@ class ReceptionController extends Controller
 
         $this->authorize('useMassReception', $purchaseOrder->receivingLocation);
 
-        $repseWarning = $this->receptionService->validateRepseIfService($purchaseOrder);
+        $repseWarning      = $this->receptionService->validateRepseIfService($purchaseOrder);
+        $receivingLocations = ReceivingLocation::active()->orderBy('name')->get();
 
         return view('receptions.create', [
-            'order'        => $purchaseOrder,
-            'orderType'    => 'purchase_order',
-            'storeRoute'   => route('receptions.store', $purchaseOrder),
-            'repseWarning' => $repseWarning,
+            'order'              => $purchaseOrder,
+            'orderType'          => 'purchase_order',
+            'storeRoute'         => route('receptions.store', $purchaseOrder),
+            'repseWarning'       => $repseWarning,
+            'receivingLocations' => $receivingLocations,
         ]);
     }
 
@@ -215,15 +218,20 @@ class ReceptionController extends Controller
         $this->authorize('useMassReception', $purchaseOrder->receivingLocation);
 
         $validated = $request->validate([
+            'receiving_location_id'          => 'required|integer|exists:receiving_locations,id',
             'delivery_reference'             => 'nullable|string|max:100',
             'notes'                          => 'nullable|string|max:1000',
             'received_at'                    => 'required|date',
+            'remission_file'                 => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'items'                          => 'required|array|min:1',
-            'items.*.item_id'                => 'required|integer|exists:purchase_order_items,id',
+            'items.*.receivable_item_id'     => 'required|integer|exists:purchase_order_items,id',
             'items.*.quantity_received'      => 'required|numeric|min:0',
             'items.*.quantity_rejected'      => 'nullable|numeric|min:0',
             'items.*.rejection_reason'       => 'nullable|string|max:255',
         ]);
+
+        $remissionPath = $request->file('remission_file')->store('remisiones', 'public');
+        $validated['remission_path'] = $remissionPath;
 
         try {
             $reception = $this->receptionService->receive(
@@ -238,6 +246,8 @@ class ReceptionController extends Controller
                 ->with('success', "Recepción {$reception->folio} registrada correctamente.");
 
         } catch (\RuntimeException $e) {
+            Storage::disk('public')->delete($remissionPath);
+
             return back()
                 ->withInput()
                 ->with('error', $e->getMessage());
@@ -253,13 +263,15 @@ class ReceptionController extends Controller
 
         $this->authorize('useMassReception', $directPurchaseOrder->receivingLocation);
 
-        $repseWarning = $this->receptionService->validateRepseIfService($directPurchaseOrder);
+        $repseWarning      = $this->receptionService->validateRepseIfService($directPurchaseOrder);
+        $receivingLocations = ReceivingLocation::active()->orderBy('name')->get();
 
         return view('receptions.create', [
-            'order'        => $directPurchaseOrder,
-            'orderType'    => 'direct_purchase_order',
-            'storeRoute'   => route('receptions.store-direct', $directPurchaseOrder),
-            'repseWarning' => $repseWarning,
+            'order'              => $directPurchaseOrder,
+            'orderType'          => 'direct_purchase_order',
+            'storeRoute'         => route('receptions.store-direct', $directPurchaseOrder),
+            'repseWarning'       => $repseWarning,
+            'receivingLocations' => $receivingLocations,
         ]);
     }
 
@@ -273,15 +285,20 @@ class ReceptionController extends Controller
         $this->authorize('useMassReception', $directPurchaseOrder->receivingLocation);
 
         $validated = $request->validate([
+            'receiving_location_id'          => 'required|integer|exists:receiving_locations,id',
             'delivery_reference'             => 'nullable|string|max:100',
             'notes'                          => 'nullable|string|max:1000',
             'received_at'                    => 'required|date',
+            'remission_file'                 => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'items'                          => 'required|array|min:1',
-            'items.*.item_id'                => 'required|integer|exists:odc_direct_purchase_order_items,id',
+            'items.*.receivable_item_id'     => 'required|integer|exists:odc_direct_purchase_order_items,id',
             'items.*.quantity_received'      => 'required|numeric|min:0',
             'items.*.quantity_rejected'      => 'nullable|numeric|min:0',
             'items.*.rejection_reason'       => 'nullable|string|max:255',
         ]);
+
+        $remissionPath = $request->file('remission_file')->store('remisiones', 'public');
+        $validated['remission_path'] = $remissionPath;
 
         try {
             $reception = $this->receptionService->receive(
@@ -296,6 +313,8 @@ class ReceptionController extends Controller
                 ->with('success', "Recepción {$reception->folio} registrada correctamente.");
 
         } catch (\RuntimeException $e) {
+            Storage::disk('public')->delete($remissionPath);
+
             return back()
                 ->withInput()
                 ->with('error', $e->getMessage());

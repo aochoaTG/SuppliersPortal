@@ -25,6 +25,7 @@ class Reception extends Model
         'received_by',
         'status',
         'delivery_reference',
+        'remission_path',
         'notes',
         'received_at',
     ];

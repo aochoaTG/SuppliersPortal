@@ -40,10 +40,11 @@ class ReceptionService
                 'folio'                 => Reception::generateNextFolio(),
                 'receivable_type'       => get_class($order),
                 'receivable_id'         => $order->id,
-                'receiving_location_id' => $order->receiving_location_id,
+                'receiving_location_id' => $data['receiving_location_id'] ?? $order->receiving_location_id,
                 'received_by'           => $receiver->id,
                 'status'                => Reception::STATUS_PENDING,
                 'delivery_reference'    => $data['delivery_reference'] ?? null,
+                'remission_path'        => $data['remission_path'] ?? null,
                 'notes'                 => $data['notes'] ?? null,
                 'received_at'           => $data['received_at'] ?? now(),
             ]);
@@ -52,7 +53,7 @@ class ReceptionService
             $itemClass = $this->resolveItemClass($order);
 
             foreach ($itemsData as $lineData) {
-                $item             = $itemClass::findOrFail($lineData['item_id']);
+                $item             = $itemClass::findOrFail($lineData['receivable_item_id']);
                 $quantityReceived = max(0, (float) ($lineData['quantity_received'] ?? 0));
                 $quantityRejected = max(0, (float) ($lineData['quantity_rejected'] ?? 0));
                 $accepted         = $quantityReceived - $quantityRejected;

@@ -33,6 +33,10 @@ return new class extends Migration
             // Referencia del documento de entrega del proveedor (remisión, albarán, folio de factura)
             $table->string('delivery_reference', 100)->nullable();
 
+            // Archivo de remisión PDF/JPG/PNG subido por el receptor
+            $table->string('remission_path', 500)->nullable()
+                ->comment('Archivo de remisión PDF/JPG/PNG subido por receptor');
+
             // Notas generales del receptor
             $table->text('notes')->nullable();
 
