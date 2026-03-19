@@ -48,8 +48,10 @@ return new class extends Migration
                 'REJECTED',           // Rechazada por aprobador
                 'RETURNED',           // Devuelta para corrección
                 'ISSUED',             // Emitida (PDF generado)
+                'PARTIALLY_RECEIVED', // Parcialmente recibida
                 'RECEIVED',           // Bienes/servicios recibidos
-                'CANCELLED'           // Cancelada
+                'CANCELLED',          // Cancelada
+                'CLOSED_BY_INACTIVITY', // Cerrada por inactividad
             ])->default('DRAFT');
 
             // Ruta del PDF generado
@@ -72,6 +74,8 @@ return new class extends Migration
             $table->timestamp('returned_at')->nullable();
             $table->timestamp('issued_at')->nullable();
             $table->timestamp('received_at')->nullable();
+            $table->timestamp('closed_at')->nullable();
+            $table->timestamp('inactivity_warning_sent_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

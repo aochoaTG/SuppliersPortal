@@ -19,7 +19,7 @@ return new class extends Migration
                 ->constrained('odc_direct_purchase_orders')
                 ->onDelete('cascade'); // Si se elimina la OCD, se eliminan sus items
 
-            // ✅ AGREGADO: Relación con Categoría de Gasto por partida
+            // Relación con Categoría de Gasto por partida
             $table->foreignId('expense_category_id')
                 ->constrained('expense_categories')
                 ->noActionOnDelete();
@@ -27,6 +27,7 @@ return new class extends Migration
             // Datos de la partida
             $table->text('description'); // Descripción del bien o servicio
             $table->decimal('quantity', 12, 2); // Cantidad solicitada
+            $table->decimal('quantity_received', 10, 3)->default(0); // Cantidad recibida
             $table->decimal('unit_price', 12, 2); // Precio unitario
             $table->decimal('iva_rate', 5, 2)->default(16.00); // Tasa de IVA (0, 8, 16)
 
@@ -44,7 +45,7 @@ return new class extends Migration
 
             // Índices para consultas rápidas
             $table->index('direct_purchase_order_id');
-            $table->index('expense_category_id'); // ✅ Índice nuevo para búsquedas por categoría
+            $table->index('expense_category_id');
             $table->index('iva_rate');
             $table->index('sku');
 

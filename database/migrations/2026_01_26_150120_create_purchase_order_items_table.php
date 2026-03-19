@@ -19,6 +19,7 @@ return new class extends Migration
             // Datos congelados al momento de la compra
             $table->string('description');
             $table->decimal('quantity', 12, 2);
+            $table->decimal('quantity_received', 10, 3)->default(0);
             $table->decimal('unit_price', 12, 2);
             $table->decimal('subtotal', 12, 2);
             $table->decimal('iva_amount', 12, 2);

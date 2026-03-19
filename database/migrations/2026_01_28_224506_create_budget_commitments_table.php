@@ -43,6 +43,7 @@ return new class extends Migration
             // Fechas de control
             $table->timestamp('committed_at');   // Cuándo se comprometió
             $table->timestamp('released_at')->nullable(); // Cuándo se liberó
+            $table->timestamp('received_at')->nullable(); // Cuándo se recibió
 
             $table->timestamps();
 

@@ -19,6 +19,7 @@ return new class extends Migration
             $table->foreignId('requisition_id')->constrained()->noActionOnDelete();
             $table->foreignId('supplier_id')->constrained()->noActionOnDelete();
             $table->foreignId('quotation_summary_id')->constrained()->noActionOnDelete();
+            $table->unsignedBigInteger('receiving_location_id')->nullable();
 
             // Datos Financieros (Heredados del sumario)
             $table->decimal('subtotal', 12, 2);
@@ -31,11 +32,43 @@ return new class extends Migration
             $table->integer('estimated_delivery_days')->nullable();
 
             // Estado de la OC
-            $table->enum('status', ['OPEN', 'RECEIVED', 'CANCELLED', 'PAID'])->default('OPEN');
+            $table->enum('status', [
+                'OPEN',
+                'ISSUED',
+                'PARTIALLY_RECEIVED',
+                'RECEIVED',
+                'CANCELLED',
+                'PAID',
+                'CLOSED_BY_INACTIVITY',
+            ])->default('OPEN');
 
+            // Timestamps de eventos importantes
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('issued_at')->nullable();
+            $table->timestamp('closed_at')->nullable();
+            $table->timestamp('received_at')->nullable();
+            $table->timestamp('inactivity_warning_sent_at')->nullable();
+
+            // Notas de recepción
+            $table->text('reception_notes')->nullable();
+
+            // Auditoría
             $table->foreignId('created_by')->constrained('users');
+            $table->unsignedBigInteger('received_by')->nullable();
+
             $table->timestamps();
             $table->softDeletes();
+
+            // Foreign keys
+            $table->foreign('receiving_location_id')
+                ->references('id')
+                ->on('receiving_locations')
+                ->nullOnDelete();
+
+            $table->foreign('received_by')
+                ->references('id')
+                ->on('users')
+                ->nullOnDelete();
         });
     }
 
