@@ -116,7 +116,6 @@
                 type: "GET",
                 error: function(xhr) {
                     console.error('Error en DataTable:', xhr.responseText);
-                    alert('Error al cargar los datos. Revisa la consola.');
                 }
             },
             columns: [{

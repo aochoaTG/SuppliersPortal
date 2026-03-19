@@ -1,24 +1,13 @@
-<div class="dropdown">
-    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="ti ti-dots-vertical"></i> Acciones
-    </button>
-    <ul class="dropdown-menu dropdown-menu-end">
-        <li>
-            <a class="dropdown-item js-open-company-modal"
-               href="#"
-               data-url="{{ route('companies.edit', $row->id) }}">
-                <i class="ti ti-pencil me-1 text-primary"></i> Editar
-            </a>
-        </li>
-        <li>
-            <a class="dropdown-item js-delete-company"
-               href="#"
-               data-url="{{ route('companies.destroy', $row->id) }}"
-               data-name="{{ $row->name }}">
-                <i class="ti ti-trash me-1 text-danger"></i> Eliminar
-            </a>
-        </li>
-    </ul>
+<div class="d-flex justify-content-end gap-1">
+    <a class="btn btn-sm btn-outline-primary js-open-company-modal"
+       href="#"
+       data-url="{{ route('companies.edit', $row->id) }}"
+       title="Editar"><i class="ti ti-pencil"></i></a>
+    <a class="btn btn-sm btn-outline-danger js-delete-company"
+       href="#"
+       data-url="{{ route('companies.destroy', $row->id) }}"
+       data-name="{{ $row->name }}"
+       title="Eliminar"><i class="ti ti-trash"></i></a>
 </div>
 
 <script>
@@ -32,17 +21,22 @@ $(document).off('click', '.js-delete-company').on('click', '.js-delete-company',
         text: "Esta acción no se puede deshacer.",
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#6c757d',
         confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-danger',
+            cancelButton: 'btn btn-light'
+        },
+        buttonsStyling: false,
+        reverseButtons: true
     }).then((result) => {
         if (result.isConfirmed) {
-            // Aqui le vamos a decir al usuario que esta accion no se puede realizar. SWAL
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
                 text: `No se puede eliminar esta compañia porque tiene usuarios asociados.`,
+                customClass: { confirmButton: 'btn btn-primary' },
+                buttonsStyling: false,
                 timer: 2000,
                 showConfirmButton: false
             });

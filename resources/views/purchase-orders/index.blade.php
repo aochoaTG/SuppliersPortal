@@ -13,14 +13,10 @@
 <div class="row">
     <div class="col-12">
         <div class="card shadow-sm border-0">
-            {{-- Header con botón de Nueva OCD --}}
-            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 text-primary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
                     <i class="ti ti-shopping-cart me-1"></i>Órdenes de Compra
                 </h5>
-                <a href="{{ route('direct-purchase-orders.create') }}" class="btn btn-sm btn-primary">
-                    <i class="ti ti-plus me-1"></i>Nueva Orden de Compra Directa
-                </a>
             </div>
 
             <div class="card-body">
@@ -72,9 +68,8 @@
                         </div>
 
                         <div class="table-responsive">
-                            <table class="table table-hover table-centered table-nowrap mb-0" 
-                                   id="regular-orders-table" 
-                                   style="width: 100%">
+                            <table class="table-bordered table-hover w-100 table"
+                                   id="regular-orders-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Folio</th>
@@ -103,9 +98,8 @@
                         </div>
 
                         <div class="table-responsive">
-                            <table class="table table-hover table-centered table-nowrap mb-0" 
-                                   id="direct-orders-table" 
-                                   style="width: 100%">
+                            <table class="table-bordered table-hover w-100 table"
+                                   id="direct-orders-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Folio</th>
@@ -152,13 +146,27 @@ $(document).ready(function() {
             { data: 'status', name: 'status', orderable: true },
             { data: 'actions', name: 'actions', orderable: false, searchable: false }
         ],
-        order: [[1, 'desc']], // Ordenar por fecha descendente
+        order: [[1, 'desc']],
         language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json'
+            url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"
         },
         pageLength: 25,
-        responsive: true,
-        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+        dom: '<"top"Bf>rt<"bottom"lip>',
+        buttons: [
+            {
+                extend: 'excel',
+                text: '<i class="ti ti-file-spreadsheet me-1"></i> Excel',
+                className: 'btn btn-success btn-sm'
+            },
+            {
+                extend: 'copy',
+                text: '<i class="ti ti-copy me-1"></i> Copiar',
+                className: 'btn btn-warning btn-sm'
+            }
+        ],
+        drawCallback: function() {
+            $(".dataTables_paginate > .pagination").addClass("pagination-rounded");
+        }
     });
 
     // ==========================================
@@ -188,7 +196,7 @@ $(document).ready(function() {
                 ],
                 order: [[1, 'desc']], // Ordenar por fecha descendente
                 language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json'
+                    url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"
                 },
                 pageLength: 25,
                 responsive: true,

@@ -106,32 +106,13 @@ class CategoryController extends Controller
                 $editUrl = route('categories.edit', $row->id);
                 $deleteUrl = route('categories.destroy', $row->id);
 
-                return '
-                <div class="dropdown">
-                    <button class="btn btn-primary btn-sm dropdown-toggle" type="button" 
-                            id="dropdownActions' . $row->id . '" 
-                            data-bs-toggle="dropdown" 
-                            aria-expanded="false">
-                        Acciones
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownActions' . $row->id . '">
-                        <li>
-                            <a class="dropdown-item" href="' . $editUrl . '">
-                                <i class="ti ti-edit me-2"></i>Editar
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <form action="' . $deleteUrl . '" method="POST" class="d-inline js-delete-form">
-                                ' . csrf_field() . method_field('DELETE') . '
-                                <button type="button" class="dropdown-item text-danger js-delete-btn"
-                                        data-entity="' . e($row->name) . '">
-                                    <i class="ti ti-trash me-2"></i>Eliminar
-                                </button>
-                            </form>
-                        </li>
-                    </ul>
-                </div>';
+                return '<div class="d-flex justify-content-end gap-1">'
+                    . '<a href="' . $editUrl . '" class="btn btn-sm btn-outline-primary" title="Editar"><i class="ti ti-pencil"></i></a>'
+                    . '<form action="' . $deleteUrl . '" method="POST" class="d-inline js-delete-form">'
+                    . csrf_field() . method_field('DELETE')
+                    . '<button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-entity="' . e($row->name) . '" title="Eliminar"><i class="ti ti-trash"></i></button>'
+                    . '</form>'
+                    . '</div>';
             })
             ->rawColumns(['is_active', 'actions'])
             ->make(true);

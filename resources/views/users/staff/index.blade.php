@@ -47,8 +47,8 @@
         </div>
         <div class="card-body">
             {{-- Aquí va tu tabla o listado --}}
-            <table class="table table-sm table-striped align-middle w-100" id="usuariosTable">
-                <thead>
+            <table class="table-bordered table-hover w-100 table" id="usuariosTable">
+                <thead class="table-light">
                     <tr>
                         <th>#</th>
                         <th>Usuario</th>
@@ -126,7 +126,6 @@ $(function () {
             type: "GET", // 👈 Especificar método
             error: function(xhr, error, thrown) {
                 console.error('Error en DataTable:', xhr.responseText);
-                alert('Error al cargar los datos. Revisa la consola.');
             }
         },
         columns: [
@@ -270,7 +269,13 @@ $(function () {
                 table.ajax.reload(null, false);
             })
             .fail(function () {
-                alert('No se pudo cambiar el estado.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cambiar el estado.',
+                    customClass: { confirmButton: 'btn btn-primary' },
+                    buttonsStyling: false
+                });
             });
     });
 
@@ -285,10 +290,14 @@ $(function () {
             text: "Esta acción no se puede deshacer.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -388,12 +397,13 @@ $(function () {
                     </div>
                 `,
                 icon: 'warning',
-                confirmButtonText: 'Entendido',
-                confirmButtonColor: '#0d6efd',
+                confirmButtonText: '<i class="ti ti-check me-1"></i>Entendido',
                 width: '600px',
                 customClass: {
-                    popup: 'text-start'
-                }
+                    popup: 'text-start',
+                    confirmButton: 'btn btn-primary'
+                },
+                buttonsStyling: false
             });
             return false;
         }

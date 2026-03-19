@@ -14,8 +14,8 @@
 
 @section('page.title', 'Estaciones')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Administración</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item">Administración</li>
     <li class="breadcrumb-item active">Estaciones</li>
 @endsection
 
@@ -25,17 +25,17 @@
             <h5 class="mb-0"><i class="ti ti-gas-station me-1"></i> Listado de Estaciones</h5>
         </div>
         <div class="card-body">
-            <table class="table-sm table-striped w-100 table align-middle" id="stationsTable">
-                <thead>
+            <table class="table-bordered table-hover w-100 table align-middle" id="stationsTable">
+                <thead class="table-light">
                     <tr>
-                        <th>#</th>
+                        <th style="width: 60px;">#</th>
                         <th>Estación</th>
                         <th>Empresa</th>
                         <th>Estado/Municipio</th>
                         <th>Permiso CRE</th>
                         <th>Sistema / ID</th>
-                        <th>Activo</th>
-                        <th>Acciones</th>
+                        <th class="text-center">Activo</th>
+                        <th class="text-end" style="width: 140px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -101,7 +101,6 @@
                     type: "GET",
                     error: function(xhr) {
                         console.error('Error en DataTable:', xhr.responseText);
-                        alert('Error al cargar los datos.');
                     }
                 },
                 columns: [{
@@ -137,13 +136,15 @@
                         data: 'is_active',
                         name: 'is_active',
                         orderable: false,
-                        searchable: false
+                        searchable: false,
+                        className: 'text-center'
                     },
                     {
                         data: 'actions',
                         name: 'actions',
                         orderable: false,
-                        searchable: false
+                        searchable: false,
+                        className: 'text-end'
                     }
                 ],
                 language: {
@@ -240,13 +241,17 @@
 
                 Swal.fire({
                     title: `¿Desactivar ${name}?`,
-                    text: "Se marcará como inactiva.",
+                    text: 'Se marcará como inactiva.',
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Sí, desactivar',
-                    cancelButtonText: 'Cancelar'
+                    confirmButtonText: '<i class="ti ti-toggle-left me-1"></i>Sí, desactivar',
+                    cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+                    customClass: {
+                        confirmButton: 'btn btn-danger',
+                        cancelButton: 'btn btn-secondary'
+                    },
+                    buttonsStyling: false,
+                    reverseButtons: true
                 }).then((result) => {
                     if (result.isConfirmed) {
                         $.ajax({
@@ -270,7 +275,9 @@
                                 Swal.fire({
                                     icon: 'error',
                                     title: 'Error',
-                                    text: 'No se pudo desactivar.'
+                                    text: 'No se pudo desactivar.',
+                                    customClass: { confirmButton: 'btn btn-primary' },
+                                    buttonsStyling: false
                                 });
                             });
                     }
@@ -293,7 +300,13 @@
                         if (typeof toastOk === 'function') toastOk('Estado cambiado');
                     })
                     .fail(function() {
-                        alert('No se pudo cambiar el estado.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'No se pudo cambiar el estado.',
+                            customClass: { confirmButton: 'btn btn-primary' },
+                            buttonsStyling: false
+                        });
                     });
             });
 

@@ -7,11 +7,6 @@
     <li class="breadcrumb-item active">Listado</li>
 @endsection
 
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-bs5/css/dataTables.bootstrap5.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-buttons-bs5/css/buttons.bootstrap5.min.css') }}">
-@endpush
-
 @section('content')
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -28,57 +23,18 @@
             @endif
 
             <div class="table-responsive">
-                <table id="departmentsTable" class="table-striped table-bordered table align-middle">
-                    <thead>
+                <table id="departmentsTable" class="table-bordered table-hover w-100 table">
+                    <thead class="table-light">
                         <tr>
-                            <th>#</th>
+                            <th style="width: 60px;">#</th>
                             <th>Nombre</th>
                             <th>Abreviación</th>
-                            <th>Activo</th>
+                            <th class="text-center">Activo</th>
                             <th>Notas</th>
-                            <th style="width:120px;">Acciones</th>
+                            <th class="text-end" style="width: 140px;">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @foreach ($departments as $d)
-                            <tr>
-                                <td>{{ $d->id }}</td>
-                                <td>{{ $d->name }}</td>
-                                <td><span class="badge bg-secondary">{{ $d->abbreviated }}</span></td>
-                                <td>
-                                    @if ($d->is_active)
-                                        <span class="badge bg-success">Active</span>
-                                    @else
-                                        <span class="badge bg-danger">Inactive</span>
-                                    @endif
-                                </td>
-                                <td>{{ $d->notes }}</td>
-                                <td class="text-center">
-                                    <a href="{{ route('departments.edit', $d) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="ti ti-edit"></i>
-                                    </a>
-                                    <form action="{{ route('departments.destroy', $d) }}" method="POST" class="d-inline"
-                                        onsubmit="return confirm('¿Eliminar este departamento?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            <i class="ti ti-trash"></i>
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <th>#</th>
-                            <th>Nombre</th>
-                            <th>Abreviación</th>
-                            <th>Activo</th>
-                            <th>Notas</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </tfoot>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -87,9 +43,36 @@
 
 @push('scripts')
     <script>
+        $(document).on('click', '.js-delete-btn', function(e) {
+            e.preventDefault();
+            const btn = $(this);
+            const form = btn.closest('.js-delete-form');
+            const entity = btn.data('entity') || 'este registro';
+
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: `Se eliminará: ${entity}`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+                cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+                customClass: {
+                    confirmButton: 'btn btn-danger',
+                    cancelButton: 'btn btn-secondary'
+                },
+                buttonsStyling: false,
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        });
+
         $(function() {
             $('#departmentsTable').DataTable({
                 responsive: false,
+                processing: true,
                 dom: '<"top"Bf>rt<"bottom"lip>',
                 pageLength: 50,
                 buttons: [{
@@ -119,6 +102,45 @@
                         className: 'btn btn-info btn-sm',
                         orientation: 'portrait',
                         pageSize: 'A4'
+                    }
+                ],
+                ajax: {
+                    url: "{{ route('departments.datatable') }}",
+                    type: "GET",
+                    error: function(xhr) {
+                        console.error('Error en DataTable:', xhr.responseText);
+                    }
+                },
+                columns: [{
+                        data: 'id',
+                        name: 'id',
+                        width: '60px'
+                    },
+                    {
+                        data: 'name',
+                        name: 'name'
+                    },
+                    {
+                        data: 'abbreviated',
+                        name: 'abbreviated'
+                    },
+                    {
+                        data: 'is_active',
+                        name: 'is_active',
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center'
+                    },
+                    {
+                        data: 'notes',
+                        name: 'notes'
+                    },
+                    {
+                        data: 'actions',
+                        name: 'actions',
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-end'
                     }
                 ],
                 language: {

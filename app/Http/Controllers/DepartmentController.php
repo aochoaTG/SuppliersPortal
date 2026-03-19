@@ -6,13 +6,48 @@ use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
+use Yajra\DataTables\Facades\DataTables;
 
 class DepartmentController extends Controller
 {
     public function index()
     {
-        $departments = Department::orderBy('name')->get();
-        return view('departments.index', compact('departments'));
+        return view('departments.index');
+    }
+
+    public function datatable()
+    {
+        $query = Department::query();
+
+        return DataTables::of($query)
+            ->editColumn('abbreviated', function ($row) {
+                return '<span class="badge bg-secondary">' . e($row->abbreviated) . '</span>';
+            })
+            ->editColumn('is_active', function ($row) {
+                return $row->is_active
+                    ? '<span class="badge bg-success">Activo</span>'
+                    : '<span class="badge bg-danger">Inactivo</span>';
+            })
+            ->addColumn('actions', function ($row) {
+                $editUrl = route('departments.edit', $row->id);
+                $deleteUrl = route('departments.destroy', $row->id);
+
+                return '
+                <div class="d-flex justify-content-end gap-1">
+                    <a href="' . $editUrl . '" class="btn btn-sm btn-outline-primary">
+                        <i class="ti ti-edit"></i>
+                    </a>
+                    <form action="' . $deleteUrl . '" method="POST" class="d-inline js-delete-form">
+                        ' . csrf_field() . method_field('DELETE') . '
+                        <button type="button" class="btn btn-sm btn-outline-danger js-delete-btn"
+                                data-entity="' . e($row->name) . '">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </form>
+                </div>';
+            })
+            ->rawColumns(['abbreviated', 'is_active', 'actions'])
+            ->make(true);
     }
 
     public function create()

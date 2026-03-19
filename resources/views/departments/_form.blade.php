@@ -25,7 +25,7 @@
 
             <input class="form-check-input" type="checkbox" id="is_active" name="is_active" value="1"
                 {{ old('is_active', $department->is_active ?? true) ? 'checked' : '' }}>
-            <label class="form-check-label" for="is_active">Active</label>
+            <label class="form-check-label" for="is_active">Activo</label>
         </div>
     </div>
 

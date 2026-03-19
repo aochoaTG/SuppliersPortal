@@ -314,26 +314,17 @@ class AnnouncementController extends Controller
             $token   = csrf_token();
 
             $acciones = <<<HTML
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="ti ti-dots-vertical"></i> Acciones
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <a href="{$editUrl}" class="dropdown-item btn-edit-comunicado" data-edit-url="{$editUrl}">
-                                <i class="ti ti-pencil me-1"></i> Editar
-                            </a>
-                        </li>
-                        <li>
-                            <form method="POST" action="{$delUrl}" class="form-eliminar-comunicado">
-                                <input type="hidden" name="_token" value="{$token}">
-                                <input type="hidden" name="_method" value="DELETE">
-                                <button type="button" class="dropdown-item text-danger btn-eliminar-comunicado">
-                                    <i class="ti ti-trash me-1"></i> Eliminar
-                                </button>
-                            </form>
-                        </li>
-                    </ul>
+                <div class="d-flex justify-content-end gap-1">
+                    <a href="{$editUrl}" class="btn btn-sm btn-outline-primary btn-edit-comunicado" data-edit-url="{$editUrl}" title="Editar">
+                        <i class="ti ti-pencil"></i>
+                    </a>
+                    <form method="POST" action="{$delUrl}" class="form-eliminar-comunicado d-inline">
+                        <input type="hidden" name="_token" value="{$token}">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar-comunicado" title="Eliminar">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </form>
                 </div>
             HTML;
 
@@ -490,27 +481,10 @@ class AnnouncementController extends Controller
             $coverUrl = $r->cover_path ? asset('storage/' . $r->cover_path) : null;
 
             $actions = <<<HTML
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="ti ti-dots-vertical"></i> Acciones
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <a href="{$showUrl}" class="dropdown-item" title="Abrir">
-                                <i class="ti ti-external-link me-1"></i> Abrir
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{$pdfUrl}" class="dropdown-item" target="_blank" title="Abrir en PDF">
-                                <i class="ti ti-file-text me-1"></i> Abrir en PDF
-                            </a>
-                        </li>
-                        <li>
-                            <button class="dropdown-item text-danger js-dismiss" data-url="{$dismissUrl}" title="No mostrar más">
-                                <i class="ti ti-eye-off me-1"></i> No mostrar más
-                            </button>
-                        </li>
-                    </ul>
+                <div class="d-flex justify-content-end gap-1">
+                    <a href="{$showUrl}" class="btn btn-sm btn-outline-secondary" title="Abrir"><i class="ti ti-external-link"></i></a>
+                    <a href="{$pdfUrl}" class="btn btn-sm btn-outline-info" target="_blank" title="Abrir en PDF"><i class="ti ti-file-text"></i></a>
+                    <button class="btn btn-sm btn-outline-danger js-dismiss" data-url="{$dismissUrl}" title="No mostrar más"><i class="ti ti-eye-off"></i></button>
                 </div>
             HTML;
 

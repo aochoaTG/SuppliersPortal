@@ -18,8 +18,8 @@
 
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-sm table-striped align-middle w-100" id="suppliersTable">
-                <thead>
+            <table class="table-bordered table-hover w-100 table" id="suppliersTable">
+                <thead class="table-light">
                     <tr>
                         <th>ID</th>
                         <th>Origen</th>
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { data: 'clabe', name: 'clabe'},
             { data: 'currency', name: 'currency'},
         ],
-        dom: '<"top"Bf>rt<"bottom"lipl>',
+        dom: '<"top"Bf>rt<"bottom"lip>',
         language: {
             url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"
         },

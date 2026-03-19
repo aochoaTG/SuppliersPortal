@@ -29,7 +29,6 @@
 @section('page.title', 'Gestión de Comunicados')
 @section('page.breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Portal Proveedores</a></li>
     <li class="breadcrumb-item active">Comunicados</li>
 @endsection
 
@@ -80,8 +79,8 @@
             </div>
 
             {{-- Tabla de comunicados --}}
-            <table class="table table-sm table-striped align-middle w-100" id="comunicadosTable">
-                <thead>
+            <table class="table-bordered table-hover w-100 table" id="comunicadosTable">
+                <thead class="table-light">
                     <tr>
                         <th width="50">#</th>
                         <th width="250">Título</th>
@@ -144,8 +143,6 @@
 
 {{-- JS ADICIONAL   --}}
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
 $(function () {
     // CSRF para AJAX
@@ -278,7 +275,8 @@ $(function () {
                 data: 'acciones',
                 name: 'acciones',
                 orderable: false,
-                searchable: false
+                searchable: false,
+                className: 'text-end'
             }
         ],
         language: {
@@ -386,8 +384,6 @@ $(function () {
                 table.ajax.reload(null, false);
                 if (typeof toastOk === 'function') {
                     toastOk(response.message || 'Comunicado guardado correctamente');
-                } else {
-                    alert(response.message || 'Comunicado guardado correctamente');
                 }
                 cleanupModalBackdrops();
             });
@@ -426,7 +422,13 @@ $(function () {
                 }
             })
             .fail(function () {
-                alert('No se pudo cambiar el estado del comunicado.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cambiar el estado del comunicado.',
+                    customClass: { confirmButton: 'btn btn-primary' },
+                    buttonsStyling: false
+                });
             })
             .always(function () {
                 $btn.html(originalHtml).prop('disabled', false);
@@ -444,10 +446,14 @@ $(function () {
             text: "Esta acción no se puede deshacer. El comunicado será eliminado permanentemente.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -469,7 +475,9 @@ $(function () {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: 'No se pudo eliminar el comunicado.'
+                        text: 'No se pudo eliminar el comunicado.',
+                        customClass: { confirmButton: 'btn btn-primary' },
+                        buttonsStyling: false
                     });
                 });
             }
@@ -492,10 +500,14 @@ $(function () {
             text: "¡Este comunicado se eliminará definitivamente!",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 form.submit();
@@ -548,15 +560,15 @@ $(function () {
                             title: 'Actualizado',
                             text: resp.message || 'El comunicado se actualizó correctamente.',
                             timer: 1300,
-                            showConfirmButton: false
+                            showConfirmButton: false,
+                            customClass: { confirmButton: 'btn btn-primary' },
+                            buttonsStyling: false
                         });
                     } else {
-                        // Caso: devolvió HTML (no JSON), refrescamos de todas formas
-                        Swal.fire({ icon:'success', title:'Actualizado', timer: 1200, showConfirmButton:false });
+                        Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                     }
                 } catch (err) {
-                    // Silencioso: igual mostramos éxito si status 200
-                    Swal.fire({ icon:'success', title:'Actualizado', timer:1200, showConfirmButton:false });
+                    Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 }
 
                 // Cerrar modal
@@ -579,9 +591,9 @@ $(function () {
                         messages.forEach(m => html += `<li>${m}</li>`);
                     }
                     html += '</ul>';
-                    Swal.fire({ icon: 'error', title: 'Datos inválidos', html });
+                    Swal.fire({ icon: 'error', title: 'Datos inválidos', html, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar el comunicado.' });
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar el comunicado.', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 }
             },
             complete: function () {

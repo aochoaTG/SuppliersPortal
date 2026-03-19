@@ -397,12 +397,12 @@ class ReceivingLocationController extends Controller
      */
     private function getActionButtons(ReceivingLocation $location): string
     {
-        $buttons = '<div class="btn-group" role="group" style="gap: 4px;">';
+        $buttons = '<div class="d-flex justify-content-end gap-1">';
         
         // Botón Ver - disponible para todos con permiso
         if (auth()->user()->can('view', $location)) {
-            $buttons .= '<a href="' . route('receiving-locations.show', $location) . '" 
-                           class="btn btn-sm btn-info" 
+            $buttons .= '<a href="' . route('receiving-locations.show', $location) . '"
+                           class="btn btn-sm btn-outline-secondary"
                            title="Ver detalles">
                            <i class="ti ti-eye"></i>
                         </a>';
@@ -411,7 +411,7 @@ class ReceivingLocationController extends Controller
         // Botón Editar - solo para buyer y superadmin
         if (auth()->user()->can('update', $location)) {
             $buttons .= '<a href="' . route('receiving-locations.edit', $location) . '"
-                           class="btn btn-sm btn-warning"
+                           class="btn btn-sm btn-outline-primary"
                            title="Editar">
                            <i class="ti ti-edit"></i>
                         </a>';
@@ -421,14 +421,14 @@ class ReceivingLocationController extends Controller
         if (auth()->user()->can('blockPortal', $location)) {
             if ($location->portal_blocked) {
                 $buttons .= '<button type="button"
-                                   class="btn btn-sm btn-success btn-unblock-portal"
+                                   class="btn btn-sm btn-outline-success btn-unblock-portal"
                                    data-id="' . $location->id . '"
                                    title="Desbloquear Portal">
                                    <i class="ti ti-lock-open"></i>
                             </button>';
             } else {
                 $buttons .= '<button type="button"
-                                   class="btn btn-sm btn-danger btn-block-portal"
+                                   class="btn btn-sm btn-outline-danger btn-block-portal"
                                    data-id="' . $location->id . '"
                                    title="Bloquear Portal">
                                    <i class="ti ti-lock"></i>
@@ -439,7 +439,7 @@ class ReceivingLocationController extends Controller
         // Botón Eliminar - solo para buyer y superadmin
         if (auth()->user()->can('delete', $location)) {
             $buttons .= '<button type="button"
-                           class="btn btn-sm btn-danger btn-delete"
+                           class="btn btn-sm btn-outline-danger btn-delete"
                            data-id="' . $location->id . '"
                            data-name="' . $location->name . '"
                            title="Eliminar">
@@ -448,6 +448,7 @@ class ReceivingLocationController extends Controller
         }
         
         $buttons .= '</div>';
+
         
         return $buttons;
     }

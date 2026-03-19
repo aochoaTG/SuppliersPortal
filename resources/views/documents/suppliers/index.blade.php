@@ -165,8 +165,8 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <table class="table table-sm table-striped align-middle w-100" id="docsTable">
-                        <thead>
+                    <table class="table-bordered table-hover w-100 table" id="docsTable">
+                        <thead class="table-light">
                             <tr>
                                 <th style="width:35%;">Documento</th>
                                 <th style="width:15%;">Status</th>
@@ -843,32 +843,23 @@
                                             @endif
                                         </td>
                                         <td class="col-actions text-end">
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                                    <i class="ti ti-dots-vertical"></i>
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-end">
-                                                    <a class="dropdown-item" href="{{ route('suppliers.sirocs.show', [$supplier, $s]) }}">
-                                                        <i class="ti ti-eye me-1"></i> Ver
-                                                    </a>
-                                                    <button type="button" class="dropdown-item js-edit-siroc"
-                                                        data-update-url="{{ route('suppliers.sirocs.update', [$s->supplier, $s]) }}"
-                                                        data-siroc-number="{{ e($s->siroc_number) }}"
-                                                        data-contract-number="{{ e($s->contract_number) }}"
-                                                        data-work-name="{{ e($s->work_name) }}"
-                                                        data-work-location="{{ e($s->work_location) }}"
-                                                        data-start-date="{{ optional($s->start_date)->format('Y-m-d') }}"
-                                                        data-end-date="{{ optional($s->end_date)->format('Y-m-d') }}"
-                                                        data-status="{{ $s->status }}"
-                                                        data-observations="{{ e($s->observations) }}"
-                                                        data-file-url="{{ $s->siroc_file ? asset('storage/'.$s->siroc_file) : '' }}">
-                                                        <i class="ti ti-pencil me-1"></i> Editar
-                                                    </button>
-                                                    <button class="dropdown-item text-danger js-del-siroc"
-                                                            data-url="{{ route('suppliers.sirocs.destroy', [$supplier, $s]) }}">
-                                                        <i class="ti ti-trash me-1"></i> Eliminar
-                                                    </button>
-                                                </div>
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <a href="{{ route('suppliers.sirocs.show', [$supplier, $s]) }}" class="btn btn-sm btn-outline-secondary" title="Ver"><i class="ti ti-eye"></i></a>
+                                                <button type="button" class="btn btn-sm btn-outline-primary js-edit-siroc"
+                                                    data-update-url="{{ route('suppliers.sirocs.update', [$s->supplier, $s]) }}"
+                                                    data-siroc-number="{{ e($s->siroc_number) }}"
+                                                    data-contract-number="{{ e($s->contract_number) }}"
+                                                    data-work-name="{{ e($s->work_name) }}"
+                                                    data-work-location="{{ e($s->work_location) }}"
+                                                    data-start-date="{{ optional($s->start_date)->format('Y-m-d') }}"
+                                                    data-end-date="{{ optional($s->end_date)->format('Y-m-d') }}"
+                                                    data-status="{{ $s->status }}"
+                                                    data-observations="{{ e($s->observations) }}"
+                                                    data-file-url="{{ $s->siroc_file ? asset('storage/'.$s->siroc_file) : '' }}"
+                                                    title="Editar"><i class="ti ti-pencil"></i></button>
+                                                <button class="btn btn-sm btn-outline-danger js-del-siroc"
+                                                        data-url="{{ route('suppliers.sirocs.destroy', [$supplier, $s]) }}"
+                                                        title="Eliminar"><i class="ti ti-trash"></i></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -1320,10 +1311,14 @@ $(function () {
             text: 'Esta acción no se puede deshacer.',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((r) => {
             if (!r.isConfirmed) return;
 
@@ -1726,21 +1721,10 @@ $(function () {
             <td>${statusBadge(s.status)}</td>
             <td>${pdfBtn}</td>
             <td class="text-end">
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="ti ti-dots-vertical"></i>
-                    </button>
-                    <div class="dropdown-menu dropdown-menu-end">
-                        <a class="dropdown-item" href="${s.show_url || '#'}">
-                            <i class="ti ti-eye me-1"></i> Ver
-                        </a>
-                        <a class="dropdown-item" href="${s.edit_url || '#'}">
-                            <i class="ti ti-pencil me-1"></i> Editar
-                        </a>
-                        <button class="dropdown-item text-danger js-del-siroc" data-url="${s.destroy_url || '#'}">
-                            <i class="ti ti-trash me-1"></i> Eliminar
-                        </button>
-                    </div>
+                <div class="d-flex justify-content-end gap-1">
+                    <a href="${s.show_url || '#'}" class="btn btn-sm btn-outline-secondary" title="Ver"><i class="ti ti-eye"></i></a>
+                    <a href="${s.edit_url || '#'}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="ti ti-pencil"></i></a>
+                    <button class="btn btn-sm btn-outline-danger js-del-siroc" data-url="${s.destroy_url || '#'}" title="Eliminar"><i class="ti ti-trash"></i></button>
                 </div>
             </td>
         </tr>`;

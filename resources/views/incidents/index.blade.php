@@ -26,8 +26,8 @@
         
         <div class="card-body">
             {{-- Aquí va tu tabla o listado --}}
-            <table class="table table-sm table-striped align-middle">
-                <thead>
+            <table class="table-bordered table-hover w-100 table">
+                <thead class="table-light">
                     <tr>
                         <th>#</th>
                         <th>Nombre</th>

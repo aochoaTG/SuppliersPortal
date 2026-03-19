@@ -16,16 +16,12 @@
             <i class="ti ti-arrows-exchange me-2"></i>
             Movimientos Presupuestales
         </h5>
-        <a href="{{ route('budget_movements.create') }}" class="btn btn-primary">
-            <i class="ti ti-plus me-1"></i>
-            Nuevo Movimiento
-        </a>
     </div>
     <div class="card-body">
         <!-- Tabla de movimientos -->
         <div class="table-responsive">
-            <table id="movementsTable" class="table table-striped table-hover">
-                <thead>
+            <table id="movementsTable" class="table-bordered table-hover w-100 table">
+                <thead class="table-light">
                     <tr>
                         <th>ID</th>
                         <th>Tipo</th>
@@ -47,23 +43,34 @@
 </div>
 @endsection
 
-@push('styles')
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css">
-@endpush
-
 @push('scripts')
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap5.min.js"></script>
-
 <script>
     $(document).ready(function() {
         // Inicializar DataTable
         const table = $('#movementsTable').DataTable({
             processing: true,
             serverSide: true,
+            dom: '<"top"Bf>rt<"bottom"lip>',
+            pageLength: 25,
+            buttons: [
+                {
+                    text: '<i class="ti ti-plus me-1"></i> Nuevo Movimiento',
+                    className: 'btn btn-primary btn-sm',
+                    action: function() {
+                        window.location.href = "{{ route('budget_movements.create') }}";
+                    }
+                },
+                {
+                    extend: 'excel',
+                    text: '<i class="ti ti-file-spreadsheet me-1"></i> Excel',
+                    className: 'btn btn-success btn-sm'
+                },
+                {
+                    extend: 'copy',
+                    text: '<i class="ti ti-copy me-1"></i> Copiar',
+                    className: 'btn btn-warning btn-sm'
+                }
+            ],
             ajax: {
                 url: "{{ route('budget_movements.index') }}",
                 type: 'GET'
@@ -262,17 +269,15 @@
                 title: '¿Rechazar movimiento?',
                 text: 'El movimiento no se aplicará al presupuesto.',
                 icon: 'warning',
-                iconHtml: '<i class="ti ti-alert-triangle"></i>',
                 showCancelButton: true,
-                confirmButtonColor: '#dc3545',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Sí, rechazar',
-                cancelButtonText: 'Cancelar',
+                confirmButtonText: '<i class="ti ti-x me-1"></i>Sí, rechazar',
+                cancelButtonText: '<i class="ti ti-arrow-back me-1"></i>Cancelar',
                 customClass: {
                     confirmButton: 'btn btn-danger',
                     cancelButton: 'btn btn-secondary'
                 },
-                buttonsStyling: false
+                buttonsStyling: false,
+                reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -319,17 +324,15 @@
                 title: '¿Eliminar movimiento?',
                 text: 'Esta acción no se puede deshacer.',
                 icon: 'warning',
-                iconHtml: '<i class="ti ti-alert-triangle"></i>',
                 showCancelButton: true,
-                confirmButtonColor: '#dc3545',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Sí, eliminar',
-                cancelButtonText: 'Cancelar',
+                confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+                cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
                 customClass: {
                     confirmButton: 'btn btn-danger',
                     cancelButton: 'btn btn-secondary'
                 },
-                buttonsStyling: false
+                buttonsStyling: false,
+                reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

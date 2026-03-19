@@ -10,19 +10,12 @@
 @endsection
 
 @section('content')
-<!-- ===== HEADER CON BOTÓN =====  -->
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <p class="text-muted mb-0">
-            <i class="ti ti-calendar-dollar me-2"></i>
-            Gestión de presupuestos por año fiscal
-        </p>
-    </div>
-    <div>
-        <a href="{{ route('annual_budgets.create') }}" class="btn btn-primary">
-            <i class="ti ti-plus me-1"></i> Nuevo Presupuesto
-        </a>
-    </div>
+<!-- ===== HEADER =====  -->
+<div class="mb-4">
+    <p class="text-muted mb-0">
+        <i class="ti ti-calendar-dollar me-2"></i>
+        Gestión de presupuestos por año fiscal
+    </p>
 </div>
 
 <!-- ===== FILTROS ===== -->
@@ -59,7 +52,7 @@
 <!-- ===== TABLA DATATABLE ===== -->
 <div class="card">
     <div class="card-body table-responsive">
-        <table id="tableBudgets" class="table-hover table-striped mb-0 table w-100">
+        <table id="tableBudgets" class="table-bordered table-hover w-100 table">
             <thead class="table-light">
                 <tr>
                     <th>Empresa</th>
@@ -84,6 +77,34 @@
         const table = new DataTable('#tableBudgets', {
             processing: true,
             serverSide: true,
+            dom: '<"top"Bf>rt<"bottom"lip>',
+            pageLength: 25,
+            buttons: [
+                {
+                    text: '<i class="ti ti-plus me-1"></i> Nuevo Presupuesto',
+                    className: 'btn btn-primary btn-sm',
+                    action: function() {
+                        window.location.href = "{{ route('annual_budgets.create') }}";
+                    }
+                },
+                {
+                    extend: 'excel',
+                    text: '<i class="ti ti-file-spreadsheet me-1"></i> Excel',
+                    className: 'btn btn-success btn-sm'
+                },
+                {
+                    extend: 'copy',
+                    text: '<i class="ti ti-copy me-1"></i> Copiar',
+                    className: 'btn btn-warning btn-sm'
+                },
+                {
+                    extend: 'pdf',
+                    text: '<i class="ti ti-file-text me-1"></i> PDF',
+                    className: 'btn btn-info btn-sm',
+                    orientation: 'landscape',
+                    pageSize: 'A4'
+                }
+            ],
             ajax: {
                 url: @json(route('annual_budgets.datatable')),
                 data: function(d) {
@@ -126,7 +147,6 @@
                 [2, 'desc'],
                 [0, 'asc']
             ],
-            pageLength: 25,
             language: {
                 url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"
             },
@@ -167,10 +187,14 @@
                     text: `Se eliminará: ${entity}`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
-                    cancelButtonColor: '#6c757d',
                     confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
                     cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+                    customClass: {
+                        confirmButton: 'btn btn-danger',
+                        cancelButton: 'btn btn-secondary'
+                    },
+                    buttonsStyling: false,
+                    reverseButtons: true
                 }).then((result) => {
                     if (result.isConfirmed) {
                         form.submit();

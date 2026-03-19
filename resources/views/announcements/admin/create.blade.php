@@ -9,7 +9,7 @@
         <!-- Primera fila: Título y Prioridad -->
         <div class="row">
             <div class="col-md-8 mb-3">
-                <label class="form-label">Título de comunicado *</label>
+                <label class="form-label">Título de comunicado <span class="text-danger">*</span></label>
                 <input type="text" name="title" class="form-control form-control-sm"
                        maxlength="50" minlength="5" required autocomplete="off"
                        placeholder="Ingrese el título del comunicado">
@@ -17,7 +17,7 @@
             </div>
 
             <div class="col-md-4 mb-3">
-                <label class="form-label">Prioridad *</label>
+                <label class="form-label">Prioridad <span class="text-danger">*</span></label>
                 <select name="priority" class="form-select form-select-sm" required>
                     <option value="1" selected>🟢 Baja</option>
                     <option value="2">🔵 Normal</option>
@@ -30,7 +30,7 @@
 
         <!-- Descripción -->
         <div class="mb-3">
-            <label class="form-label">Descripción *</label>
+            <label class="form-label">Descripción <span class="text-danger">*</span></label>
             <textarea name="description" class="form-control form-control-sm"
                      maxlength="500" minlength="10" rows="2" required
                      placeholder="Descripción breve del comunicado"></textarea>
@@ -40,14 +40,14 @@
         <!-- Segunda fila: Fechas -->
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label class="form-label">Fecha publicación *</label>
+                <label class="form-label">Fecha publicación <span class="text-danger">*</span></label>
                 <input type="datetime-local" name="published_at"
                        class="form-control form-control-sm" required
                        min="{{ now()->format('Y-m-d\TH:i') }}">
             </div>
 
             <div class="col-md-6 mb-3">
-                <label class="form-label">Visible hasta</label>
+                <label class="form-label">Visible hasta <span class="text-danger">*</span></label>
                 <input type="datetime-local" name="visible_until"
                        class="form-control form-control-sm"
                        min="{{ now()->addHour()->format('Y-m-d\TH:i') }}">

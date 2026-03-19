@@ -18,8 +18,8 @@
 
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-sm table-striped align-middle w-100" id="efosTable">
-                <thead>
+            <table class="table-bordered table-hover w-100 table" id="efosTable">
+                <thead class="table-light">
                     <tr>
                         <th>#</th>
                         <th>RFC</th>

@@ -8,8 +8,6 @@
 @endsection
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-bs5/css/dataTables.bootstrap5.min.css') }}">
-<link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-buttons-bs5/css/buttons.bootstrap5.min.css') }}">
 <style>
     .filter-input {
         width: 100%;
@@ -156,8 +154,6 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
     $(function() {
 
@@ -198,15 +194,15 @@
                 `,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: '<i class="ti ti-trash me-1"></i> Sí, Eliminar',
-                cancelButtonText: '<i class="ti ti-x me-1"></i> Cancelar',
-                confirmButtonColor: '#dc3545',
-                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, Eliminar',
+                cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
                 width: '600px',
                 customClass: {
                     confirmButton: 'btn btn-danger',
-                    cancelButton: 'btn btn-outline-secondary'
-                }
+                    cancelButton: 'btn btn-secondary'
+                },
+                buttonsStyling: false,
+                reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
                     $form.submit();
@@ -260,15 +256,15 @@
                 `,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: '<i class="ti ti-ban me-1"></i> Sí, Cancelar Requisición',
-                cancelButtonText: '<i class="ti ti-x me-1"></i> No Cancelar',
-                confirmButtonColor: '#ffc107',
-                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="ti ti-ban me-1"></i>Sí, Cancelar Requisición',
+                cancelButtonText: '<i class="ti ti-x me-1"></i>No Cancelar',
                 width: '650px',
                 customClass: {
                     confirmButton: 'btn btn-warning',
-                    cancelButton: 'btn btn-outline-secondary'
+                    cancelButton: 'btn btn-secondary'
                 },
+                buttonsStyling: false,
+                reverseButtons: true,
                 preConfirm: () => {
                     const reason = document.getElementById('cancellation_reason').value;
                     

@@ -197,71 +197,25 @@
                                     ]);
                                 @endphp
 
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
-                                            data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="ti ti-settings mx-1"></i> Acciones
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-
-
-
+                                <div class="d-flex justify-content-end gap-1">
                                         @if($doc)
-                                            <li>
-                                                <a class="dropdown-item" href="{{ $viewUrl }}" target="_blank" rel="noopener">
-                                                    <i class="ti ti-eye me-1"></i> Abrir
-                                                </a>
-                                            </li>
-
+                                            <a href="{{ $viewUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Abrir"><i class="ti ti-eye"></i></a>
                                             @if($canApprove)
-                                                <li>
-                                                    <a class="dropdown-item js-accept-doc"
-                                                    href="javascript:void(0);"
-                                                    data-url="{{ route('admin.review.documents.accept', $doc) }}">
-                                                        <i class="ti ti-check me-1 text-success"></i> Aprobar
-                                                    </a>
-                                                </li>
+                                                <a href="javascript:void(0);" class="btn btn-sm btn-outline-success js-accept-doc"
+                                                    data-url="{{ route('admin.review.documents.accept', $doc) }}" title="Aprobar"><i class="ti ti-check"></i></a>
                                             @endif
-
                                             @if($canReject)
-                                                <li>
-                                                    <a class="dropdown-item js-reject-doc"
-                                                    href="javascript:void(0);"
-                                                    data-url="{{ route('admin.review.documents.reject', $doc) }}">
-                                                        <i class="ti ti-x me-1 text-danger"></i> Rechazar
-                                                    </a>
-                                                </li>
-                                            @endif
-
-                                            @if($versions->count() > 1)
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li class="px-3 text-muted small">Versiones anteriores</li>
-                                                @foreach($versions->slice(1) as $old)
-                                                    @php
-                                                        $oldUrl = Storage::disk('public')->url($old->path_file);
-                                                        $pill = $old->status === 'accepted' ? 'success' : ($old->status === 'rejected' ? 'danger' : 'secondary');
-                                                    @endphp
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ $oldUrl }}" target="_blank">
-                                                            <span class="badge bg-{{ $pill }} history-badge me-1">{{ strtoupper($old->status[0]) }}</span>
-                                                            {{ optional($old->uploaded_at ?? $old->created_at)->format('Y-m-d H:i') }}
-                                                        </a>
-                                                    </li>
-                                                @endforeach
+                                                <a href="javascript:void(0);" class="btn btn-sm btn-outline-danger js-reject-doc"
+                                                    data-url="{{ route('admin.review.documents.reject', $doc) }}" title="Rechazar"><i class="ti ti-x"></i></a>
                                             @endif
                                         @endif
                                         {{-- Retroalimentación: SIEMPRE visible --}}
-                                        <li>
-                                            <a class="dropdown-item js-feedback-doc"
-                                            href="javascript:void(0);"
+                                        <a href="javascript:void(0);" class="btn btn-sm btn-outline-info js-feedback-doc"
                                             data-url="{{ $feedbackUrl }}"
                                             data-supplier="{{ $supplier->id }}"
                                             data-type="{{ $type }}"
-                                            data-doc="{{ $doc->id ?? '' }}">
-                                                <i class="ti ti-message-dots me-1"></i> Retroalimentación
-                                            </a>
-                                        </li>
-                                    </ul>
+                                            data-doc="{{ $doc->id ?? '' }}"
+                                            title="Retroalimentación"><i class="ti ti-message-dots"></i></a>
                                 </div>
                             </td>
                         </tr>

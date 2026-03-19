@@ -33,7 +33,7 @@
                                 @if ($station->company)
                                     <span class="badge bg-primary">{{ $station->company->name }}</span>
                                 @else
-                                    <span class="badge badge-null">Sin empresa</span>
+                                    <span class="badge bg-secondary">Sin empresa</span>
                                 @endif
                             </div>
                             <div><strong>Dirección:</strong> {{ $station->address }}</div>
@@ -98,8 +98,8 @@
             <div class="card">
                 <div class="card-body">
                     <h5><i class="ti ti-info-circle"></i> Metadatos</h5>
-                    <div><strong>Creación:</strong> {{ $station->created_at }}</div>
-                    <div><strong>Actualización:</strong> {{ $station->updated_at }}</div>
+                    <div><strong>Creación:</strong> {{ $station->created_at->format('d/m/Y H:i') }}</div>
+                    <div><strong>Actualización:</strong> {{ $station->updated_at->format('d/m/Y H:i') }}</div>
                 </div>
             </div>
         </div>

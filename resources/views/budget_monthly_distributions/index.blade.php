@@ -112,7 +112,7 @@
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table id="tableDistributions" class="table table-hover table-striped mb-0">
+            <table id="tableDistributions" class="table-bordered table-hover w-100 table">
                 <thead class="table-light">
                     <tr>
                         <th>Mes</th>
@@ -163,6 +163,19 @@
         const dataTableConfig = {
             processing: true,
             serverSide: true,
+            dom: '<"top"Bf>rt<"bottom"lip>',
+            buttons: [
+                {
+                    extend: 'excel',
+                    text: '<i class="ti ti-file-spreadsheet me-1"></i> Excel',
+                    className: 'btn btn-success btn-sm'
+                },
+                {
+                    extend: 'copy',
+                    text: '<i class="ti ti-copy me-1"></i> Copiar',
+                    className: 'btn btn-warning btn-sm'
+                }
+            ],
             ajax: {
                 url: @json(route('budget_monthly_distributions.datatable')),
                 data: function(d) {

@@ -95,8 +95,6 @@
     <script src="{{ asset('assets/vendor/jszip/jszip.min.js') }}"></script>
     <script src="{{ asset('assets/vendor/pdfmake/pdfmake.min.js') }}"></script>
     <script src="{{ asset('assets/vendor/pdfmake/vfs_fonts.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <script>
         $(function() {
             const table = $('#productsTable').DataTable({
@@ -134,7 +132,6 @@
                     type: "GET",
                     error: function(xhr) {
                         console.error('Error en DataTable:', xhr.responseText);
-                        alert('Error al cargar los datos.');
                     }
                 },
                 columns: [{

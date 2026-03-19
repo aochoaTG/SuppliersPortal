@@ -17,7 +17,7 @@
     </div>
 
     <div class="card-body table-responsive">
-        <table class="table table-striped align-middle" id="sirocAdminTable">
+        <table class="table-bordered table-hover w-100 table" id="sirocAdminTable">
             <thead class="table-light">
                 <tr>
                     <th>#</th>
@@ -67,35 +67,25 @@
                             @endif
                         </td>
                         <td class="col-actions text-end">
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                    <i class="ti ti-dots-vertical"></i>
-                                </button>
-                                <div class="dropdown-menu dropdown-menu-end">
-                                    <a class="dropdown-item" href="{{ route('suppliers.sirocs.show', [$s->supplier, $s]) }}">
-                                        <i class="ti ti-eye me-1"></i> Ver
-                                    </a>
-                                    <button type="button" class="dropdown-item js-edit-siroc"
-                                        data-update-url="{{ route('suppliers.sirocs.update', [$s->supplier, $s]) }}"
-                                        data-siroc-number="{{ e($s->siroc_number) }}"
-                                        data-contract-number="{{ e($s->contract_number) }}"
-                                        data-work-name="{{ e($s->work_name) }}"
-                                        data-work-location="{{ e($s->work_location) }}"
-                                        data-start-date="{{ optional($s->start_date)->format('Y-m-d') }}"
-                                        data-end-date="{{ optional($s->end_date)->format('Y-m-d') }}"
-                                        data-status="{{ $s->status }}"
-                                        data-observations="{{ e($s->observations) }}"
-                                        data-file-url="{{ $s->siroc_file ? asset('storage/'.$s->siroc_file) : '' }}">
-                                        <i class="ti ti-pencil me-1"></i> Editar
-                                    </button>
-                                    <form action="{{ route('suppliers.sirocs.destroy', [$s->supplier, $s]) }}" method="POST" class="js-del-form">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="dropdown-item text-danger">
-                                            <i class="ti ti-trash me-1"></i> Eliminar
-                                        </button>
-                                    </form>
-                                </div>
+                            <div class="d-flex justify-content-end gap-1">
+                                <a href="{{ route('suppliers.sirocs.show', [$s->supplier, $s]) }}" class="btn btn-sm btn-outline-secondary" title="Ver"><i class="ti ti-eye"></i></a>
+                                <button type="button" class="btn btn-sm btn-outline-primary js-edit-siroc"
+                                    data-update-url="{{ route('suppliers.sirocs.update', [$s->supplier, $s]) }}"
+                                    data-siroc-number="{{ e($s->siroc_number) }}"
+                                    data-contract-number="{{ e($s->contract_number) }}"
+                                    data-work-name="{{ e($s->work_name) }}"
+                                    data-work-location="{{ e($s->work_location) }}"
+                                    data-start-date="{{ optional($s->start_date)->format('Y-m-d') }}"
+                                    data-end-date="{{ optional($s->end_date)->format('Y-m-d') }}"
+                                    data-status="{{ $s->status }}"
+                                    data-observations="{{ e($s->observations) }}"
+                                    data-file-url="{{ $s->siroc_file ? asset('storage/'.$s->siroc_file) : '' }}"
+                                    title="Editar"><i class="ti ti-pencil"></i></button>
+                                <form action="{{ route('suppliers.sirocs.destroy', [$s->supplier, $s]) }}" method="POST" class="js-del-form d-inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="ti ti-trash"></i></button>
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -230,8 +220,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 text: 'Esta acción no se puede deshacer.',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Sí, eliminar',
-                cancelButtonText: 'Cancelar'
+                confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+                cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+                customClass: {
+                    confirmButton: 'btn btn-danger',
+                    cancelButton: 'btn btn-secondary'
+                },
+                buttonsStyling: false,
+                reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
                     fetch(form.action, {
@@ -249,7 +245,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             icon: 'success',
                             title: json.message || 'Eliminado',
                             timer: 1500,
-                            showConfirmButton: false
+                            showConfirmButton: false,
+                            customClass: { confirmButton: 'btn btn-primary' },
+                            buttonsStyling: false
                         }).then(() => {
                             window.location.reload();
                         });
@@ -258,7 +256,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: 'No se pudo eliminar el SIROC.'
+                            text: 'No se pudo eliminar el SIROC.',
+                            customClass: { confirmButton: 'btn btn-primary' },
+                            buttonsStyling: false
                         });
                     });
                 }
@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const s = form.start_date.value;
         const x = form.end_date.value;
         if (s && x && x < s) {
-            Swal.fire({icon:'warning', title:'Revisa las fechas', text:'La fecha de término debe ser >= inicio.'});
+            Swal.fire({ icon: 'warning', title: 'Revisa las fechas', text: 'La fecha de término debe ser >= inicio.', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
             return;
         }
 
@@ -363,10 +363,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     const list = Object.values(json.errors).flat().map(e => `<li>${e}</li>`).join('');
                     errBox.classList.remove('d-none');
                     errBox.innerHTML = `<ul class="mb-0">${list}</ul>`;
-                    Swal.fire({icon:'error', title:'Datos inválidos', html:`<ul class="text-start">${list}</ul>`});
+                    Swal.fire({icon:'error', title:'Datos inválidos', html:`<ul class="text-start">${list}</ul>`, customClass:{confirmButton:'btn btn-primary'}, buttonsStyling:false});
                     return;
                 }
-                Swal.fire({icon:'error', title:'Error', text: json?.message || 'No se pudo actualizar.'});
+                Swal.fire({icon:'error', title:'Error', text: json?.message || 'No se pudo actualizar.', customClass:{confirmButton:'btn btn-primary'}, buttonsStyling:false});
                 return;
             }
 
@@ -400,12 +400,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 editBtn.dataset.fileUrl        = d.siroc_file_url || '';
             }
 
-            Swal.fire({icon:'success', title:'Actualizado', timer:1600, showConfirmButton:false});
+            Swal.fire({icon:'success', title:'Actualizado', timer:1600, showConfirmButton:false, customClass:{confirmButton:'btn btn-primary'}, buttonsStyling:false});
             modal.hide();
 
         } catch (err) {
             console.error(err);
-            Swal.fire({icon:'error', title:'Error de red', text:'No se pudo conectar con el servidor.'});
+            Swal.fire({icon:'error', title:'Error de red', text:'No se pudo conectar con el servidor.', customClass:{confirmButton:'btn btn-primary'}, buttonsStyling:false});
         } finally {
             setLoading(false);
             // Limpia el file input

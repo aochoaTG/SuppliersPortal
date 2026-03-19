@@ -83,28 +83,14 @@
                             @endforeach
                         </div>
                     </div>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <i class="ti ti-dots-vertical"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="javascript:void(0);" onclick="openUserModal('{{ route('users.edit', $user->id) }}')">
-                                <i class="ti ti-edit me-2"></i>Editar usuario
-                            </a></li>
-                            @if($user->is_active)
-                                <li><a class="dropdown-item text-warning" href="#" onclick="toggleUserStatus({{ $user->id }}, false)">
-                                    <i class="ti ti-player-pause me-2"></i>Desactivar
-                                </a></li>
-                            @else
-                                <li><a class="dropdown-item text-success" href="#" onclick="toggleUserStatus({{ $user->id }}, true)">
-                                    <i class="ti ti-player-play me-2"></i>Activar
-                                </a></li>
-                            @endif
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteUser({{ $user->id }})">
-                                <i class="ti ti-trash me-2"></i>Eliminar
-                            </a></li>
-                        </ul>
+                    <div class="d-flex gap-1">
+                        <a href="javascript:void(0);" class="btn btn-outline-primary" onclick="openUserModal('{{ route('users.edit', $user->id) }}')" title="Editar usuario"><i class="ti ti-pencil"></i></a>
+                        @if($user->is_active)
+                            <a href="#" class="btn btn-outline-warning" onclick="toggleUserStatus({{ $user->id }}, false)" title="Desactivar"><i class="ti ti-player-pause"></i></a>
+                        @else
+                            <a href="#" class="btn btn-outline-success" onclick="toggleUserStatus({{ $user->id }}, true)" title="Activar"><i class="ti ti-player-play"></i></a>
+                        @endif
+                        <a href="#" class="btn btn-outline-danger" onclick="deleteUser({{ $user->id }})" title="Eliminar"><i class="ti ti-trash"></i></a>
                     </div>
                 </div>
             </div>

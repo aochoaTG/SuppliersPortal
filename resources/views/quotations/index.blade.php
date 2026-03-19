@@ -18,7 +18,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover table-centered mb-0" id="approvals-table">
+                    <table class="table-bordered table-hover w-100 table" id="approvals-table">
                         <thead class="table-light">
                             <tr>
                                 <th>Fecha Req.</th>
@@ -194,7 +194,6 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     function setDecision(status) {
         const reasonField = $('#rejection_reason');
@@ -202,12 +201,12 @@
         if(status === 'rejected') {
             if ($('#rejection_area').is(':hidden')) {
                 $('#rejection_area').slideDown();
-                Swal.fire('Atención', 'Por favor escriba el motivo del rechazo en el campo rojo.', 'info');
+                Swal.fire({ icon: 'info', title: 'Atención', text: 'Por favor escriba el motivo del rechazo en el campo rojo.', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 return;
             }
-            
+
             if(reasonField.val().trim().length < 10) {
-                Swal.fire('Atención', 'Debe proporcionar un motivo de rechazo detallado (mín. 10 caracteres).', 'warning');
+                Swal.fire({ icon: 'warning', title: 'Atención', text: 'Debe proporcionar un motivo de rechazo detallado (mín. 10 caracteres).', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 reasonField.addClass('is-invalid');
                 return;
             }
@@ -232,10 +231,14 @@
                 </ul>`,
             icon: status === 'approved' ? 'success' : 'warning',
             showCancelButton: true,
-            confirmButtonText: status === 'approved' ? 'Sí, Generar Orden de Compra' : 'Sí, Rechazar y Devolver',
-            cancelButtonText: 'Regresar',
-            confirmButtonColor: status === 'approved' ? '#1bb99a' : '#f05050',
-            cancelButtonColor: '#4c5667',
+            confirmButtonText: status === 'approved' ? '<i class="ti ti-check me-1"></i>Sí, Generar Orden de Compra' : '<i class="ti ti-arrow-back-up me-1"></i>Sí, Rechazar y Devolver',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Regresar',
+            customClass: {
+                confirmButton: status === 'approved' ? 'btn btn-success' : 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true,
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({ 

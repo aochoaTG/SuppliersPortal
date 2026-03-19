@@ -97,93 +97,35 @@ class AnnualBudgetController extends Controller
                 $deleteUrl = route('annual_budgets.destroy', $row->id);
                 $showUrl = route('annual_budgets.show', $row->id);
 
-                // Iniciar dropdown
-                $dropdown = '
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                            Acciones
-                        </button>
-                        <ul class="dropdown-menu">
-                ';
-
-                // ===== OPCIÓN: VER DETALLE =====
-                $dropdown .= '
-                            <li>
-                                <a class="dropdown-item" href="' . $showUrl . '">
-                                    <i class="ti ti-eye me-2"></i> Ver detalle
-                                </a>
-                            </li>
-                ';
+                $dropdown = '<div class="d-flex justify-content-end gap-1">'
+                    . '<a class="btn btn-sm btn-outline-secondary" href="' . $showUrl . '" title="Ver detalle"><i class="ti ti-eye"></i></a>';
 
                 // ===== OPCIÓN: DISTRIBUCIONES MENSUALES =====
                 if ($row->monthly_distributions_count > 0) {
-                    // Si ya tiene distribuciones, mostrar opción para ver/editar
                     $distributionsUrl = route('budget_monthly_distributions.edit', $row->id);
-                    $dropdown .= '
-                            <li>
-                                <a class="dropdown-item" href="' . $distributionsUrl . '">
-                                    <i class="ti ti-calendar-stats me-2"></i> Ver/Editar Distribuciones
-                                </a>
-                            </li>
-                    ';
+                    $dropdown .= '<a class="btn btn-sm btn-outline-secondary" href="' . $distributionsUrl . '" title="Ver/Editar Distribuciones"><i class="ti ti-calendar-stats"></i></a>';
                 } elseif ($row->status === 'PLANIFICACION') {
-                    // Si no tiene distribuciones y está en PLANIFICACION, mostrar opción para crear
                     $distributionsUrl = route('budget_monthly_distributions.create', $row->id);
-                    $dropdown .= '
-                            <li>
-                                <a class="dropdown-item" href="' . $distributionsUrl . '">
-                                    <i class="ti ti-calendar-plus me-2"></i> Crear Distribuciones
-                                </a>
-                            </li>
-                    ';
-                }
-
-                // ===== SEPARADOR (si hay opciones de edición/eliminación) =====
-                if ($row->status === 'PLANIFICACION') {
-                    $dropdown .= '<li><hr class="dropdown-divider"></li>';
+                    $dropdown .= '<a class="btn btn-sm btn-outline-secondary" href="' . $distributionsUrl . '" title="Crear Distribuciones"><i class="ti ti-calendar-plus"></i></a>';
                 }
 
                 // ===== OPCIÓN: EDITAR =====
                 if ($row->status === 'PLANIFICACION') {
-                    $dropdown .= '
-                            <li>
-                                <a class="dropdown-item" href="' . $editUrl . '">
-                                    <i class="ti ti-edit me-2"></i> Editar
-                                </a>
-                            </li>
-                    ';
+                    $dropdown .= '<a class="btn btn-sm btn-outline-primary" href="' . $editUrl . '" title="Editar"><i class="ti ti-pencil"></i></a>';
                 }
 
                 // ===== OPCIÓN: APROBAR =====
                 if ($row->status === 'PLANIFICACION') {
                     $approveUrl = route('annual_budgets.approve', $row->id);
-                    $dropdown .= '
-                            <li>
-                                <a class="dropdown-item text-success" href="' . $approveUrl . '">
-                                    <i class="ti ti-check me-2"></i> Aprobar
-                                </a>
-                            </li>
-                    ';
+                    $dropdown .= '<a class="btn btn-sm btn-outline-success" href="' . $approveUrl . '" title="Aprobar"><i class="ti ti-check"></i></a>';
                 }
 
                 // ===== OPCIÓN: ELIMINAR =====
-                $dropdown .= '
-                            <li>
-                                <form action="' . $deleteUrl . '" method="POST" class="js-delete-form">
-                                    ' . csrf_field() . method_field('DELETE') . '
-                                    <button type="button" class="dropdown-item text-danger js-delete-btn"
-                                            data-entity="Presupuesto ' . $row->fiscal_year . '">
-                                        <i class="ti ti-trash me-2"></i> Eliminar
-                                    </button>
-                                </form>
-                            </li>
-                    ';
-
-                // Cerrar dropdown
-                $dropdown .= '
-                        </ul>
-                    </div>
-                ';
+                $dropdown .= '<form action="' . $deleteUrl . '" method="POST" class="js-delete-form d-inline">'
+                    . csrf_field() . method_field('DELETE')
+                    . '<button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-entity="Presupuesto ' . $row->fiscal_year . '" title="Eliminar"><i class="ti ti-trash"></i></button>'
+                    . '</form>'
+                    . '</div>';
 
                 return $dropdown;
             })

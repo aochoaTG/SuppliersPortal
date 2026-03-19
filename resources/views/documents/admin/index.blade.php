@@ -47,8 +47,8 @@
 
 @section('page.title','Revisión de documentos')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Administración</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item">Administración</li>
     <li class="breadcrumb-item active">Revisión</li>
 @endsection
 
@@ -115,8 +115,8 @@
                     <span class="text-muted small"></span>
                 </div>
                 <div class="card-body">
-                    <table class="table table-sm table-striped align-middle w-100">
-                        <thead>
+                    <table class="table-bordered table-hover w-100 table">
+                        <thead class="table-light">
                             <tr>
                                 <th>Proveedor</th>
                                 <th>RFC</th>
@@ -150,38 +150,11 @@
                                     <td>{{ optional($doc->uploaded_at ?? $doc->created_at)->format('Y-m-d H:i') }}</td>
                                     <td>{!! badge_status($doc->status) !!}</td>
                                     <td>
-                                        <div class="btn-group">
-                                            <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
-                                                    data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="ti ti-settings"></i> Acciones
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end">
-                                                <li>
-                                                    <a class="dropdown-item" href="{{ $url }}" target="_blank">
-                                                        <i class="ti ti-eye me-1"></i> Abrir
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item js-accept-doc"
-                                                    href="javascript:void(0);"
-                                                    data-url="{{ route('admin.review.documents.accept', $doc) }}">
-                                                        <i class="ti ti-check me-1 text-success"></i> Aprobar
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item js-reject-doc"
-                                                    href="javascript:void(0);"
-                                                    data-url="{{ route('admin.review.documents.reject', $doc) }}">
-                                                        <i class="ti ti-x me-1 text-danger"></i> Rechazar
-                                                    </a>
-                                                </li>
-                                                {{-- Retroalimentación: SIEMPRE visible --}}
-                                                <li>
-                                                    <a class="dropdown-item js-feedback-doc" href="javascript:void(0);" data-url="{{ $feedbackUrl }}" data-supplier="{{ $prov->id }}" data-type="{{ $type }}" data-doc="{{ $doc->id ?? '' }}">
-                                                        <i class="ti ti-message-dots me-1"></i> Retroalimentación
-                                                    </a>
-                                                </li>
-                                            </ul>
+                                        <div class="d-flex justify-content-end gap-1">
+                                            <a href="{{ $url }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Abrir"><i class="ti ti-eye"></i></a>
+                                            <a href="javascript:void(0);" class="btn btn-sm btn-outline-success js-accept-doc" data-url="{{ route('admin.review.documents.accept', $doc) }}" title="Aprobar"><i class="ti ti-check"></i></a>
+                                            <a href="javascript:void(0);" class="btn btn-sm btn-outline-danger js-reject-doc" data-url="{{ route('admin.review.documents.reject', $doc) }}" title="Rechazar"><i class="ti ti-x"></i></a>
+                                            <a href="javascript:void(0);" class="btn btn-sm btn-outline-info js-feedback-doc" data-url="{{ $feedbackUrl }}" data-supplier="{{ $prov->id }}" data-type="{{ $type }}" data-doc="{{ $doc->id ?? '' }}" title="Retroalimentación"><i class="ti ti-message-dots"></i></a>
                                         </div>
                                     </td>
                                 </tr>
@@ -215,8 +188,8 @@
                     <span class="text-muted small"></span>
                 </div>
                 <div class="card-body">
-                    <table class="table table-sm table-striped align-middle w-100">
-                        <thead>
+                    <table class="table-bordered table-hover w-100 table">
+                        <thead class="table-light">
                             <tr>
                                 <th>Proveedor</th>
                                 <th>RFC</th>
@@ -311,8 +284,14 @@ $(function () {
             text: "Esta acción no se puede deshacer.",
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Sí, aprobar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-check me-1"></i>Sí, aprobar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-success',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then(res => {
             if (!res.isConfirmed) return;
 
@@ -320,7 +299,7 @@ $(function () {
             .done(function (json) {
                 // Actualiza la fila visualmente
                 $row.find('td:nth-child(6)').html('<span class="badge bg-success">Aprobado</span>'); // asumiendo col 6 = Status
-                Swal.fire({ icon: 'success', title: 'Aprobado', timer: 1400, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Aprobado', timer: 1400, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
 
                 // ACEPTAR
                 let pendientes = parseInt($('#kpiPendientes').text());
@@ -330,7 +309,7 @@ $(function () {
                 $('#kpiAprobadosHoy').text(aprobados + 1);
             })
             .fail(function (xhr) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo aprobar.' });
+                Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo aprobar.', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 console.error(xhr?.responseText || xhr);
             });
         });
@@ -349,8 +328,14 @@ $(function () {
             inputPlaceholder: 'Escribe el motivo…',
             inputAttributes: { 'aria-label': 'Motivo de rechazo' },
             showCancelButton: true,
-            confirmButtonText: 'Rechazar',
-            cancelButtonText: 'Cancelar',
+            confirmButtonText: '<i class="ti ti-x me-1"></i>Rechazar',
+            cancelButtonText: '<i class="ti ti-arrow-back me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true,
             preConfirm: (reason) => {
                 if (!reason || reason.trim().length < 5) {
                     Swal.showValidationMessage('El motivo es obligatorio (mín. 5 caracteres).');
@@ -365,7 +350,7 @@ $(function () {
                 // Actualiza la fila visualmente
                 $row.find('td:nth-child(6)').html('<span class="badge bg-danger">Rechazado</span>');
                 // Si tienes una columna de motivo (o tooltip), podrías añadirlo aquí
-                Swal.fire({ icon: 'success', title: 'Rechazado', timer: 1400, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Rechazado', timer: 1400, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
 
                 // RECHAZAR
                 let pendientes = parseInt($('#kpiPendientes').text());
@@ -379,7 +364,7 @@ $(function () {
                 if (xhr.status === 422 && xhr.responseJSON?.errors?.reason) {
                     msg = xhr.responseJSON.errors.reason.join('\n');
                 }
-                Swal.fire({ icon: 'error', title: 'Error', text: msg });
+                Swal.fire({ icon: 'error', title: 'Error', text: msg, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 console.error(xhr?.responseText || xhr);
             });
         });
@@ -411,8 +396,14 @@ $(document).on('click', '.js-feedback-doc', function (e) {
         `,
         focusConfirm: false,
         showCancelButton: true,
-        confirmButtonText: 'Enviar',
-        cancelButtonText: 'Cancelar',
+        confirmButtonText: '<i class="ti ti-send me-1"></i>Enviar',
+        cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-secondary'
+        },
+        buttonsStyling: false,
+        reverseButtons: true,
         preConfirm: () => {
             const message = document.getElementById('swal-feedback-message').value || '';
             if (message.trim().length < 5) {
@@ -426,14 +417,14 @@ $(document).on('click', '.js-feedback-doc', function (e) {
 
         $.post(url, { feedback: res.value.message, doc_id: docId, type: type })
             .done(() => {
-                Swal.fire({ icon: 'success', title: 'Enviado', text: 'La retroalimentación fue enviada al proveedor.', timer: 1600, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: 'Enviado', text: 'La retroalimentación fue enviada al proveedor.', timer: 1600, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
             })
             .fail(xhr => {
                 let msg = 'No se pudo enviar la retroalimentación.';
                 if (xhr.status === 422 && xhr.responseJSON?.errors?.message) {
                     msg = xhr.responseJSON.errors.message.join('\n');
                 }
-                Swal.fire({ icon: 'error', title: 'Error', text: msg });
+                Swal.fire({ icon: 'error', title: 'Error', text: msg, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                 console.error(xhr?.responseText || xhr);
             });
     });

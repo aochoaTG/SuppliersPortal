@@ -168,7 +168,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered" id="rfqsTable" style="width:100%">
+                        <table class="table-bordered table-hover w-100 table" id="rfqsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th width="10%">Folio</th>
@@ -196,10 +196,6 @@
 @endsection
 
 @push('styles')
-<!-- DataTables CSS -->
-<link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-<link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
-
 <style>
 .status-badge {
     font-size: 0.85rem;
@@ -232,12 +228,6 @@
 @endpush
 
 @push('scripts')
-<!-- DataTables JS -->
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-
 <script>
 $(document).ready(function() {
     console.log('🎨 Inicializando RFQs DataTable');
@@ -248,6 +238,19 @@ $(document).ready(function() {
     const table = $('#rfqsTable').DataTable({
         processing: true,
         serverSide: true,
+        dom: '<"top"Bf>rt<"bottom"lip>',
+        buttons: [
+            {
+                extend: 'excel',
+                text: '<i class="ti ti-file-spreadsheet me-1"></i> Excel',
+                className: 'btn btn-success btn-sm'
+            },
+            {
+                extend: 'copy',
+                text: '<i class="ti ti-copy me-1"></i> Copiar',
+                className: 'btn btn-warning btn-sm'
+            }
+        ],
         ajax: {
             url: '{{ route('rfq.datatable') }}',
             data: function(d) {
@@ -319,12 +322,12 @@ $(document).ready(function() {
                 className: 'text-center',
                 orderable: false
             },
-            { 
-                data: 'action', 
-                name: 'action', 
-                orderable: false, 
+            {
+                data: 'action',
+                name: 'action',
+                orderable: false,
                 searchable: false,
-                className: 'text-center'
+                className: 'text-end'
             }
         ],
         order: [[0, 'desc']],
@@ -414,12 +417,17 @@ $(document).ready(function() {
             icon: 'question',
             title: '¿Confirmar envío?',
             html: `¿Estás seguro de enviar la solicitud <strong>${folio}</strong>?<br>
-                ${emailsHtml}`, // Insertamos la lista aquí
+                ${emailsHtml}`,
             showCancelButton: true,
-            confirmButtonText: '<i class="ti ti-send me-2"></i>Sí, enviar',
-            cancelButtonText: 'Revisar',
-            confirmButtonColor: '#198754', // Color success de Bootstrap
-            width: '450px' // Un poco más ancho para que la lista luzca bien
+            confirmButtonText: '<i class="ti ti-send me-1"></i>Sí, enviar',
+            cancelButtonText: '<i class="ti ti-arrow-back me-1"></i>Revisar',
+            customClass: {
+                confirmButton: 'btn btn-success',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true,
+            width: '450px'
         }).then((result) => {
             if (result.isConfirmed) {
                 sendRFQ(rfqId);
@@ -462,7 +470,9 @@ $(document).ready(function() {
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: xhr.responseJSON?.message || 'No se pudo enviar la RFQ'
+                    text: xhr.responseJSON?.message || 'No se pudo enviar la RFQ',
+                    customClass: { confirmButton: 'btn btn-primary' },
+                    buttonsStyling: false
                 });
             }
         });
@@ -481,9 +491,14 @@ $(document).ready(function() {
             input: 'textarea',
             inputPlaceholder: 'Motivo de cancelación (opcional)',
             showCancelButton: true,
-            confirmButtonText: 'Sí, cancelar',
-            cancelButtonText: 'No',
-            confirmButtonColor: '#dc3545'
+            confirmButtonText: '<i class="ti ti-ban me-1"></i>Sí, cancelar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>No',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 cancelRFQ(rfqId, result.value);
@@ -518,7 +533,9 @@ $(document).ready(function() {
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: xhr.responseJSON?.message || 'No se pudo cancelar la RFQ'
+                    text: xhr.responseJSON?.message || 'No se pudo cancelar la RFQ',
+                    customClass: { confirmButton: 'btn btn-primary' },
+                    buttonsStyling: false
                 });
             }
         });

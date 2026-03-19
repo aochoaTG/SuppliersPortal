@@ -77,88 +77,50 @@ class ProductServiceController extends Controller
                 $canReject = $p->status === ProductServiceStatus::PENDING->value;
                 $canReactivate = $p->status === ProductServiceStatus::INACTIVE->value;
 
-                $html = '<div class="dropdown">
-                    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="ti ti-dots-vertical"></i> Acciones
-                    </button>
-                    <ul class="dropdown-menu">';
-
-                $html .= '<li>
-                    <a class="dropdown-item" href="' . $showUrl . '">
-                        <i class="ti ti-eye me-2"></i>Ver
-                    </a>
-                </li>';
+                $html = '<div class="d-flex justify-content-end gap-1">'
+                    . '<a class="btn btn-sm btn-outline-secondary" href="' . $showUrl . '" title="Ver"><i class="ti ti-eye"></i></a>';
 
                 if ($canEdit) {
-                    $html .= '<li>
-                        <a class="dropdown-item" href="' . $editUrl . '">
-                            <i class="ti ti-edit me-2"></i>Editar
-                        </a>
-                    </li>';
+                    $html .= '<a class="btn btn-sm btn-outline-primary" href="' . $editUrl . '" title="Editar"><i class="ti ti-pencil"></i></a>';
                 }
-
-                $html .= '<li><hr class="dropdown-divider"></li>';
 
                 // Acciones de estado (solo para Administrador del Catálogo)
                 if (auth()->check() && auth()->user()->hasRole(['catalog_admin', 'superadmin'])) {
                     if ($canActivate) {
                         $approveUrl = route('products-services.approve', $p->id);
-                        $html .= '<li>
-                            <form action="' . $approveUrl . '" method="POST" class="js-approve-form">
-                                ' . csrf_field() . '
-                                <button type="submit" class="dropdown-item text-success">
-                                    <i class="ti ti-check me-2"></i>Aprobar
-                                </button>
-                            </form>
-                        </li>';
+                        $html .= '<form action="' . $approveUrl . '" method="POST" class="js-approve-form d-inline">'
+                            . csrf_field()
+                            . '<button type="submit" class="btn btn-sm btn-outline-success" title="Aprobar"><i class="ti ti-check"></i></button>'
+                            . '</form>';
                     }
 
                     if ($canReject) {
                         $rejectUrl = route('products-services.reject', $p->id);
-                        $html .= '<li>
-                            <a class="dropdown-item text-warning js-reject-btn" href="#" data-url="' . $rejectUrl . '" data-entity="' . $p->code . '">
-                                <i class="ti ti-x me-2"></i>Rechazar
-                            </a>
-                        </li>';
+                        $html .= '<a class="btn btn-sm btn-outline-warning js-reject-btn" href="#" data-url="' . $rejectUrl . '" data-entity="' . $p->code . '" title="Rechazar"><i class="ti ti-x"></i></a>';
                     }
 
                     if ($canDeactivate) {
                         $deactivateUrl = route('products-services.deactivate', $p->id);
-                        $html .= '<li>
-                            <form action="' . $deactivateUrl . '" method="POST">
-                                ' . csrf_field() . '
-                                <button type="submit" class="dropdown-item text-secondary">
-                                    <i class="ti ti-circle-off me-2"></i>Desactivar
-                                </button>
-                            </form>
-                        </li>';
+                        $html .= '<form action="' . $deactivateUrl . '" method="POST" class="d-inline">'
+                            . csrf_field()
+                            . '<button type="submit" class="btn btn-sm btn-outline-secondary" title="Desactivar"><i class="ti ti-circle-off"></i></button>'
+                            . '</form>';
                     }
 
                     if ($canReactivate) {
                         $reactivateUrl = route('products-services.reactivate', $p->id);
-                        $html .= '<li>
-                            <form action="' . $reactivateUrl . '" method="POST">
-                                ' . csrf_field() . '
-                                <button type="submit" class="dropdown-item text-success">
-                                    <i class="ti ti-circle-check me-2"></i>Reactivar
-                                </button>
-                            </form>
-                        </li>';
+                        $html .= '<form action="' . $reactivateUrl . '" method="POST" class="d-inline">'
+                            . csrf_field()
+                            . '<button type="submit" class="btn btn-sm btn-outline-success" title="Reactivar"><i class="ti ti-circle-check"></i></button>'
+                            . '</form>';
                     }
-
-                    $html .= '<li><hr class="dropdown-divider"></li>';
                 }
 
-                $html .= '<li>
-                    <form action="' . $deleteUrl . '" method="POST" class="js-delete-form">
-                        ' . csrf_field() . method_field('DELETE') . '
-                        <button type="button" class="dropdown-item text-danger js-delete-btn" data-entity="' . $p->code . '">
-                            <i class="ti ti-trash me-2"></i>Eliminar
-                        </button>
-                    </form>
-                </li>';
-
-                $html .= '</ul></div>';
+                $html .= '<form action="' . $deleteUrl . '" method="POST" class="js-delete-form d-inline">'
+                    . csrf_field() . method_field('DELETE')
+                    . '<button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-entity="' . $p->code . '" title="Eliminar"><i class="ti ti-trash"></i></button>'
+                    . '</form>'
+                    . '</div>';
 
                 return $html;
             })

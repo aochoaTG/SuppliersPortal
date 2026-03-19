@@ -204,10 +204,11 @@ Route::middleware(['auth', 'lock'])->group(function () {
     Route::resource('companies', CompanyController::class)->except(['show']);
 
     Route::get('stations/datatable', [StationController::class, 'datatable'])->name('stations.datatable');
-    Route::resource('stations', StationController::class)->except(['show']);
+    Route::resource('stations', StationController::class);
     Route::post('stations/{station}/toggle-active', [StationController::class, 'toggleActive'])->name('stations.toggle-active');
     Route::post('stations/{station}/link-company', [StationController::class, 'linkCompany'])->name('stations.link-company');
 
+    Route::get('taxes/datatable', [TaxController::class, 'datatable'])->name('taxes.datatable');
     Route::resource('taxes', TaxController::class)->except(['show']);
 
     Route::get('categories/datatable', [CategoryController::class, 'datatable'])->name('categories.datatable');
@@ -217,6 +218,7 @@ Route::middleware(['auth', 'lock'])->group(function () {
     Route::get('cost-centers/api/companies/{company}/cost-centers', [CostCenterController::class, 'byCompany'])->name('cost-centers.api.by-company');
     Route::resource('cost-centers', CostCenterController::class)->except(['show'])->parameters(['cost-centers' => 'cost_center']);
 
+    Route::get('departments/datatable', [DepartmentController::class, 'datatable'])->name('departments.datatable');
     Route::resource('departments', DepartmentController::class)->except(['show']);
 
     // ========================================================================

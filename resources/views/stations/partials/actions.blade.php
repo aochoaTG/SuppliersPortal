@@ -1,33 +1,16 @@
-<div class="btn-group">
-    <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="ti ti-dots-vertical"></i> Acciones
-    </button>
-    <ul class="dropdown-menu dropdown-menu-end">
-        {{-- Ver --}}
-        <li>
-            <a href="{{ route('stations.show', $s->id) }}" class="dropdown-item" target="_blank">
-                <i class="ti ti-eye me-1"></i> Ver
-            </a>
-        </li>
+<div class="d-flex justify-content-end gap-1">
+    {{-- Ver --}}
+    <a href="{{ route('stations.show', $s->id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" title="Ver"><i class="ti ti-eye"></i></a>
 
-        {{-- Editar (abre modal por AJAX) --}}
-        <li>
-            <a href="javascript:void(0);" class="dropdown-item js-open-station-modal"
-                data-url="{{ route('stations.edit', $s->id) }}">
-                <i class="ti ti-edit me-1"></i> Editar
-            </a>
-        </li>
+    {{-- Editar (abre modal por AJAX) --}}
+    <a href="javascript:void(0);" class="btn btn-sm btn-outline-primary js-open-station-modal"
+        data-url="{{ route('stations.edit', $s->id) }}" title="Editar"><i class="ti ti-pencil"></i></a>
 
-        {{-- Activar / Desactivar (POST) --}}
-        <li>
-            <form method="POST" action="{{ route('stations.toggle-active', $s->id) }}"
-                class="js-toggle-station-active">
-                @csrf
-                <button type="submit" class="dropdown-item">
-                    <i class="ti {{ $s->is_active ? 'ti-toggle-left' : 'ti-toggle-right' }} me-1"></i>
-                    {{ $s->is_active ? 'Desactivar' : 'Activar' }}
-                </button>
-            </form>
-        </li>
-    </ul>
+    {{-- Activar / Desactivar (POST) --}}
+    <form method="POST" action="{{ route('stations.toggle-active', $s->id) }}" class="js-toggle-station-active d-inline">
+        @csrf
+        <button type="submit" class="btn btn-sm btn-outline-warning" title="{{ $s->is_active ? 'Desactivar' : 'Activar' }}">
+            <i class="ti {{ $s->is_active ? 'ti-toggle-left' : 'ti-toggle-right' }}"></i>
+        </button>
+    </form>
 </div>

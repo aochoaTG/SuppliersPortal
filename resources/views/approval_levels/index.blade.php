@@ -17,7 +17,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover table-centered w-100" id="approval-levels-table">
+                    <table class="table-bordered table-hover w-100 table" id="approval-levels-table">
                         <thead class="table-light">
                             <tr>
                                 <th style="width: 50px;">Nivel</th>
@@ -44,7 +44,20 @@
         $('#approval-levels-table').DataTable({
             processing: true,
             serverSide: false,
-            data: @json($levels), 
+            dom: '<"top"Bf>rt<"bottom"lip>',
+            buttons: [
+                {
+                    extend: 'excel',
+                    text: '<i class="ti ti-file-spreadsheet me-1"></i> Excel',
+                    className: 'btn btn-success btn-sm'
+                },
+                {
+                    extend: 'copy',
+                    text: '<i class="ti ti-copy me-1"></i> Copiar',
+                    className: 'btn btn-warning btn-sm'
+                }
+            ],
+            data: @json($levels),
             columns: [
                 { data: 'level_number', className: 'fw-bold text-center' },
                 { data: 'label', className: 'fw-semibold' },
@@ -87,7 +100,7 @@
                 }
             ],
             language: {
-                url: 'https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
+                url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"
             },
             drawCallback: function() {
                 $('.dataTables_paginate > .pagination').addClass('pagination-rounded');

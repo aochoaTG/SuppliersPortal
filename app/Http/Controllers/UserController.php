@@ -537,22 +537,11 @@ class UserController extends Controller
             $docsUrl   = route('admin.review.suppliers.show', $row->supplier_id);
 
             $acciones = <<<HTML
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                        <i class="ti ti-dots-vertical"></i> Acciones
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a href="{$editUrl}" class="dropdown-item js-open-user-modal" data-url="{$editUrl}">
-                            <i class="ti ti-pencil me-2"></i> Editar</a></li>
-                        <li><a href="#" class="dropdown-item js-toggle-active" data-url="{$toggleUrl}">
-                            <i class="ti ti-switch-2 me-2"></i> Activar/Desactivar</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a href="{$docsUrl}" class="dropdown-item" target="_blank">
-                            <i class="ti ti-file-description me-2"></i> Revisar documentos</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a href="#" class="dropdown-item text-danger js-delete-user" data-url="{$delUrl}" data-name="{$row->company_name}">
-                            <i class="ti ti-trash me-2"></i> Eliminar</a></li>
-                    </ul>
+                <div class="d-flex justify-content-end gap-1">
+                    <a href="{$editUrl}" class="btn btn-sm btn-outline-primary js-open-user-modal" data-url="{$editUrl}" title="Editar"><i class="ti ti-pencil"></i></a>
+                    <a href="#" class="btn btn-sm btn-outline-secondary js-toggle-active" data-url="{$toggleUrl}" title="Activar/Desactivar"><i class="ti ti-switch-2"></i></a>
+                    <a href="{$docsUrl}" class="btn btn-sm btn-outline-info" target="_blank" title="Revisar documentos"><i class="ti ti-file-description"></i></a>
+                    <a href="#" class="btn btn-sm btn-outline-danger js-delete-user" data-url="{$delUrl}" data-name="{$row->company_name}" title="Eliminar"><i class="ti ti-trash"></i></a>
                 </div>
                 HTML;
 

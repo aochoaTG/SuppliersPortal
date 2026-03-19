@@ -1,7 +1,6 @@
 @extends('layouts.zircos')
 
 @section('title', 'Ubicaciones de Recepción')
-
 @section('page.title', 'Ubicaciones de Recepción')
 
 @section('page.breadcrumbs')
@@ -12,28 +11,30 @@
 @section('content')
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Ubicaciones de Recepción</h5>
-        @can('create', App\Models\ReceivingLocation::class)
-            <a href="{{ route('receiving-locations.create') }}" class="btn btn-primary btn-sm">
-                <i class="fas fa-plus me-1"></i> Nueva Ubicación
-            </a>
-        @endcan
+        <h5 class="mb-0"><i class="ti ti-map-pin me-1"></i> Ubicaciones de Recepción</h5>
     </div>
     <div class="card-body">
+        @if (session('success'))
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="ti ti-check"></i> {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
         <div class="table-responsive">
-            <table id="receiving-locations-table" class="table table-sm table-striped align-middle w-100">
-                <thead>
+            <table id="receiving-locations-table" class="table-bordered table-hover w-100 table">
+                <thead class="table-light">
                     <tr>
-                        <th>ID</th>
+                        <th style="width: 60px;">ID</th>
                         <th>Código</th>
                         <th>Nombre</th>
                         <th>Tipo</th>
                         <th>Ciudad</th>
                         <th>Responsable</th>
-                        <th>Estado</th>
-                        <th>Portal</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Portal</th>
                         <th>Creado</th>
-                        <th>Acciones</th>
+                        <th class="text-end" style="width: 160px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -51,22 +52,56 @@ $(document).ready(function() {
     });
 
     var table = $('#receiving-locations-table').DataTable({
-        ajax: "{{ route('receiving-locations.data') }}",
+        processing: true,
+        dom: '<"top"Bf>rt<"bottom"lip>',
+        pageLength: 100,
+        buttons: [
+            @can('create', App\Models\ReceivingLocation::class)
+            {
+                text: '<i class="ti ti-plus me-1"></i> Nueva Ubicación',
+                className: 'btn btn-primary btn-sm',
+                action: function() {
+                    window.location.href = "{{ route('receiving-locations.create') }}";
+                }
+            },
+            @endcan
+            {
+                extend: 'excel',
+                text: '<i class="ti ti-file-spreadsheet me-1"></i> Excel',
+                className: 'btn btn-success btn-sm'
+            },
+            {
+                extend: 'copy',
+                text: '<i class="ti ti-copy me-1"></i> Copiar',
+                className: 'btn btn-warning btn-sm'
+            },
+            {
+                extend: 'pdf',
+                text: '<i class="ti ti-file-text me-1"></i> PDF',
+                className: 'btn btn-info btn-sm',
+                orientation: 'landscape',
+                pageSize: 'A4'
+            }
+        ],
+        ajax: {
+            url: "{{ route('receiving-locations.data') }}",
+            error: function(xhr) {
+                console.error('Error en DataTable:', xhr.responseText);
+            }
+        },
         columns: [
-            { data: 'id',              name: 'id' },
-            { data: 'code',            name: 'code' },
-            { data: 'name',            name: 'name' },
-            { data: 'type',            name: 'type' },
-            { data: 'city',            name: 'city' },
-            { data: 'manager_name',    name: 'manager_name' },
-            { data: 'is_active',       name: 'is_active' },
-            { data: 'portal_blocked',  name: 'portal_blocked' },
-            { data: 'created_at',      name: 'created_at' },
-            { data: 'action',          name: 'action' }
+            { data: 'id',           name: 'id',           width: '60px' },
+            { data: 'code',         name: 'code' },
+            { data: 'name',         name: 'name' },
+            { data: 'type',         name: 'type' },
+            { data: 'city',         name: 'city' },
+            { data: 'manager_name', name: 'manager_name' },
+            { data: 'is_active',    name: 'is_active',      orderable: false, searchable: false, className: 'text-center' },
+            { data: 'portal_blocked', name: 'portal_blocked', orderable: false, searchable: false, className: 'text-center' },
+            { data: 'created_at',   name: 'created_at' },
+            { data: 'action',       name: 'action',         orderable: false, searchable: false, className: 'text-end' }
         ],
         order: [[1, 'asc']],
-        // Mostrar los 100 primeros registros
-        lengthMenu: [100, 200, 500],
         language: {
             url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"
         },
@@ -82,13 +117,17 @@ $(document).ready(function() {
 
         Swal.fire({
             title: '¿Estás seguro?',
-            text: `¿Eliminar la ubicación "${name}"?`,
+            text: `Se eliminará: ${name}`,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -97,14 +136,32 @@ $(document).ready(function() {
                     data: { _method: 'DELETE' },
                     success: function(response) {
                         if (response.success) {
-                            Swal.fire({ icon: 'success', title: 'Eliminado', text: response.message, timer: 2000, showConfirmButton: false });
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Eliminado',
+                                text: response.message,
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
                             table.ajax.reload(null, false);
                         } else {
-                            Swal.fire('Error', response.message, 'error');
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message,
+                                customClass: { confirmButton: 'btn btn-primary' },
+                                buttonsStyling: false
+                            });
                         }
                     },
                     error: function() {
-                        Swal.fire('Error', 'Error al eliminar la ubicación', 'error');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Error al eliminar la ubicación.',
+                            customClass: { confirmButton: 'btn btn-primary' },
+                            buttonsStyling: false
+                        });
                     }
                 });
             }
@@ -120,10 +177,14 @@ $(document).ready(function() {
             text: 'Los proveedores no podrán registrar nuevas entregas en esta ubicación.',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Sí, bloquear',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-lock me-1"></i>Sí, bloquear',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -134,7 +195,7 @@ $(document).ready(function() {
                             Swal.fire({ icon: 'success', title: 'Bloqueado', text: response.message, timer: 2000, showConfirmButton: false });
                             table.ajax.reload(null, false);
                         } else {
-                            Swal.fire('Error', response.message, 'error');
+                            Swal.fire({ icon: 'error', title: 'Error', text: response.message, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                         }
                     }
                 });
@@ -151,10 +212,14 @@ $(document).ready(function() {
             text: 'Los proveedores podrán registrar nuevas entregas en esta ubicación.',
             icon: 'info',
             showCancelButton: true,
-            confirmButtonColor: '#28a745',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Sí, desbloquear',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-lock-open me-1"></i>Sí, desbloquear',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-success',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -165,7 +230,7 @@ $(document).ready(function() {
                             Swal.fire({ icon: 'success', title: 'Desbloqueado', text: response.message, timer: 2000, showConfirmButton: false });
                             table.ajax.reload(null, false);
                         } else {
-                            Swal.fire('Error', response.message, 'error');
+                            Swal.fire({ icon: 'error', title: 'Error', text: response.message, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
                         }
                     }
                 });

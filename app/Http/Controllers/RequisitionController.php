@@ -145,64 +145,28 @@ class RequisitionController extends Controller
 
                 $csrfToken = csrf_token();
 
-                $html = <<<HTML
-            <div class="dropdown">
-                <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="ti ti-dots-vertical"></i>
-                </button>
-                <ul class="dropdown-menu">
-                    <li>
-                        <a class="dropdown-item" href="{$showUrl}">
-                            <i class="ti ti-eye me-2"></i>Ver Detalles
-                        </a>
-                    </li>
-            HTML;
+                $html = '<div class="d-flex justify-content-end gap-1">'
+                    . '<a class="btn btn-sm btn-outline-secondary" href="' . $showUrl . '" title="Ver Detalles"><i class="ti ti-eye"></i></a>';
 
                 if ($canEdit) {
-                    $html .= <<<HTML
-                    <li>
-                        <a class="dropdown-item" href="{$editUrl}">
-                            <i class="ti ti-edit me-2"></i>Editar
-                        </a>
-                    </li>
-                HTML;
+                    $html .= '<a class="btn btn-sm btn-outline-primary" href="' . $editUrl . '" title="Editar"><i class="ti ti-pencil"></i></a>';
                 }
 
-                // Separador si hay acciones destructivas
-                if ($canDelete || $canCancel) {
-                    $html .= '<li><hr class="dropdown-divider"></li>';
-                }
-
-                // Eliminar (solo DRAFT) - Acción destructiva ROJA
+                // Eliminar (solo DRAFT)
                 if ($canDelete) {
-                    $html .= <<<HTML
-                    <li>
-                        <form action="{$deleteUrl}" method="POST" class="js-delete-form">
-                            <input type="hidden" name="_token" value="{$csrfToken}">
-                            <input type="hidden" name="_method" value="DELETE">
-                            <button type="button" class="dropdown-item text-danger js-delete-btn" 
-                                    data-folio="{$r->folio}">
-                                <i class="ti ti-trash me-2"></i>Eliminar
-                            </button>
-                        </form>
-                    </li>
-                HTML;
+                    $html .= '<form action="' . $deleteUrl . '" method="POST" class="js-delete-form d-inline">'
+                        . '<input type="hidden" name="_token" value="' . $csrfToken . '">'
+                        . '<input type="hidden" name="_method" value="DELETE">'
+                        . '<button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-folio="' . $r->folio . '" title="Eliminar"><i class="ti ti-trash"></i></button>'
+                        . '</form>';
                 }
 
-                // Cancelar (PENDING, PAUSED, IN_QUOTATION) - Acción AMARILLA
+                // Cancelar (PENDING, PAUSED, IN_QUOTATION)
                 if ($canCancel) {
-                    $html .= <<<HTML
-                    <li>
-                        <button type="button" class="dropdown-item text-warning js-cancel-btn" 
-                                data-folio="{$r->folio}"
-                                data-url="{$cancelUrl}">
-                            <i class="ti ti-ban me-2"></i>Cancelar
-                        </button>
-                    </li>
-                HTML;
+                    $html .= '<button type="button" class="btn btn-sm btn-outline-warning js-cancel-btn" data-folio="' . $r->folio . '" data-url="' . $cancelUrl . '" title="Cancelar"><i class="ti ti-ban"></i></button>';
                 }
 
-                $html .= '</ul></div>';
+                $html .= '</div>';
                 return $html;
             })
             ->rawColumns(['status', 'actions'])
@@ -658,22 +622,11 @@ class RequisitionController extends Controller
                     return '<span class="text-muted">Sin acciones</span>';
                 }
 
-                $html = '<div class="dropdown">
-                <button class="btn btn-sm btn-primary dropdown-toggle" type="button" 
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="ti ti-dots-vertical"></i>
-                </button>
-                <ul class="dropdown-menu">';
-
+                $html = '<div class="d-flex justify-content-end gap-1">';
                 foreach ($actions as $action) {
-                    $html .= '<li>
-                    <a class="dropdown-item" href="' . $action['url'] . '">
-                        <i class="' . $action['icon'] . ' me-2"></i>' . $action['label'] . '
-                    </a>
-                </li>';
+                    $html .= '<a class="btn btn-sm btn-outline-secondary" href="' . $action['url'] . '" title="' . $action['label'] . '"><i class="' . $action['icon'] . '"></i></a>';
                 }
-
-                $html .= '</ul></div>';
+                $html .= '</div>';
 
                 return $html;
             })

@@ -14,8 +14,8 @@
 
 @section('page.title', 'Empresas')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Administración</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item">Administración</li>
     <li class="breadcrumb-item active">Empresas</li>
 @endsection
 
@@ -25,8 +25,8 @@
             <h5 class="mb-0">Listado de Empresas</h5>
         </div>
         <div class="card-body">
-            <table class="table table-sm table-striped align-middle w-100" id="companiesTable">
-                <thead>
+            <table class="table-bordered table-hover w-100 table" id="companiesTable">
+                <thead class="table-light">
                     <tr>
                         <th>#</th>
                         <th>Código</th>
@@ -98,7 +98,6 @@ $(function () {
             type: "GET",
             error: function(xhr) {
                 console.error('Error en DataTable:', xhr.responseText);
-                alert('Error al cargar los datos. Revisa la consola.');
             }
         },
         columns: [
@@ -111,13 +110,15 @@ $(function () {
                 data: 'is_active',
                 name: 'is_active',
                 orderable: false,
-                searchable: false
+                searchable: false,
+                className: 'text-center'
             },
             {
                 data: 'actions',
                 name: 'actions',
                 orderable: false,
-                searchable: false
+                searchable: false,
+                className: 'text-end'
             }
         ],
         language: {
@@ -203,10 +204,14 @@ $(function () {
             text: "Esta acción no se puede deshacer.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({ url, type: 'POST', data: { _method: 'DELETE' } })
@@ -224,7 +229,9 @@ $(function () {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: 'No se pudo eliminar la empresa.'
+                            text: 'No se pudo eliminar la empresa.',
+                            customClass: { confirmButton: 'btn btn-primary' },
+                            buttonsStyling: false
                         });
                     });
             }
@@ -237,7 +244,15 @@ $(function () {
         const url = $(this).data('url');
         $.ajax({ url, type: 'PATCH' })
             .done(function () { table.ajax.reload(null, false); })
-            .fail(function () { alert('No se pudo cambiar el estado.'); });
+            .fail(function () {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cambiar el estado.',
+                    customClass: { confirmButton: 'btn btn-primary' },
+                    buttonsStyling: false
+                });
+            });
     });
 
     // Limpieza de backdrops al cerrar modal

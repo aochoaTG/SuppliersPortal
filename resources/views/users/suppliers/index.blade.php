@@ -65,8 +65,8 @@
 
 @section('page.title', 'Listado de Usuarios Proveedores')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Administración</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item">Administración</li>
     <li class="breadcrumb-item active">Usuarios Proveedores</li>
 @endsection
 {{-- CONTENIDO PRINCIPAL       --}}
@@ -78,8 +78,8 @@
         </div>
         <div class="card-body">
             {{-- Aquí va tu tabla o listado --}}
-            <table class="table table-sm table-striped align-middle w-100" id="suppliersTable">
-                <thead>
+            <table class="table-bordered table-hover w-100 table" id="suppliersTable">
+                <thead class="table-light">
                     <tr>
                         <th>#</th>
                         <th>Empresa</th>
@@ -263,7 +263,13 @@ $(function () {
             toastOk(res.message || 'Estado actualizado');
         })
         .fail(function () {
-            Swal.fire('Error', 'No se pudo cambiar el estado.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'No se pudo cambiar el estado.',
+                customClass: { confirmButton: 'btn btn-primary' },
+                buttonsStyling: false
+            });
         });
     });
 
@@ -278,10 +284,14 @@ $(function () {
             text: "Esta acción no se puede deshacer.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, eliminar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({ url, type: 'POST', data: { _method: 'DELETE' } })
@@ -299,7 +309,9 @@ $(function () {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: 'No se pudo eliminar el usuario.'
+                        text: 'No se pudo eliminar el usuario.',
+                        customClass: { confirmButton: 'btn btn-primary' },
+                        buttonsStyling: false
                     });
                 });
             }
@@ -326,12 +338,12 @@ $(document).on('change', 'input[name="user[avatar]"]', function () {
   // Validaciones simples (opcional)
   const okTypes = ['image/jpeg','image/png','image/webp'];
   if (!okTypes.includes(file.type)) {
-    if (window.Swal) Swal.fire('Archivo no válido', 'Solo JPG, PNG o WEBP.', 'warning');
+    if (window.Swal) Swal.fire({ icon: 'warning', title: 'Archivo no válido', text: 'Solo JPG, PNG o WEBP.', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
     this.value = '';
     return;
   }
   if (file.size > 2 * 1024 * 1024) {
-    if (window.Swal) Swal.fire('Archivo muy grande', 'Máximo 2 MB.', 'warning');
+    if (window.Swal) Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'Máximo 2 MB.', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
     this.value = '';
     return;
   }
@@ -382,8 +394,14 @@ $(function () {
             text: 'Se eliminará la foto actual del usuario.',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Sí, quitar',
-            cancelButtonText: 'Cancelar'
+            confirmButtonText: '<i class="ti ti-trash me-1"></i>Sí, quitar',
+            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
         }).then(res => res.isConfirmed && doRemove());
         } else {
         if (confirm('Se eliminará la foto actual del usuario. ¿Continuar?')) doRemove();
