@@ -5,7 +5,9 @@
       "Bash(cd \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal\" && php artisan route:list --path=rfq 2>&1 | head -60)",
       "Bash(find /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Models -name \"*Budget*\" -o -name \"*Reception*\" -o -name \"*Approval*\" | xargs ls -la)",
       "Bash(find /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/resources/views -type f -name \"*.blade.php\" | xargs grep -l \"receiving_location_id\\\\|received_by\\\\|quantity_received\\\\|issued_at\" 2>/dev/null | head -20)",
-      "Bash(find \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal/resources/views\" -name \"*index.blade.php\" -exec grep -l \"DataTable\\\\|Swal\\\\.\" {})"
+      "Bash(find \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal/resources/views\" -name \"*index.blade.php\" -exec grep -l \"DataTable\\\\|Swal\\\\.\" {})",
+      "Bash(ls -la /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Notifications/*.php)",
+      "Bash(grep -n \"class.*Purchase.*Order\" /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Models/*.php)"
     ]
   }
 }

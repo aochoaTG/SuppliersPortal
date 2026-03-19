@@ -3,7 +3,7 @@
 **Fecha:** 2026-03-13
 **Autor:** Análisis generado por Arquitecto de Software (Claude Code)
 **Versión:** 1.8
-**Estado:** Borrador para revisión de equipo — Pasos 1 a 8 implementados
+**Estado:** Borrador para revisión de equipo — Pasos 1 a 9 implementados
 
 ---
 
@@ -492,11 +492,42 @@ Permite que el servicio consulte semánticamente si un ítem de OCD pertenece a 
 - **OC estándar**: los ítems no tienen `expenseCategory`, así que el check se aplica a nivel del proveedor (`provides_specialized_services`). Si el proveedor presta servicios especializados, aplica.
 - **OCD**: los ítems sí tienen `expenseCategory`. El check solo activa la advertencia si al menos un ítem tiene categoría `SER` (Servicios). Una OCD de materiales con un proveedor REPSE-registered no genera advertencia.
 
-#### Paso 9 — Notificaciones
+#### ~~Paso 9~~ ✅ COMPLETADO — Notificaciones de recepción (2026-03-19)
 
-Crear `ReceptionCompletedNotification` para:
-- Notificar al Comprador (creador de la OC)
-- Notificar a Finanzas/Contabilidad (nuevo actor a definir con el equipo)
+**Archivos creados/modificados:**
+- `app/Notifications/ReceptionCompletedNotification.php` — creado
+- `app/Services/ReceptionService.php` — método `receive()` actualizado + `notifyReception()` agregado
+
+**`ReceptionCompletedNotification` — características:**
+
+| Aspecto | Detalle |
+|---|---|
+| Canales | `['mail', 'database']` |
+| Trait | `Queueable` (compatible con colas) |
+| Parámetro | `Reception $reception` (con relación polimórfica `receivable`) |
+| Asunto del email | `✅ Recepción REC-YYYY-NNNN (COMPLETADA) — OC-XXXX` o `🔶 ... (PARCIAL)` |
+| Cuerpo del email | Folio, orden, proveedor, punto de entrega, receptor, fecha, estado de la orden, referencia del proveedor (si existe), aviso si la recepción es parcial |
+| `toArray()` | `type`, `reception_id`, `reception_folio`, `reception_status`, `order_id`, `order_folio`, `url`, `message` |
+
+**Destinatarios (método `notifyReception()` en `ReceptionService`):**
+1. El **creador de la orden** (`$order->creator`) — siempre notificado, ya sea comprador (OC) o solicitante (OCD).
+2. Todos los usuarios con rol **`buyer`** (`User::role('buyer')->get()`).
+3. Se **deduplica por ID** para evitar notificación doble si el creador también tiene rol `buyer`.
+
+> **Nota:** El actor de **Finanzas/Contabilidad** queda pendiente de definir con el equipo. Cuando se modele ese rol, bastará con agregar `User::role('finanzas')->get()` dentro de `notifyReception()`.
+
+**Decisión de arquitectura — notificación fuera de la transacción:**
+
+El método `notifyReception()` se invoca **después** del `DB::transaction`, no dentro de él. Esto garantiza que:
+- La notificación solo se despacha si el commit fue exitoso (no hay rollback).
+- Los trabajos en cola no leen datos en estado intermedio.
+
+```php
+// ReceptionService::receive() — flujo completo:
+$reception = DB::transaction(fn() => /* ... persiste todo ... */);
+$this->notifyReception($reception, $order);   // ← después del commit
+return $reception;
+```
 
 ---
 
@@ -514,9 +545,9 @@ Crear `ReceptionCompletedNotification` para:
 | `ReceptionController` + Rutas | ✅ Completo | Paso 6 completado el 2026-03-13 |
 | Integración `BudgetCommitment` | ✅ Completo | Paso 7 completado el 2026-03-13. `received_at` agregado; `PARTIALLY_RECEIVED` en OCD corregido. |
 | Validación REPSE en recepción | ✅ Completo | Paso 8 completado el 2026-03-13. Bug en `repseExpiresIn()` corregido. Check item-level para OCD. |
-| Notificaciones de recepción | ❌ No existe | Implementar (Paso 9) |
+| Notificaciones de recepción | ✅ Completo | Paso 9 completado el 2026-03-19. `ReceptionCompletedNotification` notifica al creador + buyers. |
 
-**Respuesta directa:** Los pasos 1 a 8 están completados. La capa de modelos, lógica de negocio, controlador y vistas están listos. **Antes de usar el sistema, es necesario ejecutar `php artisan migrate` para aplicar las 6 migraciones creadas.** El único paso pendiente de implementar desde cero es el Paso 9: Notificaciones de recepción.
+**Respuesta directa:** Los pasos 1 a 9 están completados. La capa de modelos, lógica de negocio, controlador, vistas y notificaciones están listos. **Antes de usar el sistema, es necesario ejecutar `php artisan migrate` para aplicar las 6 migraciones creadas.** El módulo de recepciones está completamente implementado. El único ítem pendiente de definición es la incorporación del actor Finanzas/Contabilidad como destinatario adicional de notificaciones (ver detalle del Paso 9).
 
 ---
 

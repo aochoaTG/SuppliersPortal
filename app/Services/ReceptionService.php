@@ -9,6 +9,7 @@ use App\Models\PurchaseOrderItem;
 use App\Models\Reception;
 use App\Models\ReceptionItem;
 use App\Models\User;
+use App\Notifications\ReceptionCompletedNotification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +33,7 @@ class ReceptionService
     {
         $this->validateCanReceive($order);
 
-        return DB::transaction(function () use ($order, $itemsData, $receiver, $data) {
+        $reception = DB::transaction(function () use ($order, $itemsData, $receiver, $data) {
 
             // 1. Crear cabecera de recepción
             $reception = Reception::create([
@@ -94,6 +95,12 @@ class ReceptionService
 
             return $reception->load('items.receivableItem');
         });
+
+        // Notificar al creador de la orden y al equipo de Compras (fuera de la transacción
+        // para garantizar que el commit ya ocurrió antes de despachar el trabajo).
+        $this->notifyReception($reception, $order);
+
+        return $reception;
     }
 
     /**
@@ -233,5 +240,27 @@ class ReceptionService
     private function markBudgetAsReceived(Model $order): void
     {
         $order->budgetCommitment?->markAsReceived();
+    }
+
+    /**
+     * Envía la notificación de recepción al creador de la orden y a todos los compradores.
+     * Se deduplica por ID para que el creador no reciba la notificación dos veces si
+     * él mismo tiene el rol 'buyer'.
+     */
+    private function notifyReception(Reception $reception, Model $order): void
+    {
+        $notification = new ReceptionCompletedNotification($reception);
+
+        $notifiables = collect();
+
+        // Siempre notificar al creador de la orden (puede ser buyer o solicitante en OCD)
+        if ($order->creator) {
+            $notifiables->push($order->creator);
+        }
+
+        // Notificar a todos los compradores activos
+        User::role('buyer')->get()->each(fn($u) => $notifiables->push($u));
+
+        $notifiables->unique('id')->each->notify($notification);
     }
 }
