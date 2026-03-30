@@ -222,30 +222,26 @@ class DirectPurchaseOrderController extends Controller
                 }
             }
 
-            // 2. Cambiar estatus a Aprobada
+            // 2. Cambiar estatus a Emitida (aprobada y lista para recepción)
             $directPurchaseOrder->update([
-                'status' => 'APPROVED',
+                'status' => 'ISSUED',
                 'approved_by' => Auth::id(),
                 'approved_at' => now(),
             ]);
 
             // 3. Comprometer presupuesto en cada categoría
+            $date = \Carbon\Carbon::parse($monthStr . '-01');
+            $budget = \App\Models\AnnualBudget::where('cost_center_id', $costCenterId)
+                ->where('fiscal_year', $date->year)
+                ->where('status', 'APROBADO')
+                ->with(['monthlyDistributions' => fn($q) => $q->where('month', $date->month)])
+                ->first();
+
             foreach ($itemsByCategory as $categoryId => $items) {
                 $amountToCommit = (float) $items->sum('total');
 
-                // Obtener la distribución mensual correspondiente
-                $date = \Carbon\Carbon::parse($monthStr . '-01');
-                $year = $date->year;
-                $month = $date->month;
-
-                $budget = \App\Models\AnnualBudget::where('cost_center_id', $costCenterId)
-                    ->where('fiscal_year', $year)
-                    ->where('status', 'APROBADO')
-                    ->first();
-
                 if ($budget) {
-                    $distribution = $budget->monthlyDistributions()
-                        ->where('month', $month)
+                    $distribution = $budget->monthlyDistributions
                         ->where('expense_category_id', $categoryId)
                         ->first();
 
@@ -352,8 +348,43 @@ class DirectPurchaseOrderController extends Controller
     {
         $request->validate(['comments' => 'required|string|max:500']);
 
+        $comingFromIssued = $directPurchaseOrder->status === 'ISSUED';
+
+        if ($comingFromIssued && !$directPurchaseOrder->canBeReturnedToRevision()) {
+            return back()->withErrors(['error' => 'No se puede devolver a revisión una OCD que ya tiene recepciones registradas.']);
+        }
+
+        if (!$comingFromIssued && $directPurchaseOrder->status !== 'PENDING_APPROVAL') {
+            return back()->withErrors(['error' => 'Esta OCD no puede ser devuelta en su estado actual.']);
+        }
+
         try {
             DB::beginTransaction();
+
+            // Si viene de ISSUED, liberar el presupuesto comprometido
+            if ($comingFromIssued) {
+                $itemsByCategory = $directPurchaseOrder->items->groupBy('expense_category_id');
+                $costCenterId    = $directPurchaseOrder->cost_center_id;
+                $date            = \Carbon\Carbon::parse($directPurchaseOrder->application_month . '-01');
+
+                $budget = \App\Models\AnnualBudget::where('cost_center_id', $costCenterId)
+                    ->where('fiscal_year', $date->year)
+                    ->where('status', 'APROBADO')
+                    ->with(['monthlyDistributions' => fn($q) => $q->where('month', $date->month)])
+                    ->first();
+
+                if ($budget) {
+                    foreach ($itemsByCategory as $categoryId => $items) {
+                        $distribution = $budget->monthlyDistributions
+                            ->where('expense_category_id', $categoryId)
+                            ->first();
+
+                        if ($distribution) {
+                            $distribution->releaseCommitment((float) $items->sum('total'));
+                        }
+                    }
+                }
+            }
 
             $directPurchaseOrder->update([
                 'status'      => 'RETURNED',
@@ -600,6 +631,12 @@ class DirectPurchaseOrderController extends Controller
     private function validateBudgetAvailability($costCenterId, $monthStr, $categoryId, $requiredAmount): array
     {
         try {
+            // 0. Si el CC es de consumo libre, no requiere validación presupuestal
+            $costCenter = \App\Models\CostCenter::find($costCenterId);
+            if ($costCenter && $costCenter->budget_type === 'FREE_CONSUMPTION') {
+                return ['available' => true, 'message' => 'Centro de costo de consumo libre.'];
+            }
+
             // 1. Parsear el mes (YYYY-MM a Year y Month numeric)
             $date = \Carbon\Carbon::parse($monthStr . '-01');
             $year = $date->year;

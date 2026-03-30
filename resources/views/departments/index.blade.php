@@ -3,14 +3,14 @@
 @section('title', 'Departamentos')
 @section('page.title', 'Departamentos')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('departments.index') }}">Departamentos</a></li>
-    <li class="breadcrumb-item active">Listado</li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item active">Departamentos</li>
 @endsection
 
 @section('content')
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="ti ti-building"></i> Departamentos</h5>
+            <h5 class="mb-0"><i class="ti ti-building me-1"></i> Departamentos</h5>
         </div>
 
         <div class="card-body">

@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Validación de tamaño de archivo
     fileInput.addEventListener('change', function() {
         if (this.files[0] && this.files[0].size > maxSize) {
-            alert('El archivo excede el tamaño máximo permitido (5MB)');
+            Swal.fire({ icon: 'error', title: 'Archivo demasiado grande', text: 'El archivo excede el tamaño máximo permitido (5MB).' });
             this.value = '';
         }
     });
@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (publishedAt && visibleUntil && visibleUntil <= publishedAt) {
             e.preventDefault();
-            alert('La fecha "Visible hasta" debe ser posterior a la fecha de publicación');
+            Swal.fire({ icon: 'warning', title: 'Fechas inválidas', text: 'La fecha "Visible hasta" debe ser posterior a la fecha de publicación.' });
             return false;
         }
 

@@ -1,22 +1,16 @@
 @extends('layouts.zircos')
 
-@section('title', 'Categorias - CC')
-@section('page.title', 'Categorias - CC')
+@section('title', 'Categorías - CC')
+@section('page.title', 'Categorías - CC')
 @section('page.breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ route('categories.index') }}">Categorias</a></li>
-<li class="breadcrumb-item active">Listado</li>
+<li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+<li class="breadcrumb-item active">Categorías</li>
 @endsection
-
-@push('styles')
-{{-- Estilos de DataTables --}}
-<link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-bs5/css/dataTables.bootstrap5.min.css') }}">
-<link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-buttons-bs5/css/buttons.bootstrap5.min.css') }}">
-@endpush
 
 @section('content')
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="ti ti-category"></i> Categorias</h5>
+        <h5 class="mb-0"><i class="ti ti-category me-1"></i> Categorías</h5>
     </div>
 
     <div class="card-body">

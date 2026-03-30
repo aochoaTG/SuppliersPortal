@@ -39,6 +39,15 @@
 
         <div class="d-flex align-items-center gap-2">
 
+            <!-- Log Viewer (solo dev) -->
+            @if(Auth::id() === 1)
+            <div class="topbar-item">
+                <a href="{{ route('dev.log.index') }}" class="topbar-link" title="Ver Log del sistema">
+                    <i class="ti ti-bug fs-22 text-danger"></i>
+                </a>
+            </div>
+            @endif
+
             <!-- Notification Dropdown -->
             <div class="topbar-item">
                 <div class="dropdown">

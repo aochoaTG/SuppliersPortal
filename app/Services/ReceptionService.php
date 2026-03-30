@@ -22,8 +22,9 @@ class ReceptionService
      *
      * @param  PurchaseOrder|DirectPurchaseOrder  $order
      * @param  array  $itemsData  Formato esperado por elemento:
-     *                            ['item_id' => int, 'quantity_received' => float,
-     *                             'quantity_rejected' => float, 'rejection_reason' => ?string]
+     *                            ['receivable_item_id' => int, 'quantity_received' => float,
+     *                             'conformity' => string, 'nonconformity_type' => ?string,
+     *                             'nonconformity_notes' => ?string, 'photos' => ?array]
      * @param  User   $receiver
      * @param  array  $data       ['delivery_reference' => ?string, 'notes' => ?string, 'received_at' => ?Carbon]
      *
@@ -52,25 +53,33 @@ class ReceptionService
             // 2. Procesar cada línea recibida
             $itemClass = $this->resolveItemClass($order);
 
+            // Pre-cargar todos los ítems de una sola vez para evitar N+1
+            $itemIds = collect($itemsData)->pluck('receivable_item_id')->all();
+            $loadedItems = $itemClass::whereIn('id', $itemIds)->get()->keyBy('id');
+
             foreach ($itemsData as $lineData) {
-                $item             = $itemClass::findOrFail($lineData['receivable_item_id']);
+                $item = $loadedItems[$lineData['receivable_item_id']]
+                    ?? throw new \RuntimeException("Ítem {$lineData['receivable_item_id']} no encontrado.");
                 $quantityReceived = max(0, (float) ($lineData['quantity_received'] ?? 0));
-                $quantityRejected = max(0, (float) ($lineData['quantity_rejected'] ?? 0));
-                $accepted         = $quantityReceived - $quantityRejected;
 
                 ReceptionItem::create([
                     'reception_id'         => $reception->id,
                     'receivable_item_type' => get_class($item),
                     'receivable_item_id'   => $item->id,
                     'quantity_received'    => $quantityReceived,
-                    'quantity_rejected'    => $quantityRejected,
-                    'rejection_reason'     => $lineData['rejection_reason'] ?? null,
+                    'conformity'           => $lineData['conformity'] ?? ReceptionItem::CONFORMITY_OK,
+                    'nonconformity_type'   => $lineData['nonconformity_type'] ?? null,
+                    'nonconformity_notes'  => $lineData['nonconformity_notes'] ?? null,
+                    'photos'               => $lineData['photos'] ?? null,
                 ]);
 
-                // Acumular en el ítem de la orden. Se usa increment() para evitar
-                // disparar los eventos 'saving/saved' del modelo (no recalcula montos).
-                if ($accepted > 0) {
-                    $item->increment('quantity_received', $accepted);
+                // Solo se acumulan las cantidades CONFORMES en el ítem de la orden.
+                // Si el ítem es NO_CONFORME, queda pendiente para que el proveedor
+                // lo reponga — la orden no avanzará a RECEIVED hasta que esas unidades
+                // sean recibidas conformes en una recepción posterior.
+                $isConforming = ($lineData['conformity'] ?? ReceptionItem::CONFORMITY_OK) === ReceptionItem::CONFORMITY_OK;
+                if ($quantityReceived > 0 && $isConforming) {
+                    $item->increment('quantity_received', $quantityReceived);
                 }
             }
 

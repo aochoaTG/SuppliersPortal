@@ -179,7 +179,12 @@
                 const currentValue = parseFloat(input.value) || 0;
 
                 if (currentValue < minValue) {
-                    alert(`Este mes tiene compromisos o consumos. El monto mínimo es: $${minValue.toFixed(2)}`);
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Monto mínimo requerido',
+                        text: `Este mes tiene compromisos o consumos. El monto mínimo es: $${minValue.toFixed(2)}`,
+                        confirmButtonText: 'Entendido'
+                    });
                     input.value = minValue.toFixed(2);
                     input.focus();
                 }

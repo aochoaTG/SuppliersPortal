@@ -575,6 +575,7 @@ class RequisitionController extends Controller
     {
         // 1. Query Base: Eager Loading para evitar N+1
         $query = Requisition::with(['costCenter', 'requester', 'department'])
+            ->withCount('items')
             ->select('requisitions.*')
             ->where('status', RequisitionStatus::PENDING->value)
             ->orWhere('status', RequisitionStatus::IN_QUOTATION->value);
@@ -590,7 +591,7 @@ class RequisitionController extends Controller
                 return $row->department ? $row->department->name : 'N/A';
             })
             ->addColumn('items_count', function ($row) {
-                return $row->items()->count();
+                return $row->items_count;
             })
             ->editColumn('status', function ($row) {
                 return '<span class="badge bg-' . $row->status->badgeClass() . '">' .

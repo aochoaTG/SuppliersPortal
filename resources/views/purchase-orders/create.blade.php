@@ -400,13 +400,13 @@ $(document).ready(function() {
     // Agregar nueva partida
     $('#add-item-btn').on('click', function() {
         // TODO: Implementar en Paso 5
-        alert('Funcionalidad de agregar partidas se implementará en el Paso 5');
+        Swal.fire({ icon: 'info', title: 'En desarrollo', text: 'Funcionalidad de agregar partidas se implementará en el Paso 5.' });
     });
 
     // Eliminar partida
     $(document).on('click', '.remove-item-btn', function() {
         // TODO: Implementar en Paso 5
-        alert('Funcionalidad de eliminar partidas se implementará en el Paso 5');
+        Swal.fire({ icon: 'info', title: 'En desarrollo', text: 'Funcionalidad de eliminar partidas se implementará en el Paso 5.' });
     });
 
     // Calcular subtotal de cada partida

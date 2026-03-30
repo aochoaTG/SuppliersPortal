@@ -1,9 +1,9 @@
 # Análisis Técnico: Estado Actual del Módulo de Recepciones
 
-**Fecha:** 2026-03-13
+**Fecha:** 2026-03-13 (última actualización: 2026-03-24)
 **Autor:** Análisis generado por Arquitecto de Software (Claude Code)
-**Versión:** 1.8
-**Estado:** Borrador para revisión de equipo — Pasos 1 a 9 implementados
+**Versión:** 2.0
+**Estado:** Borrador para revisión de equipo — Pasos 1 a 9 implementados + correcciones y mejoras 2026-03-24
 
 ---
 
@@ -551,4 +551,645 @@ return $reception;
 
 ---
 
-*Documento generado con base en análisis estático del código fuente. Pendiente de validación con el equipo.*
+---
+
+## 7. Cambios y Correcciones (2026-03-24)
+
+Esta sección documenta los cambios implementados en la sesión del 2026-03-24, todos relacionados con el flujo de OCD, el módulo de recepciones y herramientas de soporte técnico.
+
+---
+
+### 7.1 Restauración del botón "Nueva Orden de Compra Directa"
+
+**Archivos modificados:**
+- `resources/views/purchase-orders/index.blade.php`
+
+**Problema:** El botón para crear una OCD fue eliminado accidentalmente en el commit `72c3a59 Cambios estilos` junto con ajustes de estilos. La vista quedó sin forma de acceder a la creación de OCD directamente.
+
+**Solución:** Se restauró el botón en el card-header de la vista, apuntando a `direct-purchase-orders.create`, con los estilos originales (`bg-white border-bottom`, título con `text-primary`).
+
+---
+
+### 7.2 Fix: Validación de presupuesto bloqueaba OCD con CC de consumo libre
+
+**Archivos modificados:**
+- `app/Http/Controllers/DirectPurchaseOrderController.php` — método `validateBudgetAvailability()`
+
+**Problema:** Al aprobar una OCD cuyo centro de costo tiene `budget_type = FREE_CONSUMPTION`, el sistema lanzaba el error `"Presupuesto insuficiente: No existe un presupuesto aprobado para el centro de costo y año fiscal seleccionados."` Los CC de consumo libre no tienen presupuesto anual por diseño, por lo que la ausencia de presupuesto es correcta y no debe bloquear la aprobación.
+
+**Solución:** Se agregó una verificación al inicio de `validateBudgetAvailability()`. Si el CC tiene `budget_type = 'FREE_CONSUMPTION'`, el método retorna `['available' => true]` inmediatamente sin buscar presupuesto:
+
+```php
+$costCenter = \App\Models\CostCenter::find($costCenterId);
+if ($costCenter && $costCenter->budget_type === 'FREE_CONSUMPTION') {
+    return ['available' => true, 'message' => 'Centro de costo de consumo libre.'];
+}
+```
+
+---
+
+### 7.3 Cambio de flujo OCD: aprobación pasa directamente a ISSUED
+
+**Archivos modificados:**
+- `app/Http/Controllers/DirectPurchaseOrderController.php` — método `approve()`
+
+**Problema:** Al aprobar una OCD, el status quedaba en `APPROVED`. El módulo de recepciones filtra órdenes por status `ISSUED` y `PARTIALLY_RECEIVED`, por lo que una OCD aprobada nunca aparecía como pendiente de recepción. No existía ningún paso de "emisión" para OCD (a diferencia de las OC regulares).
+
+**Solución:** El método `approve()` ahora cambia el status directamente a `ISSUED` en lugar de `APPROVED`. El flujo queda:
+
+```
+DRAFT → PENDING_APPROVAL → ISSUED → (PARTIALLY_RECEIVED) → RECEIVED
+```
+
+El status `APPROVED` deja de usarse en el ciclo de vida de una OCD.
+
+> **Impacto en presupuesto:** El paso de comprometer presupuesto (paso 3 del método `approve()`) no se vio afectado, ya que opera sobre los ítems y el `AnnualBudget` independientemente del status final.
+
+---
+
+### 7.4 Nueva funcionalidad: Devolver OCD a revisión desde ISSUED (Opción A)
+
+**Archivos modificados:**
+- `app/Models/DirectPurchaseOrder.php` — nuevo método `canBeReturnedToRevision()`
+- `app/Http/Controllers/DirectPurchaseOrderController.php` — método `return()` actualizado
+- `resources/views/purchase-orders/show-direct.blade.php` — nuevo botón y form
+
+**Contexto:** Una OCD ya aprobada (status `ISSUED`) puede tener errores detectados después de la aprobación (proveedor incorrecto, monto equivocado, etc.), siempre y cuando no se haya registrado ninguna recepción. Se implementó la opción de devolverla a revisión como `RETURNED`, lo que permite al solicitante corregirla y reenviarla a aprobación.
+
+**Modelo — `canBeReturnedToRevision()`:**
+```php
+public function canBeReturnedToRevision(): bool
+{
+    return $this->status === 'ISSUED' && $this->receptions()->count() === 0;
+}
+```
+Solo se puede devolver si está `ISSUED` y **no tiene recepciones** registradas.
+
+**Controlador — `return()` actualizado:**
+
+Cuando el método detecta que la OCD viene de `ISSUED`, libera el presupuesto comprometido antes de cambiar el status:
+
+```
+1. Detecta $comingFromIssued = ($status === 'ISSUED')
+2. Valida canBeReturnedToRevision() — falla si ya tiene recepciones
+3. Si viene de ISSUED: busca AnnualBudget y llama releaseCommitment() por cada categoría de ítem
+4. Cambia status a RETURNED
+5. Registra en historial de aprobaciones
+6. Notifica al solicitante (DirectPurchaseOrderReturnedNotification)
+```
+
+**Vista — botón "Devolver a Revisión":**
+- Botón amarillo (`btn-warning`) visible solo cuando `$ocd->canBeReturnedToRevision()` es true
+- `form-return` también se renderiza para este estado
+- El modal SweetAlert existente de instrucciones de devolución se reutiliza
+
+**Flujo completo con devolución desde ISSUED:**
+```
+ISSUED → (sin recepciones) → RETURNED
+  → Presupuesto liberado
+  → Solicitante corrige
+  → PENDING_APPROVAL
+  → Aprobador vuelve a aprobar
+  → ISSUED (presupuesto vuelve a comprometerse)
+```
+
+---
+
+### 7.5 Fix: Botones de aprobación visibles cuando OCD está en RETURNED
+
+**Archivos modificados:**
+- `app/Models/DirectPurchaseOrder.php` — método `canBeApproved()` actualizado
+- `resources/views/purchase-orders/show-direct.blade.php` — condiciones de visibilidad de botones y forms
+
+**Problema:** Cuando una OCD quedaba en status `RETURNED`, la vista no mostraba los botones de Aprobar ni Rechazar, solo el botón "Enviar a Aprobación" (para el creador). El aprobador no tenía acciones disponibles.
+
+**Solución:**
+
+Modelo — `canBeApproved()` ahora acepta `RETURNED`:
+```php
+public function canBeApproved(): bool
+{
+    return in_array($this->status, ['PENDING_APPROVAL', 'RETURNED']);
+}
+```
+
+Vista — los botones Aprobar y Rechazar se muestran con `PENDING_APPROVAL` **o** `RETURNED`. El botón "Devolver" (para enviar de vuelta) solo aparece en `PENDING_APPROVAL` (en `RETURNED` ya está devuelta). El `form-reject` también se renderiza para `RETURNED`.
+
+---
+
+### 7.6 Fix: Métodos faltantes en `ReceptionItem` causaban error en vista `show.blade.php`
+
+**Archivos modificados:**
+- `app/Models/ReceptionItem.php`
+
+**Problema:** La vista `resources/views/receptions/show.blade.php` llamaba a `$item->hasRejections()`, `$item->quantity_rejected`, `$item->quantity_accepted` y `$item->rejection_reason`, pero ninguno existía en el modelo ni en la tabla (la migración usa `conformity` y `nonconformity_notes` en lugar de campos de rechazo por cantidad).
+
+**Causa raíz:** El documento del Paso 4 (sección 4.3) describe la tabla con `quantity_rejected` y `rejection_reason`, pero la migración real implementó un enfoque diferente: conformidad binaria por ítem (`CONFORME`/`NO_CONFORME`) en lugar de cantidad rechazada numérica.
+
+**Solución:** Se agregaron los métodos faltantes al modelo como adaptadores semánticos sobre los campos reales:
+
+| Método / Accesor | Implementación | Notas |
+|---|---|---|
+| `hasRejections()` | `$this->conformity === 'NO_CONFORME'` | Alias de `isNonConforming()` |
+| `getQuantityRejectedAttribute()` | `hasRejections() ? quantity_received : 0` | Si no conforme, toda la cantidad es rechazada |
+| `getQuantityAcceptedAttribute()` | `hasRejections() ? 0 : quantity_received` | Inverso del anterior |
+| `getRejectionReasonAttribute()` | `$this->nonconformity_notes` | Alias legible |
+
+> **Nota de deuda técnica:** El documento del Paso 4 describe `quantity_rejected` como campo de la tabla, pero la migración implementó `conformity` (binario). Esta divergencia entre documentación y código fue la causa del error. El esquema actual no soporta "recibir 8 de 10 piezas y rechazar 2" — solo "conforme" o "no conforme" para toda la cantidad recibida. Si en el futuro se necesita rechazo parcial por cantidad, se requerirá migración.
+
+---
+
+### 7.7 Nueva herramienta: Log Viewer (solo usuario id=1)
+
+**Archivos creados/modificados:**
+- `app/Http/Controllers/LogViewerController.php` — creado
+- `resources/views/dev/log-viewer.blade.php` — creado
+- `resources/views/layouts/partials/navbar.blade.php` — ícono de insecto agregado
+- `routes/web.php` — 2 rutas nuevas, import de `LogViewerController`
+
+**Propósito:** Herramienta de desarrollo para visualizar el log de Laravel directamente desde el navegador, sin necesidad de acceso SSH o al sistema de archivos.
+
+**Acceso:** Solo visible y accesible para el usuario con `id = 1`. Cualquier otro usuario recibe un `403`. El ícono de insecto rojo (`ti-bug`) en el navbar solo se renderiza cuando `Auth::id() === 1`.
+
+**Rutas:**
+```php
+GET    /dev/logs   → LogViewerController::index()   // Ver log (últimas 500 líneas)
+DELETE /dev/logs   → LogViewerController::clear()   // Vaciar el archivo
+```
+
+**Implementación — lectura eficiente:**
+
+Se usa `SplFileObject` para leer solo el final del archivo sin cargarlo completo en memoria. Útil cuando el log es de varios MB:
+
+```php
+$file->seek(PHP_INT_MAX);       // mueve el cursor al EOF para obtener el total de líneas
+$total = $file->key();          // número de líneas
+$start = max(0, $total - 500);  // últimas 500 líneas
+$file->seek($start);
+while (!$file->eof()) { $content[] = $file->fgets(); }
+```
+
+**Características de la vista:**
+- Fondo oscuro tipo terminal (`#1e1e1e`) con auto-scroll al final al cargar
+- Tamaño actual del archivo en el header
+- **Botón Copiar**: usa `navigator.clipboard.writeText()`. Feedback visual verde por 2 segundos. Swal de error si el clipboard no está disponible (sin HTTPS).
+- **Botón Vaciar log**: Swal de confirmación con `icon: warning` antes de enviar el form DELETE.
+- **Flash de éxito**: después de vaciar, se muestra Swal de éxito con auto-cierre a 3 segundos (en lugar de un `<div>` de alerta estático).
+
+---
+
+## 8. Resumen Ejecutivo Actualizado (2026-03-24)
+
+| Componente | Estado | Observación |
+|---|---|---|
+| `ReceivingLocation` | ✅ Completo | Sin cambios |
+| `PurchaseOrder` | ✅ Completo | Sin cambios |
+| `PurchaseOrderItem` / `DirectPurchaseOrderItem` | ✅ Completo | Sin cambios |
+| `Reception` / `ReceptionItem` | ✅ Completo | Fix 7.6: métodos `hasRejections()`, `quantity_rejected`, `quantity_accepted`, `rejection_reason` agregados |
+| `ReceptionService` | ✅ Completo | Sin cambios |
+| `ReceptionController` + Rutas | ✅ Completo | Sin cambios |
+| Integración `BudgetCommitment` | ✅ Completo | Sin cambios |
+| Validación REPSE | ✅ Completo | Sin cambios |
+| Notificaciones de recepción | ✅ Completo | Sin cambios |
+| Flujo de aprobación OCD | ✅ Actualizado | Fix 7.3: aprobación va directo a `ISSUED`. Fix 7.5: botones visibles en `RETURNED`. |
+| Devolución a revisión desde ISSUED | ✅ Nuevo | 7.4: `canBeReturnedToRevision()`, liberación de presupuesto, botón en vista |
+| CC de consumo libre en OCD | ✅ Corregido | Fix 7.2: `validateBudgetAvailability()` omite validación para `FREE_CONSUMPTION` |
+| Log Viewer (dev) | ✅ Nuevo | 7.7: herramienta solo para usuario id=1 |
+
+**Deuda técnica pendiente (vigente al cierre de la sesión 2026-03-24 mañana):**
+- Actor Finanzas/Contabilidad no modelado como destinatario de notificaciones (pendiente desde Paso 9).
+
+> La nota anterior sobre rechazo parcial por cantidad queda resuelta — ver Sección 9.
+
+---
+
+---
+
+## 9. Alineación con FRU — Conformidad por Partida (2026-03-24)
+
+**Versión:** 2.0
+**Contexto:** Se realizó una revisión del formulario `resources/views/receptions/create.blade.php` contra el FRU (*Módulo de Recepción de Bienes y Servicios*, solicitante: Maribel García, Directora de Administración y Finanzas), específicamente contra la Sección 4.3 *Proceso de Recepción Estándar*. Se identificaron brechas críticas y se implementaron las correcciones correspondientes.
+
+---
+
+### 9.1 Brechas identificadas antes de los cambios
+
+| Sección FRU | Brecha |
+|---|---|
+| 4.3-B Conformidad | El formulario usaba "Cant. Rechazada" + "Motivo de Rechazo" numérico. El FRU requiere un indicador explícito `CONFORME` / `NO CONFORME` por partida, con categoría y descripción detallada. |
+| 4.3-B Categorías | No existía clasificación del tipo de no conformidad (defecto, especificaciones, empaque, etc.). |
+| 4.3-B Longitud mínima | El campo de motivo no tenía restricción de longitud mínima (FRU exige ≥ 100 caracteres). |
+| 4.3-C Evidencia fotográfica | No existía campo de fotografías por partida. El FRU requiere foto obligatoria cuando `NO_CONFORME`, opcional cuando `CONFORME` (1–5 fotos, JPG/PNG, máx. 5 MB c/u). |
+| Lógica de negocio (bug) | Las cantidades `NO_CONFORME` se sumaban igual a `quantity_received` del ítem de la orden, marcando la OC como `RECEIVED` aunque el proveedor no hubiera repuesto las unidades rechazadas. |
+
+---
+
+### 9.2 Migración `2026_03_13_000004` — Rediseño de `reception_items`
+
+**Acción:** Modificación directa de la migración existente (con `migrate:fresh`). No se creó migración adicional.
+
+**Campos eliminados:**
+
+| Campo | Razón |
+|---|---|
+| `quantity_rejected decimal(10,3)` | Reemplazado por conformidad binaria — la pregunta de negocio relevante es "¿cumple especificaciones?", no "¿cuántas unidades rechazas?". |
+| `rejection_reason varchar(255)` | Reemplazado por `nonconformity_notes text` con semántica más precisa y sin límite de 255 caracteres. |
+
+**Campos nuevos:**
+
+| Campo | Tipo | Propósito |
+|---|---|---|
+| `conformity` | `string(20)` DEFAULT `'CONFORME'` | Indicador de cumplimiento de especificaciones por partida (FRU 4.3-B) |
+| `nonconformity_type` | `string(50)` nullable | Categoría del problema: `defective`, `wrong_specs`, `wrong_product`, `damaged_packaging`, `other` |
+| `nonconformity_notes` | `text` nullable | Descripción libre de la no conformidad (UI exige ≥ 100 chars cuando aplica) |
+| `photos` | `json` nullable | Array de rutas de evidencia fotográfica. Obligatorio cuando `NO_CONFORME`, opcional cuando `CONFORME` (FRU 4.3-C) |
+
+---
+
+### 9.3 Modelo `ReceptionItem` — Rediseño completo
+
+**Archivos modificados:**
+- `app/Models/ReceptionItem.php`
+
+**Constantes agregadas:**
+
+```php
+const CONFORMITY_OK   = 'CONFORME';
+const CONFORMITY_FAIL = 'NO_CONFORME';
+
+const NONCONFORMITY_TYPES = [
+    'defective'         => 'Producto defectuoso',
+    'wrong_specs'       => 'Especificaciones incorrectas',
+    'wrong_product'     => 'Producto diferente al solicitado',
+    'damaged_packaging' => 'Daño en empaque/producto',
+    'other'             => 'Otro',
+];
+```
+
+**Métodos nativos nuevos:**
+
+| Método | Propósito |
+|---|---|
+| `isConforming(): bool` | Retorna `true` si `conformity === CONFORME` |
+| `isNonConforming(): bool` | Retorna `true` si `conformity === NO_CONFORME` |
+| `getNonconformityLabel(): string` | Traduce la clave del tipo a texto legible |
+| `hasPhotos(): bool` | Verifica si hay fotos adjuntas |
+
+**Adaptadores de compatibilidad (para `show.blade.php` y código existente):**
+
+| Accesor / Método | Implementación | Semántica |
+|---|---|---|
+| `hasRejections()` | `conformity === NO_CONFORME` | Alias de `isNonConforming()` |
+| `getQuantityRejectedAttribute()` | `isNonConforming() ? quantity_received : 0` | Si no conforme → toda la cantidad es rechazada |
+| `getQuantityAcceptedAttribute()` | `isNonConforming() ? 0 : quantity_received` | Inverso del anterior |
+| `getRejectionReasonAttribute()` | `$this->nonconformity_notes` | Alias legible para vistas heredadas |
+
+> **Decisión de diseño:** Los adaptadores evitan modificar `show.blade.php` y otras vistas que ya usan la terminología anterior (`quantity_rejected`, `rejection_reason`). El contrato externo se mantiene; el almacenamiento interno es semánticamente correcto.
+
+---
+
+### 9.4 `ReceptionService` — Corrección de bug crítico en acumulación de cantidades
+
+**Archivos modificados:**
+- `app/Services/ReceptionService.php` — método `receive()`
+
+**Bug anterior:**
+```php
+// ANTES: se acumulaba quantity_received sin importar la conformidad
+if ($quantityReceived > 0) {
+    $item->increment('quantity_received', $quantityReceived);
+}
+```
+
+**Escenario que evidenciaba el bug:**
+- OC: 5 unidades ordenadas
+- Recepción 1: 2 unidades `NO_CONFORME` → `quantity_received` del ítem = 2, `pending` = 3
+- Recepción 2: 3 unidades `CONFORME` → `quantity_received` del ítem = 5, `pending` = 0
+- **Resultado incorrecto:** OC marcada como `RECEIVED`. Las 2 unidades rechazadas se daban por recibidas, el proveedor no tenía pendiente de reposición.
+
+**Corrección:**
+```php
+// DESPUÉS: solo las cantidades CONFORMES avanzan el estado de la orden
+$isConforming = ($lineData['conformity'] ?? ReceptionItem::CONFORMITY_OK) === ReceptionItem::CONFORMITY_OK;
+if ($quantityReceived > 0 && $isConforming) {
+    $item->increment('quantity_received', $quantityReceived);
+}
+```
+
+**Comportamiento correcto después del fix:**
+
+| Evento | `quantity_received` | `quantity_pending` | Estado OC |
+|---|---|---|---|
+| OC emitida (5 uds) | 0 | 5 | ISSUED |
+| Recepción 1: 2 `NO_CONFORME` | 0 | 5 | PARTIALLY_RECEIVED |
+| Recepción 2: 3 `CONFORME` | 3 | 2 | PARTIALLY_RECEIVED |
+| Recepción 3: 2 `CONFORME` (reposición) | 5 | 0 | RECEIVED ✅ |
+
+> **Implicación de negocio:** Las unidades rechazadas quedan visibles con su registro de no conformidad (tipo, descripción, fotos) pero **no cierran la orden**. El proveedor debe hacer una nueva entrega para cubrir las unidades rechazadas, lo que genera un nuevo `ReceptionItem` en el sistema.
+
+---
+
+### 9.5 `ReceptionController` — Validación alineada con nuevo modelo
+
+**Archivos modificados:**
+- `app/Http/Controllers/ReceptionController.php` — métodos `store()` y `storeDirect()`
+
+**Reglas de validación actualizadas:**
+
+Reemplazadas:
+```php
+// Eliminadas
+'items.*.quantity_rejected' => 'nullable|numeric|min:0',
+'items.*.rejection_reason'  => 'nullable|string|max:255',
+```
+
+Agregadas:
+```php
+'items.*.conformity'          => 'required|in:CONFORME,NO_CONFORME',
+'items.*.nonconformity_type'  => "nullable|string|in:{$nonconformityTypes}",
+'items.*.nonconformity_notes' => 'nullable|string|max:2000',
+'items.*.photos'              => 'nullable|array|max:5',
+'items.*.photos.*'            => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
+```
+
+**Nuevos métodos privados:**
+
+| Método | Propósito |
+|---|---|
+| `validateConformityFields(Request, array): array` | Validación manual de ítems `NO_CONFORME`: exige tipo, notas ≥ 100 chars y al menos 1 foto. Devuelve array de errores con claves `items.N.campo`. Se usa porque `required_if` de Laravel no funciona correctamente con wildcards en arrays anidados. |
+| `storeItemPhotos(Request, array): array` | Persiste las fotos de cada ítem en `storage/app/public/recepciones/fotos/` y devuelve el array de items con la clave `photos` reemplazada por las rutas resultantes. |
+
+---
+
+### 9.6 Vista `create.blade.php` — Rediseño de la sección de partidas
+
+**Archivos modificados:**
+- `resources/views/receptions/create.blade.php`
+
+**Cambios en la tabla de partidas:**
+
+| Columna anterior | Columna nueva | Cambio |
+|---|---|---|
+| Cant. Rechazada | Conformidad | Radio buttons: ✅ Conforme / ❌ No Conforme |
+| Motivo de Rechazo | Evidencia Fotográfica | Input file por partida (JPG/PNG, máx. 5 fotos) |
+
+**Fila expandible de No Conformidad:**
+
+Cuando se selecciona `❌ No Conforme`, se despliega una fila adicional (`bg-danger-subtle`) debajo de la partida con:
+- **Tipo de no conformidad** — select con las 5 categorías del FRU
+- **Descripción detallada** — textarea con contador de caracteres en tiempo real (`N/100`). El contador cambia a verde cuando se alcanzan los 100 caracteres requeridos.
+
+**Comportamiento de la evidencia fotográfica:**
+- `CONFORME` → label "Opcional", sin atributo `required`
+- `NO_CONFORME` → label "Obligatorio ✱", atributo `required` activado por JS
+
+**Validaciones en el frontend (JS):**
+- Bloqueo si `quantity_received > quantity_pending` (ya existía, conservado)
+- Verificación de tipo de no conformidad seleccionado
+- Verificación de longitud mínima de notas (< 100 chars → error)
+- Verificación de al menos 1 foto adjunta cuando `NO_CONFORME`
+- Límite de 5 fotos por partida (alerta SweetAlert si se excede)
+
+**Resumen de confirmación mejorado (SweetAlert):**
+
+Antes de guardar, el diálogo muestra un resumen dinámico:
+```
+Esta acción registrará la recepción y actualizará el estado de la orden.
+
+[ ✅ 3 conforme(s) ]  [ ❌ 1 no conforme(s) ]
+
+¿Confirmas el registro?
+```
+
+---
+
+## 10. Resumen Ejecutivo Actualizado (2026-03-24 — sesión tarde)
+
+| Componente | Estado | Observación |
+|---|---|---|
+| `ReceivingLocation` | ✅ Completo | Sin cambios |
+| `PurchaseOrder` | ✅ Completo | Sin cambios |
+| `PurchaseOrderItem` / `DirectPurchaseOrderItem` | ✅ Completo | Sin cambios |
+| `Reception` | ✅ Completo | Sin cambios |
+| `ReceptionItem` | ✅ Rediseñado | Sección 9.3: conformidad binaria, categorías, fotos, adaptadores de compat. |
+| `ReceptionService` | ✅ Bug crítico corregido | Sección 9.4: cantidades `NO_CONFORME` ya NO avanzan el estado de la orden |
+| `ReceptionController` | ✅ Actualizado | Sección 9.5: nueva validación, `validateConformityFields()`, `storeItemPhotos()` |
+| `create.blade.php` | ✅ Alineado con FRU 4.3 | Sección 9.6: conformidad, categorías, fotos, resumen de confirmación |
+| Flujo de aprobación OCD | ✅ Completo | Sin cambios (sección 7) |
+| `BudgetCommitment` | ✅ Completo | Sin cambios |
+| Validación REPSE | ✅ Completo | Sin cambios |
+| Notificaciones de recepción | ✅ Completo | Pendiente: incorporar rol Finanzas |
+
+**Brechas del FRU aún no implementadas (priorizadas para próximas sesiones):**
+
+| Brecha | Sección FRU | Complejidad |
+|---|---|---|
+| Estatus "Recibido sin Capturar" + proveedor carga evidencia primero | 4.5 | Alta |
+| Bloqueo/desbloqueo automático del portal por estación | 4.5 | Media |
+| Recepción masiva con checkbox global | 4.4 | Media |
+| Módulo de Provisiones Contables completo | 5 | Alta |
+| Scheduler de cierre automático por inactividad (OC 10d / OCD 7d) | 3.2 | Media |
+| Dashboard y reportes operativos | 7 | Media |
+| Notificación al Proveedor al confirmar recepción | 4.3 | Baja |
+| Indicadores visuales de urgencia en bandeja (semáforo) | 4.2 | Baja |
+
+---
+
+---
+
+## 11. Historial de Recepciones en Detalle de OC (2026-03-24)
+
+**Contexto:** El usuario necesitaba visualizar los comprobantes de recepción y los registros de no conformidad directamente desde el contexto de una Orden de Compra, sin tener que navegar a un módulo separado.
+
+### Decisión de arquitectura
+
+Se descartó mostrar comprobantes en `index.blade.php` (listado) porque:
+- Una OC puede tener múltiples recepciones parciales → no cabe en una columna
+- El listado ya tiene la columna de acciones saturada
+- La información de recepción pertenece al contexto de una OC específica
+
+**Flujo de navegación implementado:**
+```
+index.blade.php          show.blade.php                  receptions/show.blade.php
+─────────────────        ──────────────────────────────  ─────────────────────────
+Lista de OCs         →   Detalle de la OC            →   Comprobante completo
+[badge RECEIVED]         Historial de Recepciones         (imprimible, con fotos,
+                         ┌────────────────────────┐        conformidad por partida)
+                         │ REC-2026-0001 COMPLETADA│──►
+                         │ REC-2026-0002 PARCIAL   │──►
+                         └────────────────────────┘
+```
+
+---
+
+### 11.1 `PurchaseOrderController::show()` — eager loading de recepciones
+
+**Archivo modificado:** `app/Http/Controllers/PurchaseOrderController.php`
+
+Se agregaron tres relaciones al `load()` existente:
+
+```php
+'receptions.items.receivableItem',
+'receptions.receiver',
+'receptions.receivingLocation',
+```
+
+Esto evita N+1 queries al renderizar el historial con múltiples recepciones y sus partidas.
+
+---
+
+### 11.2 `show.blade.php` — sección "Historial de Recepciones"
+
+**Archivo modificado:** `resources/views/purchase-orders/show.blade.php`
+
+Se añadió una nueva tarjeta **fuera del área imprimible** (`d-print-none`) debajo del documento de la OC. Características:
+
+| Elemento | Detalle |
+|---|---|
+| Barra de progreso | Partidas completamente recibidas / total. Verde cuando llega al 100%. |
+| Badge "Contiene no conformidades" | Aparece en rojo si cualquier `ReceptionItem` de la OC es `NO_CONFORME` |
+| Botón "Registrar Recepción" | Visible solo si `$purchaseOrder->canBeReceived()` es true |
+| Tabla de recepciones | Folio, fecha, receptor, punto de entrega, partidas, no conformes, estado |
+| Columna "No Conformes" | Badge rojo con conteo; guion si todas son conformes |
+| Botón comprobante | `→ receptions.show` para cada recepción |
+| Estado vacío | Mensaje con ícono cuando no hay recepciones registradas |
+
+---
+
+### 11.3 `receptions/show.blade.php` — rediseño completo del comprobante
+
+**Archivo modificado:** `resources/views/receptions/show.blade.php`
+
+**Cambios respecto a la versión anterior:**
+
+| Elemento | Antes | Ahora |
+|---|---|---|
+| Columnas de tabla | Recibido / Rechazado / Aceptado / Motivo | Recibido / Conformidad |
+| Indicador de calidad | Cantidad numérica rechazada | Badge `✅ Conforme` / `❌ No Conforme` |
+| Filas de no conformidad | No existían | Fila expandida `bg-danger-subtle` con Tipo + Descripción |
+| Evidencia fotográfica | No existía | Miniaturas (64×64 px) con enlace a imagen completa |
+| Resumen de conformidad | No existía | Tarjetas de conteo: "N Conformes / N No Conformes" |
+| Breadcrumb | Genérico | Incluye enlace a la OC / OCD origen |
+| Botones de header | Solo "Regresar" | "Regresar" + "Ver OC" / "Ver OCD" según tipo |
+| Estilos de impresión | Básicos | Fila no-conforme con `background-color` para impresión |
+
+**Lógica de las filas de no conformidad:**
+
+Cada `ReceptionItem` con `conformity = NO_CONFORME` genera **dos filas** en la tabla:
+1. Fila principal (resaltada en `table-warning`) con descripción, cantidad y badge rojo
+2. Fila de detalle (`nonconf-row`, `bg-danger-subtle`) con tipo de no conformidad y descripción completa
+
+Las fotos se muestran como miniaturas clickeables en la misma celda de descripción, abriendo la imagen completa en nueva pestaña.
+
+---
+
+### 11.4 Historial de Recepciones en OCD (`show-direct.blade.php`)
+
+**Contexto:** La sección de historial se implementó inicialmente solo para OC estándar (`show.blade.php`). Se extendió a OCD al identificar que ambos tipos de orden siguen el mismo flujo de recepción.
+
+**Archivos modificados:**
+- `app/Http/Controllers/PurchaseOrderController.php` — método `showDirect()`
+- `resources/views/purchase-orders/show-direct.blade.php`
+
+**`showDirect()` — eager loading agregado:**
+```php
+'receptions.items.receivableItem',
+'receptions.receiver',
+'receptions.receivingLocation',
+```
+
+**Vista `show-direct.blade.php`:**
+
+La sección es idéntica a la de `show.blade.php` en estructura y comportamiento. La única diferencia es:
+- Variable: `$directPurchaseOrder` en lugar de `$purchaseOrder`
+- Botón "Registrar Recepción" apunta a `receptions.create-direct` en lugar de `receptions.create`
+
+> **Nota de implementación:** El bloque HTML de la sección se insertó dentro del `@section('content')` existente, después del `@endpush` del bloque de scripts. La vista `show-direct.blade.php` usa la estructura `@push('scripts')` dentro del `@section('content')`, a diferencia de `show.blade.php` que no tiene scripts propios.
+
+---
+
+### 11.5 Estado del flujo de navegación
+
+| Pantalla | Ruta | Estado |
+|---|---|---|
+| Listado de OCs | `purchase-orders.index` | Sin cambios — badge de estado indica si fue recibida |
+| Detalle de OC estándar | `purchase-orders.show` | ✅ Historial de Recepciones (Sección 11.2) |
+| Detalle de OCD | `direct-purchase-orders.show` | ✅ Historial de Recepciones (Sección 11.4) |
+| Comprobante de recepción | `receptions.show` | ✅ Actualizado: conformidad, fotos, no conformidades |
+| Formulario de recepción OC | `receptions.create` | ✅ Actualizado (Sección 9) |
+| Formulario de recepción OCD | `receptions.create-direct` | ✅ Actualizado (Sección 9) |
+
+---
+
+## 12. Resumen Ejecutivo (2026-03-24)
+
+| Componente | Estado | Notas |
+|---|---|---|
+| Modelos de datos (`PurchaseOrder`, `Reception`, `ReceptionItem`, etc.) | ✅ Completo | — |
+| `ReceptionService` | ✅ Completo | Bug de conteo NO_CONFORME corregido (Sección 9.4) |
+| `ReceptionController` | ✅ Completo | Validación conformidad + fotos por ítem |
+| `create.blade.php` | ✅ Alineado con FRU 4.3 | Conformidad, categorías, fotos, resumen |
+| `show.blade.php` (OC estándar) | ✅ Historial de Recepciones | Sección 11.2 |
+| `show-direct.blade.php` (OCD) | ✅ Historial de Recepciones | Sección 11.4 |
+| `receptions/show.blade.php` | ✅ Rediseñado | Sección 11.3 |
+| Flujo de aprobación OCD | ✅ Completo | Sección 7 |
+| Notificaciones de recepción | ✅ Completo | Pendiente: rol Finanzas |
+
+**Brechas del FRU pendientes (sin cambios respecto a Sección 10):**
+
+| Brecha | Sección FRU | Prioridad |
+|---|---|---|
+| Estatus "Recibido sin Capturar" + proveedor carga evidencia | 4.5 | Alta |
+| Bloqueo/desbloqueo automático del portal por estación | 4.5 | Media |
+| Recepción masiva con checkbox global | 4.4 | Media |
+| Módulo de Provisiones Contables | 5 | Alta |
+| Scheduler de cierre por inactividad | 3.2 | Media |
+| Dashboard y reportes operativos | 7 | Media |
+| Notificación al Proveedor al confirmar recepción | 4.3 | Baja |
+
+---
+
+## 13. Visualización de Remisión del Proveedor (2026-03-24)
+
+### 13.1 Contexto
+
+El campo `remission_path` del modelo `Reception` almacena el archivo de remisión que el proveedor carga durante el registro de la recepción. Hasta esta versión, dicho archivo se guardaba correctamente en disco pero no era accesible desde ninguna vista del sistema.
+
+### 13.2 Cambios Implementados
+
+**Nueva ruta de descarga (`routes/web.php`):**
+```
+GET /receptions/{reception}/remission  →  receptions.remission.download
+```
+
+**Nuevo método en `ReceptionController`:**
+```php
+public function downloadRemission(Reception $reception)
+```
+- Verifica que `remission_path` exista en el modelo y en disco (`abort_if` / `abort_unless`).
+- Devuelve el archivo con nombre legible: `Remision-{folio}.{ext}`.
+
+**`receptions/show.blade.php` — Comprobante de Recepción:**
+- Botón "Descargar Remisión" (`ti-paperclip`) junto a la Ref. Remisión existente.
+- Solo visible cuando `remission_path` tiene valor.
+- Marcado `d-print-none` para no aparecer al imprimir.
+
+**`purchase-orders/show.blade.php` — Historial OC Regular:**
+- Nueva columna "Remisión" con botón de descarga por fila (`ti-paperclip`).
+- Si la recepción no tiene archivo: muestra `—`.
+- El `title` del botón incluye la referencia textual de la remisión para contexto rápido.
+
+**`purchase-orders/show-direct.blade.php` — Historial OCD:**
+- Mismo cambio que el historial de OC Regular.
+
+### 13.3 Flujo de Acceso
+
+```
+OC/OCD show  →  Historial de Recepciones  →  [📎]  →  descarga directa del archivo
+                                                ↓
+                                   receptions/show  →  [Descargar Remisión]
+```
+
+---
+
+*Documento actualizado con base en análisis de código fuente y revisión contra FRU del 2026-03-24.*

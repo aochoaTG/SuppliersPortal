@@ -3,20 +3,14 @@
 @section('title', 'Centros de Costo')
 @section('page.title', 'Centros de Costo')
 @section('page.breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ route('cost-centers.index') }}">Centros de Costo</a></li>
-<li class="breadcrumb-item active">Listado</li>
+<li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+<li class="breadcrumb-item active">Centros de Costo</li>
 @endsection
-
-@push('styles')
-{{-- DataTables --}}
-<link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-bs5/css/dataTables.bootstrap5.min.css') }}">
-<link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-buttons-bs5/css/buttons.bootstrap5.min.css') }}">
-@endpush
 
 @section('content')
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="ti ti-hierarchy-2"></i> Centros de Costo</h5>
+        <h5 class="mb-0"><i class="ti ti-hierarchy-2 me-1"></i> Centros de Costo</h5>
     </div>
 
     <div class="card-body">

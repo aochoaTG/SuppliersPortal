@@ -20,12 +20,23 @@ return new class extends Migration
             // Puede ser PurchaseOrderItem o DirectPurchaseOrderItem.
             $table->morphs('receivable_item'); // receivable_item_type + receivable_item_id + índice compuesto
 
-            // Cantidades de este evento
+            // Cantidad recibida en este evento
             $table->decimal('quantity_received', 10, 3);
-            $table->decimal('quantity_rejected', 10, 3)->default(0);
 
-            // Motivo si hubo rechazo de unidades (dañadas, incorrectas, etc.)
-            $table->string('rejection_reason', 255)->nullable();
+            // Conformidad de especificaciones (FRU Sección 4.3-B)
+            // CONFORME = el producto cumple especificaciones
+            // NO_CONFORME = el producto NO cumple especificaciones
+            $table->string('conformity', 20)->default('CONFORME');
+
+            // Categoría de no conformidad — solo aplica cuando conformity = NO_CONFORME
+            $table->string('nonconformity_type', 50)->nullable();
+
+            // Descripción detallada (mínimo 100 caracteres en UI cuando NO_CONFORME)
+            $table->text('nonconformity_notes')->nullable();
+
+            // Rutas de evidencia fotográfica (JSON array, máx 5 fotos por partida)
+            // Obligatorio cuando conformity = NO_CONFORME, opcional cuando CONFORME
+            $table->json('photos')->nullable();
 
             $table->timestamps();
 

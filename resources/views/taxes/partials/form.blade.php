@@ -42,5 +42,5 @@
     <button class="btn btn-primary">
         {{ $editing ? 'Actualizar' : 'Crear' }}
     </button>
-    <a href="{{ route('taxes.index') }}" class="btn btn-light">Cancelar</a>
+    <a href="{{ route('taxes.index') }}" class="btn btn-outline-secondary">Cancelar</a>
 </div>

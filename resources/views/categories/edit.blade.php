@@ -1,9 +1,10 @@
 @extends('layouts.zircos')
 
-@section('title', 'Editar Categoria')
-@section('page.title', 'Editar Categoria')
+@section('title', 'Editar Categoría')
+@section('page.title', 'Editar Categoría')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('categories.index') }}">Categorias</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('categories.index') }}">Categorías</a></li>
     <li class="breadcrumb-item active">Editar</li>
 @endsection
 
@@ -13,7 +14,7 @@
         @method('PUT')
 
         <div class="card-header">
-            <h5 class="mb-0"><i class="ti ti-category"></i> Editar: {{ $category->name }}</h5>
+            <h5 class="mb-0"><i class="ti ti-category me-1"></i> Editar: {{ $category->name }}</h5>
         </div>
 
         <div class="card-body">
@@ -21,7 +22,7 @@
         </div>
 
         <div class="card-footer d-flex justify-content-between">
-            <a href="{{ route('categories.index') }}" class="btn btn-light">
+            <a href="{{ route('categories.index') }}" class="btn btn-outline-secondary">
                 <i class="ti ti-arrow-left"></i> Volver
             </a>
             <button type="submit" class="btn btn-primary">

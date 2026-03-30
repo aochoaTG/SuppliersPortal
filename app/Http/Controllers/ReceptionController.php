@@ -7,6 +7,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Reception;
 use App\Models\ReceivingLocation;
 use App\Services\ReceptionService;
+use App\Models\ReceptionItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -176,13 +177,13 @@ class ReceptionController extends Controller
             ->whereIn('status', $pendingStatuses)
             ->whereIn('receiving_location_id', $locationIds)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate(50, ['*'], 'oc_page');
 
         $directOrders = DirectPurchaseOrder::with(['supplier', 'receivingLocation', 'creator'])
             ->whereIn('status', $pendingStatuses)
             ->whereIn('receiving_location_id', $locationIds)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate(50, ['*'], 'ocd_page');
 
         return view('receptions.pending', compact('purchaseOrders', 'directOrders'));
     }
@@ -217,6 +218,8 @@ class ReceptionController extends Controller
 
         $this->authorize('useMassReception', $purchaseOrder->receivingLocation);
 
+        $nonconformityTypes = implode(',', array_keys(ReceptionItem::NONCONFORMITY_TYPES));
+
         $validated = $request->validate([
             'receiving_location_id'          => 'required|integer|exists:receiving_locations,id',
             'delivery_reference'             => 'nullable|string|max:100',
@@ -226,12 +229,24 @@ class ReceptionController extends Controller
             'items'                          => 'required|array|min:1',
             'items.*.receivable_item_id'     => 'required|integer|exists:purchase_order_items,id',
             'items.*.quantity_received'      => 'required|numeric|min:0',
-            'items.*.quantity_rejected'      => 'nullable|numeric|min:0',
-            'items.*.rejection_reason'       => 'nullable|string|max:255',
+            'items.*.conformity'             => 'required|in:CONFORME,NO_CONFORME',
+            'items.*.nonconformity_type'     => "nullable|string|in:{$nonconformityTypes}",
+            'items.*.nonconformity_notes'    => 'nullable|string|max:2000',
+            'items.*.photos'                 => 'nullable|array|max:5',
+            'items.*.photos.*'               => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
         ]);
+
+        // Validación manual de campos NO_CONFORME (required_if no funciona con wildcards anidados)
+        $conformityErrors = $this->validateConformityFields($request, $validated['items']);
+        if (! empty($conformityErrors)) {
+            return back()->withErrors($conformityErrors)->withInput();
+        }
 
         $remissionPath = $request->file('remission_file')->store('remisiones', 'public');
         $validated['remission_path'] = $remissionPath;
+
+        // Guardar fotos por ítem
+        $validated['items'] = $this->storeItemPhotos($request, $validated['items']);
 
         try {
             $reception = $this->receptionService->receive(
@@ -284,6 +299,8 @@ class ReceptionController extends Controller
 
         $this->authorize('useMassReception', $directPurchaseOrder->receivingLocation);
 
+        $nonconformityTypes = implode(',', array_keys(ReceptionItem::NONCONFORMITY_TYPES));
+
         $validated = $request->validate([
             'receiving_location_id'          => 'required|integer|exists:receiving_locations,id',
             'delivery_reference'             => 'nullable|string|max:100',
@@ -293,12 +310,22 @@ class ReceptionController extends Controller
             'items'                          => 'required|array|min:1',
             'items.*.receivable_item_id'     => 'required|integer|exists:odc_direct_purchase_order_items,id',
             'items.*.quantity_received'      => 'required|numeric|min:0',
-            'items.*.quantity_rejected'      => 'nullable|numeric|min:0',
-            'items.*.rejection_reason'       => 'nullable|string|max:255',
+            'items.*.conformity'             => 'required|in:CONFORME,NO_CONFORME',
+            'items.*.nonconformity_type'     => "nullable|string|in:{$nonconformityTypes}",
+            'items.*.nonconformity_notes'    => 'nullable|string|max:2000',
+            'items.*.photos'                 => 'nullable|array|max:5',
+            'items.*.photos.*'               => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
         ]);
+
+        $conformityErrors = $this->validateConformityFields($request, $validated['items']);
+        if (! empty($conformityErrors)) {
+            return back()->withErrors($conformityErrors)->withInput();
+        }
 
         $remissionPath = $request->file('remission_file')->store('remisiones', 'public');
         $validated['remission_path'] = $remissionPath;
+
+        $validated['items'] = $this->storeItemPhotos($request, $validated['items']);
 
         try {
             $reception = $this->receptionService->receive(
@@ -321,6 +348,62 @@ class ReceptionController extends Controller
         }
     }
 
+    // ─── Helpers privados ─────────────────────────────────────────────────────
+
+    /**
+     * Valida que los ítems NO_CONFORME tengan tipo, notas (min 100 chars) y al menos 1 foto.
+     * Devuelve array de errores con claves en formato "items.N.campo".
+     */
+    private function validateConformityFields(Request $request, array $items): array
+    {
+        $errors = [];
+
+        foreach ($items as $i => $itemData) {
+            if (($itemData['conformity'] ?? 'CONFORME') !== 'NO_CONFORME') {
+                continue;
+            }
+
+            if (empty($itemData['nonconformity_type'])) {
+                $errors["items.{$i}.nonconformity_type"] = 'El tipo de no conformidad es obligatorio.';
+            }
+
+            $notes = trim($itemData['nonconformity_notes'] ?? '');
+            if (strlen($notes) < 100) {
+                $errors["items.{$i}.nonconformity_notes"] = 'La descripción debe tener al menos 100 caracteres (actualmente ' . strlen($notes) . ').';
+            }
+
+            $photos = $request->file("items.{$i}.photos");
+            if (empty($photos)) {
+                $errors["items.{$i}.photos"] = 'La evidencia fotográfica es obligatoria cuando el ítem es NO CONFORME.';
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Guarda las fotos de cada ítem y devuelve el array de items
+     * con la clave 'photos' reemplazada por un array de rutas.
+     */
+    private function storeItemPhotos(Request $request, array $items): array
+    {
+        foreach ($items as $i => &$itemData) {
+            $files = $request->file("items.{$i}.photos");
+            if (! empty($files)) {
+                $paths = [];
+                foreach ($files as $file) {
+                    $paths[] = $file->store('recepciones/fotos', 'public');
+                }
+                $itemData['photos'] = $paths;
+            } else {
+                $itemData['photos'] = null;
+            }
+        }
+        unset($itemData);
+
+        return $items;
+    }
+
     /**
      * Detalle de una recepción registrada.
      */
@@ -334,5 +417,17 @@ class ReceptionController extends Controller
         ]);
 
         return view('receptions.show', compact('reception'));
+    }
+
+    public function downloadRemission(Reception $reception)
+    {
+        abort_if(!$reception->remission_path, 404, 'Esta recepción no tiene remisión adjunta.');
+
+        abort_unless(Storage::disk('public')->exists($reception->remission_path), 404, 'Archivo no encontrado.');
+
+        return Storage::disk('public')->download(
+            $reception->remission_path,
+            'Remision-' . $reception->folio . '.' . pathinfo($reception->remission_path, PATHINFO_EXTENSION)
+        );
     }
 }

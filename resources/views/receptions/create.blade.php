@@ -20,7 +20,7 @@
 
     <div class="row g-3">
 
-        {{-- ── Error general ────────────────────────────────────────────── --}}
+        {{-- ── Errores generales ──────────────────────────────────────────── --}}
         @if(session('error'))
             <div class="col-12">
                 <div class="alert alert-danger alert-dismissible fade show">
@@ -44,7 +44,7 @@
             </div>
         @endif
 
-        {{-- ── Advertencia REPSE ──────────────────────────────────────── --}}
+        {{-- ── Advertencia REPSE ──────────────────────────────────────────── --}}
         @if($repseWarning)
             <div class="col-12">
                 <div class="alert alert-warning d-flex align-items-start gap-2 mb-0">
@@ -62,9 +62,7 @@
                 <div class="card-header d-flex align-items-center gap-2">
                     <i class="ti ti-file-description"></i>
                     <h6 class="mb-0 flex-grow-1">Datos de la Orden</h6>
-                    <span class="badge bg-{{ $order->getStatusBadgeClass() }}">
-                        {{ $order->getStatusLabel() }}
-                    </span>
+                    <span class="badge bg-{{ $order->getStatusBadgeClass() }}">{{ $order->getStatusLabel() }}</span>
                     @if($orderType === 'purchase_order')
                         <span class="badge bg-soft-primary text-primary">OC Estándar</span>
                     @else
@@ -90,7 +88,7 @@
                             <p class="mb-0 fw-bold">${{ number_format($order->total, 2) }} {{ $order->currency }}</p>
                         </div>
                         <div class="col-sm-2">
-                            <label class="form-label small fw-bold text-muted">Punto de Entrega Original</label>
+                            <label class="form-label small fw-bold text-muted">Punto de Entrega</label>
                             <p class="mb-0 small">{{ $order->receivingLocation?->name ?? '—' }}</p>
                         </div>
                     </div>
@@ -109,13 +107,11 @@
                 <div class="card-body">
                     <div class="row g-3">
 
-                        {{-- Ubicación de recepción --}}
                         <div class="col-md-4">
                             <label class="form-label small fw-bold" for="receiving_location_id">
                                 Punto de Recepción <span class="text-danger">*</span>
                             </label>
-                            <select name="receiving_location_id"
-                                    id="receiving_location_id"
+                            <select name="receiving_location_id" id="receiving_location_id"
                                     class="form-select form-select-sm select2-enable @error('receiving_location_id') is-invalid @enderror"
                                     required>
                                 <option value="">Seleccionar…</option>
@@ -131,14 +127,11 @@
                             @enderror
                         </div>
 
-                        {{-- Fecha y hora de recepción --}}
                         <div class="col-md-3">
                             <label class="form-label small fw-bold" for="received_at">
                                 Fecha y Hora de Recepción <span class="text-danger">*</span>
                             </label>
-                            <input type="datetime-local"
-                                   name="received_at"
-                                   id="received_at"
+                            <input type="datetime-local" name="received_at" id="received_at"
                                    class="form-control form-control-sm @error('received_at') is-invalid @enderror"
                                    value="{{ old('received_at', now()->format('Y-m-d\TH:i')) }}"
                                    required>
@@ -147,14 +140,11 @@
                             @enderror
                         </div>
 
-                        {{-- Nº de remisión --}}
                         <div class="col-md-3">
                             <label class="form-label small fw-bold" for="delivery_reference">
                                 Nº de Remisión / Referencia
                             </label>
-                            <input type="text"
-                                   name="delivery_reference"
-                                   id="delivery_reference"
+                            <input type="text" name="delivery_reference" id="delivery_reference"
                                    class="form-control form-control-sm @error('delivery_reference') is-invalid @enderror"
                                    value="{{ old('delivery_reference') }}"
                                    maxlength="100"
@@ -164,14 +154,11 @@
                             @enderror
                         </div>
 
-                        {{-- Archivo de remisión --}}
                         <div class="col-md-4">
                             <label class="form-label small fw-bold" for="remission_file">
                                 Archivo de Remisión <span class="text-danger">*</span>
                             </label>
-                            <input type="file"
-                                   name="remission_file"
-                                   id="remission_file"
+                            <input type="file" name="remission_file" id="remission_file"
                                    class="form-control form-control-sm @error('remission_file') is-invalid @enderror"
                                    accept=".pdf,.jpg,.jpeg,.png"
                                    required>
@@ -181,17 +168,14 @@
                             @enderror
                         </div>
 
-                        {{-- Notas --}}
                         <div class="col-md-8">
                             <label class="form-label small fw-bold" for="notes">
                                 Notas u Observaciones
                             </label>
-                            <textarea name="notes"
-                                      id="notes"
+                            <textarea name="notes" id="notes"
                                       class="form-control form-control-sm @error('notes') is-invalid @enderror"
-                                      rows="2"
-                                      maxlength="1000"
-                                      placeholder="Estado del empaque, condiciones de entrega, etc.">{{ old('notes') }}</textarea>
+                                      rows="2" maxlength="1000"
+                                      placeholder="Estado general del empaque, condiciones de entrega, etc.">{{ old('notes') }}</textarea>
                             @error('notes')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -209,22 +193,26 @@
             <div class="card shadow-sm border-0">
                 <div class="card-header d-flex align-items-center justify-content-between">
                     <h6 class="mb-0"><i class="ti ti-list-details me-2"></i>Partidas a Recibir</h6>
-                    <small class="text-muted">Al menos una partida debe tener cantidad a recibir mayor a cero</small>
+                    <small class="text-muted">Al menos una partida debe tener cantidad mayor a cero</small>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover table-centered mb-0" id="items-table">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3">Descripción</th>
-                                    <th class="text-center" style="width:110px">Cant. Ordenada</th>
-                                    <th class="text-center" style="width:110px">Ya Recibido</th>
-                                    <th class="text-center" style="width:100px">Pendiente</th>
-                                    <th class="text-center" style="width:130px">
-                                        Cant. a Recibir <span class="text-danger">*</span>
+                                    <th class="ps-3" style="min-width:200px">Descripción</th>
+                                    <th class="text-center" style="width:100px">Ordenado</th>
+                                    <th class="text-center" style="width:100px">Ya Recibido</th>
+                                    <th class="text-center" style="width:90px">Pendiente</th>
+                                    <th class="text-center" style="width:120px">
+                                        A Recibir <span class="text-danger">*</span>
                                     </th>
-                                    <th class="text-center" style="width:120px">Cant. Rechazada</th>
-                                    <th style="min-width:180px">Motivo de Rechazo</th>
+                                    <th class="text-center" style="min-width:200px">
+                                        Conformidad <span class="text-danger">*</span>
+                                    </th>
+                                    <th class="text-center" style="min-width:160px">
+                                        Evidencia Fotográfica
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -234,14 +222,15 @@
                                         $pending         = (float) $item->quantity_pending;
                                         $fullyReceived   = $item->isFullyReceived();
                                         $oldReceived     = old("items.{$i}.quantity_received");
-                                        $oldRejected     = (float) old("items.{$i}.quantity_rejected", 0);
+                                        $oldConformity   = old("items.{$i}.conformity", 'CONFORME');
                                     @endphp
-                                    <tr class="{{ $fullyReceived ? 'table-secondary' : '' }}"
-                                        data-pending="{{ $pending }}">
 
-                                        <input type="hidden"
-                                               name="items[{{ $i }}][receivable_item_id]"
-                                               value="{{ $item->id }}">
+                                    {{-- ── Fila principal ─────────────────────────────── --}}
+                                    <tr class="{{ $fullyReceived ? 'table-secondary' : '' }}"
+                                        data-pending="{{ $pending }}"
+                                        data-index="{{ $i }}">
+
+                                        <input type="hidden" name="items[{{ $i }}][receivable_item_id]" value="{{ $item->id }}">
 
                                         {{-- Descripción --}}
                                         <td class="ps-3">
@@ -249,6 +238,7 @@
                                             @if($fullyReceived)
                                                 <span class="badge bg-success ms-1">Completo</span>
                                             @endif
+                                            <div class="small text-muted">{{ $item->unit ?? '' }}</div>
                                         </td>
 
                                         {{-- Cant. ordenada --}}
@@ -285,35 +275,120 @@
                                             @enderror
                                         </td>
 
-                                        {{-- Cant. rechazada --}}
+                                        {{-- Conformidad --}}
                                         <td class="text-center">
-                                            <input type="number"
-                                                   name="items[{{ $i }}][quantity_rejected]"
-                                                   class="form-control form-control-sm text-center qty-rejected"
-                                                   value="{{ $oldRejected }}"
-                                                   min="0"
-                                                   step="0.001"
-                                                   data-index="{{ $i }}"
-                                                   {{ $fullyReceived ? 'disabled' : '' }}>
-                                            @error("items.{$i}.quantity_rejected")
-                                                <div class="text-danger" style="font-size:0.75rem">{{ $message }}</div>
-                                            @enderror
+                                            @if(! $fullyReceived)
+                                                <input type="hidden" name="items[{{ $i }}][conformity]" value="CONFORME" class="conformity-hidden-{{ $i }}">
+                                                <div class="d-flex justify-content-center gap-2">
+                                                    <div class="form-check form-check-inline mb-0">
+                                                        <input class="form-check-input conformity-radio"
+                                                               type="radio"
+                                                               name="items[{{ $i }}][conformity]"
+                                                               id="conf_ok_{{ $i }}"
+                                                               value="CONFORME"
+                                                               data-index="{{ $i }}"
+                                                               {{ $oldConformity !== 'NO_CONFORME' ? 'checked' : '' }}>
+                                                        <label class="form-check-label text-success fw-semibold small" for="conf_ok_{{ $i }}">
+                                                            <i class="ti ti-circle-check"></i> Conforme
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline mb-0">
+                                                        <input class="form-check-input conformity-radio"
+                                                               type="radio"
+                                                               name="items[{{ $i }}][conformity]"
+                                                               id="conf_fail_{{ $i }}"
+                                                               value="NO_CONFORME"
+                                                               data-index="{{ $i }}"
+                                                               {{ $oldConformity === 'NO_CONFORME' ? 'checked' : '' }}>
+                                                        <label class="form-check-label text-danger fw-semibold small" for="conf_fail_{{ $i }}">
+                                                            <i class="ti ti-circle-x"></i> No Conforme
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                @error("items.{$i}.conformity")
+                                                    <div class="text-danger" style="font-size:0.75rem">{{ $message }}</div>
+                                                @enderror
+                                            @else
+                                                <span class="badge bg-secondary">—</span>
+                                            @endif
                                         </td>
 
-                                        {{-- Motivo de rechazo --}}
-                                        <td>
-                                            <input type="text"
-                                                   name="items[{{ $i }}][rejection_reason]"
-                                                   class="form-control form-control-sm rejection-reason"
-                                                   value="{{ old("items.{$i}.rejection_reason") }}"
-                                                   maxlength="255"
-                                                   placeholder="Requerido si hay rechazos"
-                                                   {{ ($fullyReceived || $oldRejected <= 0) ? 'disabled' : '' }}>
-                                            @error("items.{$i}.rejection_reason")
-                                                <div class="text-danger" style="font-size:0.75rem">{{ $message }}</div>
-                                            @enderror
+                                        {{-- Evidencia fotográfica --}}
+                                        <td class="text-center">
+                                            @if(! $fullyReceived)
+                                                <div>
+                                                    <label class="form-label small mb-1" id="photo-label-{{ $i }}">
+                                                        <span class="text-muted">Opcional</span>
+                                                    </label>
+                                                    <input type="file"
+                                                           name="items[{{ $i }}][photos][]"
+                                                           id="photos_{{ $i }}"
+                                                           class="form-control form-control-sm item-photos"
+                                                           accept=".jpg,.jpeg,.png"
+                                                           multiple
+                                                           data-index="{{ $i }}">
+                                                    <div class="form-text" style="font-size:0.7rem">JPG/PNG · Máx. 5 fotos · 5 MB c/u</div>
+                                                    @error("items.{$i}.photos")
+                                                        <div class="text-danger" style="font-size:0.75rem">{{ $message }}</div>
+                                                    @enderror
+                                                </div>
+                                            @else
+                                                <span class="text-muted small">—</span>
+                                            @endif
                                         </td>
                                     </tr>
+
+                                    {{-- ── Fila de no conformidad (oculta por defecto) ── --}}
+                                    <tr id="nonconf-row-{{ $i }}"
+                                        class="bg-danger-subtle {{ $oldConformity !== 'NO_CONFORME' ? 'd-none' : '' }}">
+                                        <td colspan="7" class="py-2 px-3">
+                                            <div class="row g-2 align-items-start">
+                                                <div class="col-md-3">
+                                                    <label class="form-label small fw-bold text-danger" for="nonconf_type_{{ $i }}">
+                                                        Tipo de No Conformidad <span class="text-danger">*</span>
+                                                    </label>
+                                                    <select name="items[{{ $i }}][nonconformity_type]"
+                                                            id="nonconf_type_{{ $i }}"
+                                                            class="form-select form-select-sm nonconformity-type @error("items.{$i}.nonconformity_type") is-invalid @enderror">
+                                                        <option value="">Seleccionar…</option>
+                                                        @foreach(\App\Models\ReceptionItem::NONCONFORMITY_TYPES as $key => $label)
+                                                            <option value="{{ $key }}"
+                                                                {{ old("items.{$i}.nonconformity_type") === $key ? 'selected' : '' }}>
+                                                                {{ $label }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                    @error("items.{$i}.nonconformity_type")
+                                                        <div class="invalid-feedback">{{ $message }}</div>
+                                                    @enderror
+                                                </div>
+                                                <div class="col-md-9">
+                                                    <label class="form-label small fw-bold text-danger" for="nonconf_notes_{{ $i }}">
+                                                        Descripción de la No Conformidad <span class="text-danger">*</span>
+                                                        <span class="fw-normal text-muted">(mínimo 100 caracteres)</span>
+                                                    </label>
+                                                    <textarea name="items[{{ $i }}][nonconformity_notes]"
+                                                              id="nonconf_notes_{{ $i }}"
+                                                              class="form-control form-control-sm nonconformity-notes @error("items.{$i}.nonconformity_notes") is-invalid @enderror"
+                                                              rows="2"
+                                                              maxlength="2000"
+                                                              data-index="{{ $i }}"
+                                                              placeholder="Describa detalladamente la no conformidad: qué se recibió, en qué condiciones, cómo difiere de lo solicitado...">{{ old("items.{$i}.nonconformity_notes") }}</textarea>
+                                                    <div class="d-flex justify-content-between">
+                                                        @error("items.{$i}.nonconformity_notes")
+                                                            <div class="text-danger" style="font-size:0.75rem">{{ $message }}</div>
+                                                        @else
+                                                            <div></div>
+                                                        @enderror
+                                                        <small class="text-muted char-counter-{{ $i }}">
+                                                            {{ strlen(old("items.{$i}.nonconformity_notes", '')) }}/100
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+
                                 @endforeach
                             </tbody>
                         </table>
@@ -343,20 +418,44 @@ $(document).ready(function () {
     // ─── Select2 ─────────────────────────────────────────────────────────────
     $('.select2-enable').select2({ width: '100%', placeholder: 'Seleccionar…' });
 
-    // ─── Motivo de rechazo: activar/desactivar según cantidad rechazada ───────
-    $(document).on('change input', '.qty-rejected', function () {
-        const $row    = $(this).closest('tr');
-        const $reason = $row.find('.rejection-reason');
-        const val     = parseFloat($(this).val()) || 0;
+    // ─── Conformidad: mostrar / ocultar fila de no conformidad ───────────────
+    $(document).on('change', '.conformity-radio', function () {
+        const idx       = $(this).data('index');
+        const isNoConf  = $(this).val() === 'NO_CONFORME';
+        const $noConfRow = $('#nonconf-row-' + idx);
+        const $photoLabel = $('#photo-label-' + idx);
+        const $photoInput = $('#photos_' + idx);
 
-        if (val > 0) {
-            $reason.prop('disabled', false).attr('required', 'required');
+        if (isNoConf) {
+            $noConfRow.removeClass('d-none');
+            $noConfRow.find('select.nonconformity-type').attr('required', true);
+            $noConfRow.find('textarea.nonconformity-notes').attr('required', true);
+            $photoLabel.html('<span class="text-danger fw-bold">Obligatorio <i class="ti ti-asterisk" style="font-size:0.6rem"></i></span>');
+            $photoInput.attr('required', true);
         } else {
-            $reason.prop('disabled', true).removeAttr('required').val('');
+            $noConfRow.addClass('d-none');
+            $noConfRow.find('select.nonconformity-type').removeAttr('required').val('');
+            $noConfRow.find('textarea.nonconformity-notes').removeAttr('required').val('');
+            $photoLabel.html('<span class="text-muted">Opcional</span>');
+            $photoInput.removeAttr('required');
         }
     });
 
-    // ─── Cant. a recibir: bloqueo estricto si excede pendiente ───────────────
+    // Inicializar estado de filas que volvieron con old() en NO_CONFORME
+    $('.conformity-radio:checked').each(function () {
+        if ($(this).val() === 'NO_CONFORME') $(this).trigger('change');
+    });
+
+    // ─── Contador de caracteres en notas de no conformidad ───────────────────
+    $(document).on('input', '.nonconformity-notes', function () {
+        const idx = $(this).data('index');
+        const len = $(this).val().length;
+        const $counter = $('.char-counter-' + idx);
+        $counter.text(len + '/100');
+        $counter.toggleClass('text-danger', len < 100).toggleClass('text-success', len >= 100);
+    });
+
+    // ─── Cant. a recibir: bloqueo si excede pendiente ────────────────────────
     $(document).on('change input', '.qty-received', function () {
         const max = parseFloat($(this).data('max')) || 0;
         const val = parseFloat($(this).val()) || 0;
@@ -366,15 +465,27 @@ $(document).ready(function () {
             Swal.fire({
                 icon: 'warning',
                 title: 'Cantidad excedida',
-                text: 'La cantidad a recibir no puede superar la pendiente (' + max.toFixed(3) + ').',
+                html: 'La cantidad a recibir no puede superar la pendiente de <strong>' + max.toFixed(3) + '</strong>.',
                 confirmButtonText: 'Entendido',
                 confirmButtonColor: '#f7b731',
             });
         }
     });
 
-    // ─── Validaciones antes de submit ────────────────────────────────────────
+    // ─── Validación de fotos por ítem (máx. 5) ───────────────────────────────
+    $(document).on('change', '.item-photos', function () {
+        if (this.files.length > 5) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Demasiadas fotos',
+                text: 'Solo se permiten un máximo de 5 fotos por partida.',
+                confirmButtonText: 'Entendido',
+            });
+            this.value = '';
+        }
+    });
 
+    // ─── Validaciones antes de submit ────────────────────────────────────────
     function validateRemissionFile() {
         const file = document.getElementById('remission_file').files[0];
         if (!file) return { valid: false, message: 'El archivo de remisión es obligatorio.' };
@@ -393,23 +504,41 @@ $(document).ready(function () {
         let hasAnyReceived = false;
         const errors = [];
 
-        $('#items-table tbody tr:not(.table-secondary)').each(function () {
-            const $row     = $(this);
-            const pending  = parseFloat($row.data('pending')) || 0;
-            const received = parseFloat($row.find('.qty-received').val()) || 0;
-            const rejected = parseFloat($row.find('.qty-rejected').val()) || 0;
+        $('#items-table tbody tr:not(.table-secondary):not([id^="nonconf-row"])').each(function () {
+            const $row    = $(this);
+            const idx     = $row.data('index');
+            if (idx === undefined) return; // fila auxiliar
+
+            const pending    = parseFloat($row.data('pending')) || 0;
+            const received   = parseFloat($row.find('.qty-received').val()) || 0;
+            const conformity = $row.find('.conformity-radio:checked').val() || 'CONFORME';
 
             if (received > 0) hasAnyReceived = true;
 
-            if ((received + rejected) > (pending + 0.0005)) {
+            if (received > (pending + 0.0005)) {
                 const desc = $row.find('td.ps-3 .fw-semibold').text().trim().substring(0, 45);
-                errors.push('"' + desc + '": recibido + rechazado (' +
-                    (received + rejected).toFixed(3) + ') supera pendiente (' + pending.toFixed(3) + ').');
+                errors.push('"' + desc + '": la cantidad excede el pendiente (' + pending.toFixed(3) + ').');
             }
 
-            if (rejected > 0 && $row.find('.rejection-reason').val().trim() === '') {
-                const desc = $row.find('td.ps-3 .fw-semibold').text().trim().substring(0, 45);
-                errors.push('"' + desc + '": el motivo de rechazo es obligatorio cuando hay rechazos.');
+            if (received > 0 && conformity === 'NO_CONFORME') {
+                const $noConfRow = $('#nonconf-row-' + idx);
+
+                if (! $noConfRow.find('select.nonconformity-type').val()) {
+                    const desc = $row.find('td.ps-3 .fw-semibold').text().trim().substring(0, 45);
+                    errors.push('"' + desc + '": selecciona el tipo de no conformidad.');
+                }
+
+                const notes = $noConfRow.find('textarea.nonconformity-notes').val().trim();
+                if (notes.length < 100) {
+                    const desc = $row.find('td.ps-3 .fw-semibold').text().trim().substring(0, 45);
+                    errors.push('"' + desc + '": la descripción de no conformidad debe tener al menos 100 caracteres (actual: ' + notes.length + ').');
+                }
+
+                const $photoInput = $('#photos_' + idx);
+                if (! $photoInput[0] || $photoInput[0].files.length === 0) {
+                    const desc = $row.find('td.ps-3 .fw-semibold').text().trim().substring(0, 45);
+                    errors.push('"' + desc + '": adjunta al menos 1 foto de evidencia (obligatorio para partidas NO CONFORMES).');
+                }
             }
         });
 
@@ -418,6 +547,28 @@ $(document).ready(function () {
         }
 
         return errors;
+    }
+
+    function buildConfirmSummary() {
+        let conformeCount = 0, noConformeCount = 0;
+
+        $('#items-table tbody tr:not(.table-secondary):not([id^="nonconf-row"])').each(function () {
+            const idx = $(this).data('index');
+            if (idx === undefined) return;
+            const received   = parseFloat($(this).find('.qty-received').val()) || 0;
+            if (received <= 0) return;
+            const conformity = $(this).find('.conformity-radio:checked').val() || 'CONFORME';
+            if (conformity === 'NO_CONFORME') noConformeCount++; else conformeCount++;
+        });
+
+        let html = 'Esta acción registrará la recepción y actualizará el estado de la orden.<br><br>';
+        html += '<div class="d-flex justify-content-center gap-3">';
+        html += '<span class="badge bg-success fs-14"><i class="ti ti-circle-check me-1"></i>' + conformeCount + ' conforme(s)</span>';
+        if (noConformeCount > 0) {
+            html += '<span class="badge bg-danger fs-14"><i class="ti ti-circle-x me-1"></i>' + noConformeCount + ' no conforme(s)</span>';
+        }
+        html += '</div><br><strong>¿Confirmas el registro?</strong>';
+        return html;
     }
 
     // ─── Botón submit con confirmación SweetAlert2 ───────────────────────────
@@ -442,8 +593,8 @@ $(document).ready(function () {
         }
 
         Swal.fire({
-            title: '¿Confirmar recepción?',
-            html: 'Esta acción registrará la recepción y actualizará el estado de la orden.<br><strong>No se puede deshacer.</strong>',
+            title: 'Confirmar Recepción',
+            html: buildConfirmSummary(),
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: '<i class="ti ti-check me-1"></i>Sí, registrar',

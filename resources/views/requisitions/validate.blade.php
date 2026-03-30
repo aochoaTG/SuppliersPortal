@@ -625,7 +625,7 @@ function fallbackCopy(text, button) {
         document.execCommand('copy');
         showCopyFeedback(button);
     } catch (err) {
-        alert('No se pudo copiar. Por favor, copia manualmente.');
+        Swal.fire({ icon: 'error', title: 'Error al copiar', text: 'No se pudo copiar. Por favor, copia manualmente.' });
     }
     
     document.body.removeChild(textarea);

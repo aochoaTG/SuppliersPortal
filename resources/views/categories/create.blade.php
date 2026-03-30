@@ -1,9 +1,10 @@
 @extends('layouts.zircos')
 
-@section('title', 'Crear Categoria')
-@section('page.title', 'Crear Categoria')
+@section('title', 'Crear Categoría')
+@section('page.title', 'Crear Categoría')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('categories.index') }}">Categorias</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('categories.index') }}">Categorías</a></li>
     <li class="breadcrumb-item active">Crear</li>
 @endsection
 
@@ -12,7 +13,7 @@
         @csrf
 
         <div class="card-header">
-            <h5 class="mb-0"><i class="ti ti-category"></i> Nueva Categoria</h5>
+            <h5 class="mb-0"><i class="ti ti-category me-1"></i> Nueva Categoría</h5>
         </div>
 
         <div class="card-body">
@@ -20,7 +21,7 @@
         </div>
 
         <div class="card-footer d-flex justify-content-between">
-            <a href="{{ route('categories.index') }}" class="btn btn-light">
+            <a href="{{ route('categories.index') }}" class="btn btn-outline-secondary">
                 <i class="ti ti-arrow-left"></i> Volver
             </a>
             <button type="submit" class="btn btn-primary">

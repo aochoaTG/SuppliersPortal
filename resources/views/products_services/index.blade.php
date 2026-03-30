@@ -3,19 +3,14 @@
 @section('title', 'Catálogo de Productos y Servicios')
 @section('page.title', 'Catálogo de Productos y Servicios')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('products-services.index') }}">Catálogo</a></li>
-    <li class="breadcrumb-item active">Listado</li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item active">Catálogo de Productos y Servicios</li>
 @endsection
-
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-bs5/css/dataTables.bootstrap5.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendor/datatables.net-buttons-bs5/css/buttons.bootstrap5.min.css') }}">
-@endpush
 
 @section('content')
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="ti ti-package"></i> Catálogo de Productos y Servicios</h5>
+            <h5 class="mb-0"><i class="ti ti-package me-1"></i> Catálogo de Productos y Servicios</h5>
         </div>
 
         <div class="card-body">

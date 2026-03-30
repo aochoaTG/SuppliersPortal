@@ -970,100 +970,6 @@ $(document).ready(function() {
     updateSummaryPanel();
     
     // =========================================================================
-    // Validación antes de enviar
-    // =========================================================================
-    $('#submit-quotation-btn').on('click', function(e) {
-        e.preventDefault();
-        
-        // Validar que todos los campos requeridos estén llenos
-        let hasErrors = false;
-        let errorMessages = [];
-        
-        $('.quotation-item').each(function(index) {
-            const $item = $(this);
-            const itemNumber = index + 1;
-            const unitPrice = $item.find('.unit-price').val();
-            const quantity = $item.find('.quantity').val();
-            
-            // Validar precio unitario
-            if (!unitPrice || parseFloat(unitPrice) <= 0) {
-                hasErrors = true;
-                $item.find('.unit-price').addClass('is-invalid');
-                errorMessages.push(`Partida ${itemNumber}: Precio unitario es requerido`);
-            } else {
-                $item.find('.unit-price').removeClass('is-invalid');
-            }
-            
-            // Validar cantidad
-            if (!quantity || parseInt(quantity) <= 0) {
-                hasErrors = true;
-                $item.find('.quantity').addClass('is-invalid');
-                errorMessages.push(`Partida ${itemNumber}: Cantidad es requerida`);
-            } else {
-                $item.find('.quantity').removeClass('is-invalid');
-            }
-        });
-        
-        if (hasErrors) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Campos incompletos',
-                html: `
-                    <p class="mb-3">Por favor completa los siguientes campos:</p>
-                    <ul class="text-start small">
-                        ${errorMessages.map(msg => `<li>${msg}</li>`).join('')}
-                    </ul>
-                `,
-                confirmButtonText: 'Entendido',
-                width: '500px'
-            });
-            return;
-        }
-        
-        // Confirmación final
-        const grandTotal = $('#grand-total').text();
-        
-        Swal.fire({
-            icon: 'question',
-            title: '¿Enviar cotización?',
-            html: `
-                <div class="text-center">
-                    <p class="mb-3">Estás a punto de enviar tu cotización por un total de:</p>
-                    <div class="alert alert-primary mb-3">
-                        <h3 class="mb-0">$${grandTotal}</h3>
-                        <small class="text-muted">(Incluye IVA)</small>
-                    </div>
-                    <div class="alert alert-warning mb-3">
-                        <i class="ti ti-alert-triangle me-2"></i>
-                        <strong>Una vez enviada, no podrás modificarla.</strong>
-                    </div>
-                    <p class="mb-0">¿Deseas continuar?</p>
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: '<i class="ti ti-send me-2"></i>Sí, enviar',
-            cancelButtonText: '<i class="ti ti-x me-2"></i>Cancelar',
-            confirmButtonColor: '#0d6efd',
-            cancelButtonColor: '#6c757d',
-            width: '500px'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Mostrar loading mientras se envía
-                Swal.fire({
-                    title: 'Enviando cotización...',
-                    html: 'Por favor espera un momento',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
-                
-                $('#quotation-form').submit();
-            }
-        });
-    });
-    
-    // =========================================================================
     // Validación de archivos PDF
     // =========================================================================
     $('input[type="file"]').on('change', function() {
@@ -1311,6 +1217,16 @@ $(document).ready(function() {
     });
 
     function validateFieldsBeforeSubmit() {
+        // Validar condiciones de pago globales
+        const globalPaymentTerms = $('#global_payment_terms').val();
+        if (!globalPaymentTerms) {
+            Swal.fire('Atención', 'Debes especificar las condiciones de pago globales antes de enviar.', 'warning');
+            $('#global_payment_terms').addClass('is-invalid').focus();
+            return false;
+        }
+        $('#global_payment_terms').removeClass('is-invalid');
+
+        // Validar precios unitarios
         let hasErrors = false;
         $('.quotation-item').each(function(index) {
             const unitPrice = $(this).find('.unit-price').val();
@@ -1342,10 +1258,12 @@ $(document).ready(function() {
         $('.item-payment-terms').val(initialGlobalVal);
     }
 
-    // 3. Validación de seguridad antes de enviar
-    $('#quotation-form').on('submit', function() {
+    // 3. Sincronización final de condiciones de pago antes de enviar
+    $('#quotation-form').on('submit', function(e) {
         const globalVal = $('#global_payment_terms').val();
-        if(!globalVal) {
+        if (!globalVal) {
+            e.preventDefault();
+            Swal.close(); // Cerrar cualquier loader abierto
             Swal.fire('Atención', 'Debes especificar las condiciones de pago globales.', 'warning');
             return false;
         }

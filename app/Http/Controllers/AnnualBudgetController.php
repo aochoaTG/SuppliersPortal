@@ -148,10 +148,10 @@ class AnnualBudgetController extends Controller
             'updatedBy',
         ]);
 
-        // Calcular totales
-        $totalAssigned = $annual_budget->monthlyDistributions()->sum('assigned_amount');
-        $totalConsumed = $annual_budget->monthlyDistributions()->sum('consumed_amount');
-        $totalCommitted = $annual_budget->monthlyDistributions()->sum('committed_amount');
+        // Calcular totales desde la colección ya cargada (sin queries adicionales)
+        $totalAssigned = $annual_budget->monthlyDistributions->sum('assigned_amount');
+        $totalConsumed = $annual_budget->monthlyDistributions->sum('consumed_amount');
+        $totalCommitted = $annual_budget->monthlyDistributions->sum('committed_amount');
         $totalAvailable = $totalAssigned - $totalConsumed - $totalCommitted;
 
         $summary = [

@@ -3,6 +3,7 @@
 @section('title', 'Nuevo Departamento')
 @section('page.title', 'Nuevo Departamento')
 @section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
     <li class="breadcrumb-item"><a href="{{ route('departments.index') }}">Departamentos</a></li>
     <li class="breadcrumb-item active">Crear</li>
 @endsection

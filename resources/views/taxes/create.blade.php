@@ -4,16 +4,16 @@
 
 @section('page.title', 'Nuevo Impuesto')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Administración</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item">Administración</li>
     <li class="breadcrumb-item"><a href="{{ route('taxes.index') }}">Impuestos</a></li>
     <li class="breadcrumb-item active">Nuevo</li>
 @endsection
 
 @section('content')
 <div class="card">
-    <div class="card-header">
-        <h5 class="mb-0">Crear impuesto</h5>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="ti ti-receipt-tax me-1"></i> Crear impuesto</h5>
     </div>
     <div class="card-body">
         @if($errors->any())

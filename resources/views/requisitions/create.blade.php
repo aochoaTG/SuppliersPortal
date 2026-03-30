@@ -725,11 +725,8 @@
             
             // Verificar que SweetAlert2 esté disponible
             if (typeof Swal === 'undefined') {
-                if (confirm('¿Estás seguro de que deseas eliminar esta partida?')) {
-                    itemsArray.splice(index, 1);
-                    refreshTable();
-                    alert('Partida eliminada correctamente');
-                }
+                itemsArray.splice(index, 1);
+                refreshTable();
                 return;
             }
             
@@ -764,7 +761,7 @@
                 }
             }).catch((error) => {
                 console.error('Error en SweetAlert:', error);
-                alert('Error al eliminar. Por favor, intenta nuevamente.');
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Error al eliminar. Por favor, intenta nuevamente.' });
             });
         });
 

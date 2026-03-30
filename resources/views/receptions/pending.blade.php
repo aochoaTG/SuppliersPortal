@@ -24,7 +24,7 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="ti ti-package-import me-2"></i>Órdenes Pendientes de Recepción</h5>
                 <span class="badge bg-warning fs-12">
-                    {{ $purchaseOrders->count() + $directOrders->count() }} pendientes
+                    {{ $purchaseOrders->total() + $directOrders->total() }} pendientes
                 </span>
             </div>
             <div class="card-body">
@@ -34,13 +34,13 @@
                     <li class="nav-item">
                         <a class="nav-link active" data-bs-toggle="tab" href="#tab-regular">
                             OC Estándar
-                            <span class="badge bg-secondary ms-1">{{ $purchaseOrders->count() }}</span>
+                            <span class="badge bg-secondary ms-1">{{ $purchaseOrders->total() }}</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" data-bs-toggle="tab" href="#tab-direct">
                             OC Directas
-                            <span class="badge bg-secondary ms-1">{{ $directOrders->count() }}</span>
+                            <span class="badge bg-secondary ms-1">{{ $directOrders->total() }}</span>
                         </a>
                     </li>
                 </ul>

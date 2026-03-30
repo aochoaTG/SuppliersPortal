@@ -3,6 +3,7 @@
 @section('title', 'Crear Centro de Costo')
 @section('page.title', 'Crear Centro de Costo')
 @section('page.breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
     <li class="breadcrumb-item"><a href="{{ route('cost-centers.index') }}">Centros de Costo</a></li>
     <li class="breadcrumb-item active">Crear</li>
 @endsection
@@ -23,7 +24,7 @@
         </div>
 
         <div class="card-footer d-flex justify-content-between">
-            <a href="{{ route('cost-centers.index') }}" class="btn btn-light">
+            <a href="{{ route('cost-centers.index') }}" class="btn btn-outline-secondary">
                 <i class="ti ti-arrow-left"></i> Regresar
             </a>
             <button type="submit" class="btn btn-primary">

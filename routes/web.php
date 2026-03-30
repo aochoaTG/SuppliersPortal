@@ -40,6 +40,7 @@ use App\Http\Controllers\{
     DirectPurchaseOrderController,
     ReceivingLocationController,
     ReceptionController,
+    LogViewerController,
 };
 
 // ============================================================================
@@ -503,6 +504,7 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
     Route::get('/direct-purchase-orders/{directPurchaseOrder}/receive', [ReceptionController::class, 'createDirect'])->name('receptions.create-direct');
     Route::post('/direct-purchase-orders/{directPurchaseOrder}/receive', [ReceptionController::class, 'storeDirect'])->name('receptions.store-direct');
     Route::get('/receptions/{reception}', [ReceptionController::class, 'show'])->name('receptions.show');
+    Route::get('/receptions/{reception}/remission', [ReceptionController::class, 'downloadRemission'])->name('receptions.remission.download');
 
     // Receiving Locations (rutas específicas ANTES del resource para evitar conflictos con {id})
     Route::get('receiving-locations/data', [ReceivingLocationController::class, 'getData'])->name('receiving-locations.data');
@@ -510,6 +512,12 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
     Route::post('receiving-locations/{receiving_location}/unblock-portal', [ReceivingLocationController::class, 'unblockPortal'])->name('receiving-locations.unblock-portal');
     Route::resource('receiving-locations', ReceivingLocationController::class);
 });
+
+// ============================================================================
+//  Dev Tools (solo usuario id=1)
+// ============================================================================
+    Route::get('/dev/logs',   [LogViewerController::class, 'index'])->name('dev.log.index');
+    Route::delete('/dev/logs', [LogViewerController::class, 'clear'])->name('dev.log.clear');
 
 // ============================================================================
 //  Rutas comentadas (sin uso actual, conservadas por decisión)

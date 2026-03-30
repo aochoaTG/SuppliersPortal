@@ -404,7 +404,17 @@ $(function () {
             reverseButtons: true
         }).then(res => res.isConfirmed && doRemove());
         } else {
-        if (confirm('Se eliminará la foto actual del usuario. ¿Continuar?')) doRemove();
+        Swal.fire({
+            icon: 'warning',
+            title: '¿Eliminar foto?',
+            text: 'Se eliminará la foto actual del usuario. ¿Continuar?',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+            customClass: { confirmButton: 'btn btn-danger', cancelButton: 'btn btn-secondary' },
+            buttonsStyling: false,
+            reverseButtons: true
+        }).then(res => res.isConfirmed && doRemove());
         }
     });
 

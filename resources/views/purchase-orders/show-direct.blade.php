@@ -131,15 +131,22 @@
                             </form>
                         @endif
                     @endif
-                    @if($ocd->status === 'PENDING_APPROVAL')
+                    @if($ocd->status === 'PENDING_APPROVAL' || $ocd->status === 'RETURNED')
                         <button type="button" class="btn btn-sm btn-success" onclick="confirmApproval()">
                             <i class="ti ti-check me-1"></i>Aprobar OC
                         </button>
+                        @if($ocd->status === 'PENDING_APPROVAL')
                         <button type="button" class="btn btn-sm btn-info" onclick="confirmReturn()">
                             <i class="ti ti-arrow-back-up me-1"></i>Devolver
                         </button>
+                        @endif
                         <button type="button" class="btn btn-sm btn-danger" onclick="confirmReject()">
                             <i class="ti ti-x me-1"></i>Rechazar OC
+                        </button>
+                    @endif
+                    @if($ocd->canBeReturnedToRevision())
+                        <button type="button" class="btn btn-sm btn-warning" onclick="confirmReturn()">
+                            <i class="ti ti-arrow-back-up me-1"></i>Devolver a Revisión
                         </button>
                     @endif
                     <button onclick="window.print();" class="btn btn-sm btn-outline-primary">
@@ -493,11 +500,13 @@
 </div>
 
 {{-- ─── Modales de Aprobación ─── --}}
-@if($ocd->status === 'PENDING_APPROVAL')
+@if($ocd->status === 'PENDING_APPROVAL' || $ocd->canBeReturnedToRevision())
     <form id="form-return" action="{{ route('direct-purchase-orders.return', $ocd->id) }}" method="POST" style="display:none">
         @csrf
         <input type="hidden" name="comments" id="return-comments-input">
     </form>
+@endif
+@if($ocd->status === 'PENDING_APPROVAL' || $ocd->status === 'RETURNED')
     <form id="form-reject" action="{{ route('direct-purchase-orders.reject', $ocd->id) }}" method="POST" style="display:none">
         @csrf
         <input type="hidden" name="comments" id="reject-comments-input">
@@ -683,4 +692,130 @@
     }
 </script>
 @endpush
+
+{{-- ╔══════════════════════════════════════════════════════════════════╗
+     ║  HISTORIAL DE RECEPCIONES  (fuera del área imprimible)         ║
+     ╚══════════════════════════════════════════════════════════════════╝ --}}
+<div class="row mt-3 d-print-none">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-primary">
+                    <i class="ti ti-clipboard-list me-2"></i>Historial de Recepciones
+                </h6>
+                @php
+                    $totalItems      = $directPurchaseOrder->items->count();
+                    $fullyReceived   = $directPurchaseOrder->items->filter->isFullyReceived()->count();
+                    $pctReceived     = $totalItems > 0 ? round(($fullyReceived / $totalItems) * 100) : 0;
+                    $hasNonConforming = $directPurchaseOrder->receptions
+                        ->flatMap->items
+                        ->contains->isNonConforming();
+                @endphp
+                <div class="d-flex align-items-center gap-3">
+                    @if($directPurchaseOrder->receptions->isNotEmpty())
+                        <div class="text-muted small">
+                            {{ $fullyReceived }}/{{ $totalItems }} partidas completas
+                        </div>
+                        <div style="width:120px">
+                            <div class="progress" style="height:8px" title="{{ $pctReceived }}% recibido">
+                                <div class="progress-bar bg-{{ $pctReceived === 100 ? 'success' : 'primary' }}"
+                                     style="width:{{ $pctReceived }}%"></div>
+                            </div>
+                        </div>
+                        @if($hasNonConforming)
+                            <span class="badge bg-danger">
+                                <i class="ti ti-alert-triangle me-1"></i>Contiene no conformidades
+                            </span>
+                        @endif
+                    @endif
+                    @if($directPurchaseOrder->canBeReceived())
+                        <a href="{{ route('receptions.create-direct', $directPurchaseOrder) }}"
+                           class="btn btn-sm btn-outline-success">
+                            <i class="ti ti-package-import me-1"></i>Registrar Recepción
+                        </a>
+                    @endif
+                </div>
+            </div>
+
+            <div class="card-body p-0">
+                @if($directPurchaseOrder->receptions->isEmpty())
+                    <div class="text-center text-muted py-5">
+                        <i class="ti ti-package-off fs-40 d-block mb-2 opacity-25"></i>
+                        <p class="mb-0">Aún no hay recepciones registradas para esta orden.</p>
+                    </div>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-hover table-centered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Folio Recepción</th>
+                                    <th>Fecha</th>
+                                    <th>Receptor</th>
+                                    <th>Punto de Entrega</th>
+                                    <th class="text-center">Partidas</th>
+                                    <th class="text-center">No Conformes</th>
+                                    <th class="text-center">Estado</th>
+                                    <th class="text-center">Remisión</th>
+                                    <th class="text-center">Recepción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($directPurchaseOrder->receptions->sortByDesc('received_at') as $reception)
+                                    @php
+                                        $nonConformingCount = $reception->items->filter->isNonConforming()->count();
+                                    @endphp
+                                    <tr>
+                                        <td class="ps-3 fw-bold text-primary">{{ $reception->folio }}</td>
+                                        <td class="small text-muted">
+                                            {{ $reception->received_at->format('d/m/Y H:i') }}
+                                        </td>
+                                        <td class="small">{{ $reception->receiver->name ?? '—' }}</td>
+                                        <td class="small">{{ $reception->receivingLocation->name ?? '—' }}</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-soft-secondary text-secondary">
+                                                {{ $reception->items->count() }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            @if($nonConformingCount > 0)
+                                                <span class="badge bg-danger">
+                                                    <i class="ti ti-circle-x me-1"></i>{{ $nonConformingCount }}
+                                                </span>
+                                            @else
+                                                <span class="text-muted small">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-{{ $reception->getStatusBadgeClass() }}">
+                                                {{ $reception->getStatusLabel() }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            @if($reception->remission_path)
+                                                <a href="{{ route('receptions.remission.download', $reception) }}"
+                                                   class="btn btn-sm btn-outline-secondary"
+                                                   title="Descargar remisión ({{ $reception->delivery_reference ?? 'sin referencia' }})">
+                                                    <i class="ti ti-paperclip"></i>
+                                                </a>
+                                            @else
+                                                <span class="text-muted small">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            <a href="{{ route('receptions.show', $reception) }}"
+                                               class="btn btn-sm btn-outline-primary"
+                                               title="Ver comprobante">
+                                                <i class="ti ti-file-check"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
 @endsection

@@ -13,10 +13,13 @@
 <div class="row">
     <div class="col-12">
         <div class="card shadow-sm border-0">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-primary">
                     <i class="ti ti-shopping-cart me-1"></i>Órdenes de Compra
                 </h5>
+                <a href="{{ route('direct-purchase-orders.create') }}" class="btn btn-sm btn-primary">
+                    <i class="ti ti-plus me-1"></i>Nueva Orden de Compra Directa
+                </a>
             </div>
 
             <div class="card-body">

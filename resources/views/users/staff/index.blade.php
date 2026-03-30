@@ -34,8 +34,8 @@
 
 @section('page.title', 'Listado de Usuarios Staff')
 @section('page.breadcrumbs')
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="javascript:void(0);">Administración</a></li>
+    <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
+    <li class="breadcrumb-item">Administración</li>
     <li class="breadcrumb-item active">Usuarios Staff</li>
 @endsection
 {{-- CONTENIDO PRINCIPAL       --}}
@@ -43,7 +43,7 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             {{-- Título del listado --}}
-            <h5 class="mb-0">Usuarios</h5>
+            <h5 class="mb-0"><i class="ti ti-users me-1"></i> Usuarios</h5>
         </div>
         <div class="card-body">
             {{-- Aquí va tu tabla o listado --}}

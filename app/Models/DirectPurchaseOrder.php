@@ -299,12 +299,17 @@ class DirectPurchaseOrder extends Model
 
     public function canBeApproved(): bool
     {
-        return $this->status === 'PENDING_APPROVAL';
+        return in_array($this->status, ['PENDING_APPROVAL', 'RETURNED']);
     }
 
     public function canBeReceived(): bool
     {
         return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
+    }
+
+    public function canBeReturnedToRevision(): bool
+    {
+        return $this->status === 'ISSUED' && $this->receptions()->count() === 0;
     }
 
     public function isPartiallyReceived(): bool
@@ -351,15 +356,14 @@ class DirectPurchaseOrder extends Model
      */
     public function calculateTotals(): array
     {
-        // Usamos items() como query builder para asegurar que tomamos los datos frescos de la BD
-        $subtotal = (float) $this->items()->sum('subtotal');
-        $iva = (float) $this->items()->sum('iva_amount');
-        $total = (float) $this->items()->sum('total');
+        $result = $this->items()
+            ->selectRaw('SUM(subtotal) as subtotal, SUM(iva_amount) as iva_amount, SUM(total) as total')
+            ->first();
 
         return [
-            'subtotal' => round($subtotal, 2),
-            'iva_amount' => round($iva, 2),
-            'total' => round($total, 2),
+            'subtotal'   => round((float) $result->subtotal, 2),
+            'iva_amount' => round((float) $result->iva_amount, 2),
+            'total'      => round((float) $result->total, 2),
         ];
     }
 

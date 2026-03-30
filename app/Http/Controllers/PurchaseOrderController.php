@@ -170,6 +170,9 @@ class PurchaseOrderController extends Controller
             'requisition.costCenter',
             'requisition.company',
             'requisition.requester',
+            'receptions.items.receivableItem',
+            'receptions.receiver',
+            'receptions.receivingLocation',
         ]);
         return view('purchase-orders.show', compact('purchaseOrder'));
     }
@@ -190,6 +193,9 @@ class PurchaseOrderController extends Controller
             'rejector',
             'approvals.approver',
             'documents',
+            'receptions.items.receivableItem',
+            'receptions.receiver',
+            'receptions.receivingLocation',
         ]);
 
         return view('purchase-orders.show-direct', compact('directPurchaseOrder'));
