@@ -9,11 +9,11 @@ use App\Models\BudgetCommitment;
 use App\Models\Supplier;
 use App\Models\CostCenter;
 use App\Models\ExpenseCategory;
-use App\Models\ApprovalLevel;
 use App\Models\ReceivingLocation;
 use App\Models\User;
 use App\Notifications\NewDirectPurchaseOrderNotification;
 use App\Http\Requests\SaveDirectPurchaseOrderRequest;
+use App\Services\ApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +22,10 @@ use Illuminate\Support\Facades\Auth;
 
 class DirectPurchaseOrderController extends Controller
 {
+    public function __construct(private ApprovalService $approvalService)
+    {
+    }
+
     /**
      * Mostrar formulario para crear nueva OCD
      */
@@ -86,14 +90,9 @@ class DirectPurchaseOrderController extends Controller
             $estimatedDays = (int) ($request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30);
             $applicationMonth = now()->addDays($estimatedDays)->format('Y-m');
 
-            // ✅ NUEVO: Determinar nivel de aprobación según el total
+            // Determinar nivel de aprobación según el total (desde cache)
             $totalAmount = $totals['total'];
-            $approvalLevel = ApprovalLevel::where('min_amount', '<=', $totalAmount)
-                ->where(function ($query) use ($totalAmount) {
-                    $query->where('max_amount', '>=', $totalAmount)
-                        ->orWhereNull('max_amount');
-                })
-                ->first();
+            $approvalLevel = $this->approvalService->getLevelForAmount($totalAmount);
             $levelNumber = $approvalLevel ? $approvalLevel->level_number : 1;
 
             // 3. Crear la OCD
@@ -509,12 +508,7 @@ class DirectPurchaseOrderController extends Controller
             $approvalLevel = null;
             if ($wasReturned) {
                 $totalAmount = $totals['total'];
-                $approvalLevel = ApprovalLevel::where('min_amount', '<=', $totalAmount)
-                    ->where(function ($query) use ($totalAmount) {
-                        $query->where('max_amount', '>=', $totalAmount)
-                            ->orWhereNull('max_amount');
-                    })
-                    ->first();
+                $approvalLevel = $this->approvalService->getLevelForAmount($totalAmount);
                 $newStatus = 'PENDING_APPROVAL';
             }
 

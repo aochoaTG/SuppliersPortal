@@ -105,6 +105,7 @@
                                     </tbody>
                                 </table>
                             </div>
+                            {{ $purchaseOrders->links() }}
                         @endif
                     </div>
 
@@ -166,6 +167,7 @@
                                     </tbody>
                                 </table>
                             </div>
+                            {{ $directOrders->links() }}
                         @endif
                     </div>
 

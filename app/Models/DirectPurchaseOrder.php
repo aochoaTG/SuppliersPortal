@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class DirectPurchaseOrder extends Model
 {
@@ -152,6 +153,7 @@ class DirectPurchaseOrder extends Model
         $year = now()->year;
         $lastOrder = self::whereYear('created_at', $year)
             ->whereNotNull('folio')
+            ->lockForUpdate()
             ->orderBy('folio', 'desc')
             ->first();
 
@@ -168,13 +170,7 @@ class DirectPurchaseOrder extends Model
      */
     public function determineRequiredApprovalLevel(): int
     {
-        $total = $this->total;
-        $level = ApprovalLevel::where('min_amount', '<=', $total)
-            ->where(function ($query) use ($total) {
-                $query->where('max_amount', '>=', $total)
-                    ->orWhereNull('max_amount');
-            })
-            ->first();
+        $level = app(\App\Services\ApprovalService::class)->getLevelForAmount($this->total);
 
         return $level ? $level->level_number : 1;
     }
@@ -188,12 +184,14 @@ class DirectPurchaseOrder extends Model
             return false;
         }
 
-        return $this->update([
-            'folio' => $this->folio ?? self::generateNextFolio(),
-            'status' => 'PENDING_APPROVAL',
-            'required_approval_level' => $this->determineRequiredApprovalLevel(),
-            'submitted_at' => now(),
-        ]);
+        return DB::transaction(function () {
+            return $this->update([
+                'folio' => $this->folio ?? self::generateNextFolio(),
+                'status' => 'PENDING_APPROVAL',
+                'required_approval_level' => $this->determineRequiredApprovalLevel(),
+                'submitted_at' => now(),
+            ]);
+        });
     }
 
     /**

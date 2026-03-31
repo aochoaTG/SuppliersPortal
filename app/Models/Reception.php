@@ -74,6 +74,7 @@ class Reception extends Model
     {
         $year = now()->year;
         $last = self::whereYear('created_at', $year)
+            ->lockForUpdate()
             ->orderBy('id', 'desc')
             ->first();
 
