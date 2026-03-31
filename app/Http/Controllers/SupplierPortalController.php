@@ -33,13 +33,15 @@ class SupplierPortalController extends Controller
             $query->where('supplier_id', $supplier->id);
         })
             ->with([
-                'requisition',
-                'quotationGroup.items',
-                'suppliers',
+                'requisition:id,folio,description,status',
+                'quotationGroup:id,name,requisition_id',
+                'quotationGroup.items:id,quotation_group_id,product_service_id',
                 'rfqResponses' => function ($query) use ($supplier) {
-                    $query->where('supplier_id', $supplier->id);
+                    $query->where('supplier_id', $supplier->id)
+                          ->select('rfq_id', 'supplier_id', 'status', 'submitted_at');
                 }
             ])
+            ->select('rfqs.*')
             ->orderBy('created_at', 'desc')
             ->get();
 

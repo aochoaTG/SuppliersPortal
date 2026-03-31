@@ -52,6 +52,7 @@ return new class extends Migration
                 'RECEIVED',           // Bienes/servicios recibidos
                 'CANCELLED',          // Cancelada
                 'CLOSED_BY_INACTIVITY', // Cerrada por inactividad
+                'DELIVERED_PENDING_RECEPTION',
             ])->default('DRAFT');
 
             // Ruta del PDF generado
@@ -74,8 +75,14 @@ return new class extends Migration
             $table->timestamp('returned_at')->nullable();
             $table->timestamp('issued_at')->nullable();
             $table->timestamp('received_at')->nullable();
+            $table->timestamp('supplier_delivered_at')->nullable()->comment('Fecha en que el proveedor reportó la entrega física');
+            $table->timestamp('reception_deadline_at')->nullable()->comment('Fecha límite (3 días hábiles) para que la estación capture la recepción');
             $table->timestamp('closed_at')->nullable();
             $table->timestamp('inactivity_warning_sent_at')->nullable();
+
+            // Campos de entrega física del proveedor
+            $table->string('physical_receiver_name', 150)->nullable()->comment('Nombre de quien recibió físicamente en la estación');
+            $table->text('delivery_observations')->nullable()->comment('Observaciones del proveedor al momento de la entrega');
 
             $table->timestamps();
             $table->softDeletes();

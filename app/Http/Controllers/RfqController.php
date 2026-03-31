@@ -53,11 +53,11 @@ class RfqController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $query->where('created_at', '>=', \Carbon\Carbon::parse($request->date_from)->startOfDay());
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $query->where('created_at', '<=', \Carbon\Carbon::parse($request->date_to)->endOfDay());
         }
 
         return DataTables::of($query)
@@ -377,7 +377,7 @@ class RfqController extends Controller
             'sent' => Rfq::where('status', 'SENT')->count(),
             'responded' => Rfq::where('status', 'RESPONSES_RECEIVED')->count(),
             'expired' => Rfq::where('status', 'SENT')
-                ->whereDate('response_deadline', '<', now())
+                ->where('response_deadline', '<', now())
                 ->count(),
         ];
 
@@ -721,15 +721,14 @@ class RfqController extends Controller
 
     /**
      * Generar folio único de RFQ
-     * 
+     *
      * @return string
      */
     private function generateRFQFolio(): string
     {
-        $date = now()->format('Ymd');
-        $count = Rfq::whereDate('created_at', today())->count() + 1;
+        $count = Rfq::whereBetween('created_at', [now()->startOfDay(), now()->endOfDay()])->count() + 1;
 
-        return 'RFQ-' . $date . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        return 'RFQ-' . now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
     }
 
     /**

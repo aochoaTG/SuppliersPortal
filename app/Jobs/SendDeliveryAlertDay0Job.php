@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Mail\DeliveryAlertDay0Mail;
 use App\Models\PurchaseOrder;
 use App\Models\DirectPurchaseOrder;
-use App\Models\User;
+use App\Services\AlertRecipientService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -56,8 +56,8 @@ class SendDeliveryAlertDay0Job implements ShouldQueue
         // Destinatarios: usuarios asignados a la estación (receptores)
         $recipients = $order->receivingLocation->users->pluck('email')->filter()->toArray();
 
-        // Destinatarios: usuarios con rol buyer (Departamento de Compras)
-        $buyers = User::role('buyer')->pluck('email')->filter()->toArray();
+        // Destinatarios: usuarios con rol buyer (Departamento de Compras) - CACHEADO
+        $buyers = AlertRecipientService::getBuyers();
         $recipients = array_unique(array_merge($recipients, $buyers));
 
         if (empty($recipients)) {

@@ -105,11 +105,13 @@ class RequisitionController extends Controller
                 // Convertir la búsqueda DD/MM/YYYY o YYYY-MM-DD a formato que SQL entienda
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $keyword)) {
                     // Si viene en formato ISO (YYYY-MM-DD) del input type="date"
-                    $query->whereDate('required_date', '=', $keyword);
+                    $query->where('required_date', '>=', \Carbon\Carbon::parse($keyword)->startOfDay())
+                          ->where('required_date', '<=', \Carbon\Carbon::parse($keyword)->endOfDay());
                 } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $keyword, $matches)) {
                     // Si viene en formato DD/MM/YYYY
                     $date = "{$matches[3]}-{$matches[2]}-{$matches[1]}";
-                    $query->whereDate('required_date', '=', $date);
+                    $query->where('required_date', '>=', \Carbon\Carbon::parse($date)->startOfDay())
+                          ->where('required_date', '<=', \Carbon\Carbon::parse($date)->endOfDay());
                 }
             })
 
@@ -117,11 +119,13 @@ class RequisitionController extends Controller
                 // Convertir la búsqueda DD/MM/YYYY o YYYY-MM-DD a formato que SQL entienda
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $keyword)) {
                     // Si viene en formato ISO (YYYY-MM-DD) del input type="date"
-                    $query->whereDate('created_at', '=', $keyword);
+                    $query->where('created_at', '>=', \Carbon\Carbon::parse($keyword)->startOfDay())
+                          ->where('created_at', '<=', \Carbon\Carbon::parse($keyword)->endOfDay());
                 } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $keyword, $matches)) {
                     // Si viene en formato DD/MM/YYYY
                     $date = "{$matches[3]}-{$matches[2]}-{$matches[1]}";
-                    $query->whereDate('created_at', '=', $date);
+                    $query->where('created_at', '>=', \Carbon\Carbon::parse($date)->startOfDay())
+                          ->where('created_at', '<=', \Carbon\Carbon::parse($date)->endOfDay());
                 }
             })
 

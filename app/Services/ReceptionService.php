@@ -11,6 +11,7 @@ use App\Models\ReceptionItem;
 use App\Models\User;
 use App\Notifications\ReceptionCompletedNotification;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -297,8 +298,11 @@ class ReceptionService
             $notifiables->push($order->creator);
         }
 
-        // Notificar a todos los compradores activos
-        User::role('buyer')->get()->each(fn($u) => $notifiables->push($u));
+        // Notificar a todos los compradores activos - CACHEADO para evitar N+1
+        $buyers = Cache::remember('buyers_list', 3600, function () {
+            return User::role('buyer')->get(['id', 'name', 'email']);
+        });
+        $buyers->each(fn($u) => $notifiables->push($u));
 
         $notifiables->unique('id')->each->notify($notification);
     }

@@ -73,7 +73,7 @@ class Reception extends Model
     public static function generateNextFolio(): string
     {
         $year = now()->year;
-        $last = self::whereYear('created_at', $year)
+        $last = self::whereBetween('created_at', ["{$year}-01-01 00:00:00", "{$year}-12-31 23:59:59"])
             ->lockForUpdate()
             ->orderBy('id', 'desc')
             ->first();

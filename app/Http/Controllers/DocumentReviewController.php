@@ -41,16 +41,21 @@ class DocumentReviewController extends Controller
 
         // (Si quieres solo los revisados por el admin actual, añade ->where('reviewed_by', auth()->id()))
 
-        // Resumen por proveedor (display simple)
-        $suppliers = Supplier::select('id','company_name','rfc')->get();
+        // Resumen por proveedor (con eager loading para evitar N+1)
+        $suppliers = Supplier::with(['documents' => function ($query) {
+            $query->select('supplier_id', 'doc_type', 'status', 'uploaded_at');
+        }])
+        ->select('id', 'company_name', 'rfc')
+        ->get();
+
         $suppliersSummary = $suppliers->map(function ($s) use ($requiredTypes) {
-            $docs = $s->documents()->select('doc_type','status','uploaded_at')->get();
+            $docs = $s->documents; // Ya cargado, sin consulta adicional
             return [
                 'supplier'         => $s,
                 'total_required'   => count($requiredTypes),
                 'uploaded'         => $docs->pluck('doc_type')->unique()->count(),
-                'accepted'         => $docs->where('status','accepted')->count(),
-                'rejected'         => $docs->where('status','rejected')->count(),
+                'accepted'         => $docs->where('status', 'accepted')->count(),
+                'rejected'         => $docs->where('status', 'rejected')->count(),
                 'last_activity_at' => optional($docs->max('uploaded_at'))?->toDateTimeString(),
             ];
         });
@@ -70,8 +75,9 @@ class DocumentReviewController extends Controller
      */
     public function showSupplier(Supplier $supplier)
     {
-        // Documentos agrupados por tipo (simple)
+        // Documentos agrupados por tipo (con eager loading para evitar N+1)
         $docs = $supplier->documents()
+            ->select('supplier_id', 'doc_type', 'status', 'uploaded_at')
             ->orderByDesc('uploaded_at')
             ->get()
             ->groupBy('doc_type');

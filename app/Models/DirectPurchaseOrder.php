@@ -163,7 +163,7 @@ class DirectPurchaseOrder extends Model
     public static function generateNextFolio(): string
     {
         $year = now()->year;
-        $lastOrder = self::whereYear('created_at', $year)
+        $lastOrder = self::whereBetween('created_at', ["{$year}-01-01 00:00:00", "{$year}-12-31 23:59:59"])
             ->whereNotNull('folio')
             ->lockForUpdate()
             ->orderBy('folio', 'desc')

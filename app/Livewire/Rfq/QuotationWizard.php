@@ -398,15 +398,14 @@ class QuotationWizard extends Component
 
     /**
      * Generar folio único de RFQ
-     * 
+     *
      * @return string
      */
     private function generateRFQFolio(): string
     {
-        $date = now()->format('Ymd');
-        $count = Rfq::whereDate('created_at', today())->count() + 1;
+        $count = Rfq::whereBetween('created_at', [now()->startOfDay(), now()->endOfDay()])->count() + 1;
 
-        return 'RFQ-' . $date . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        return 'RFQ-' . now()->format('Ymd') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
     }
 
     /**

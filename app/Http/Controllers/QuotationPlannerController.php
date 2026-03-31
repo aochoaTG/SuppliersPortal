@@ -182,7 +182,8 @@ class QuotationPlannerController extends Controller
                 $group->items()->attach($validated['item_ids']);
             }
 
-            $group->load('items.product.category');
+            // Cargar relaciones con eager loading para evitar N+1
+            $group->loadMissing('items.product.category');
 
             return response()->json([
                 'success' => true,
@@ -280,7 +281,8 @@ class QuotationPlannerController extends Controller
             // Agregar partidas al grupo (sin duplicar)
             $group->items()->syncWithoutDetaching($validated['item_ids']);
 
-            $group->load('items.productService.category');
+            // Cargar relaciones con eager loading para evitar N+1
+            $group->loadMissing('items.productService.category');
 
             return response()->json([
                 'success' => true,
@@ -327,7 +329,8 @@ class QuotationPlannerController extends Controller
         try {
             $group->items()->detach($validated['item_ids']);
 
-            $group->load('items.product.category');
+            // Cargar relaciones con eager loading para evitar N+1
+            $group->loadMissing('items.product.category');
 
             return response()->json([
                 'success' => true,

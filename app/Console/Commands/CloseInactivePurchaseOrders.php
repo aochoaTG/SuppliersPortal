@@ -58,37 +58,43 @@ class CloseInactivePurchaseOrders extends Command
         $warningThreshold = $inactivityDays - 3;                      // 4
 
         // 1a. Cerrar OCD vencidas (7+ días desde submitted_at, aún PENDING_APPROVAL)
-        $overdueOcds = DirectPurchaseOrder::where('status', 'PENDING_APPROVAL')
+        $closedCount = 0;
+        DirectPurchaseOrder::where('status', 'PENDING_APPROVAL')
             ->whereNotNull('submitted_at')
             ->where('submitted_at', '<=', $now->copy()->subDays($inactivityDays))
             ->with(['assignedApprover', 'creator', 'items.expenseCategory', 'costCenter'])
-            ->get();
+            ->chunk(200, function ($ocds) use ($now, $dryRun, &$closedCount) {
+                foreach ($ocds as $ocd) {
+                    $this->closeDirectPurchaseOrder($ocd, $now, $dryRun);
+                    $closedCount++;
+                }
+            });
 
-        if ($overdueOcds->isEmpty()) {
+        if ($closedCount === 0) {
             $this->line('  • No hay OCD vencidas para cerrar.');
         } else {
-            $this->line("  • Cerrando {$overdueOcds->count()} OCD vencida(s)...");
-            foreach ($overdueOcds as $ocd) {
-                $this->closeDirectPurchaseOrder($ocd, $now, $dryRun);
-            }
+            $this->line("  • Cerrando {$closedCount} OCD vencida(s)...");
         }
 
         // 1b. Enviar alerta preventiva (4-7 días desde submitted_at, warning no enviado)
-        $warningOcds = DirectPurchaseOrder::where('status', 'PENDING_APPROVAL')
+        $alertCount = 0;
+        DirectPurchaseOrder::where('status', 'PENDING_APPROVAL')
             ->whereNotNull('submitted_at')
             ->where('submitted_at', '<=', $now->copy()->subDays($warningThreshold))
             ->where('submitted_at', '>', $now->copy()->subDays($inactivityDays))
             ->whereNull('inactivity_warning_sent_at')
             ->with(['assignedApprover', 'creator'])
-            ->get();
+            ->chunk(200, function ($ocds) use ($dryRun, &$alertCount) {
+                foreach ($ocds as $ocd) {
+                    $this->sendDirectPurchaseOrderWarning($ocd, $dryRun);
+                    $alertCount++;
+                }
+            });
 
-        if ($warningOcds->isEmpty()) {
+        if ($alertCount === 0) {
             $this->line('  • No hay OCD en zona de alerta (3 días antes del cierre).');
         } else {
-            $this->line("  • Enviando alerta preventiva a {$warningOcds->count()} OCD...");
-            foreach ($warningOcds as $ocd) {
-                $this->sendDirectPurchaseOrderWarning($ocd, $dryRun);
-            }
+            $this->line("  • Enviando alerta preventiva a {$alertCount} OCD...");
         }
     }
 
@@ -187,35 +193,41 @@ class CloseInactivePurchaseOrders extends Command
         $warningThreshold = $inactivityDays - 3;             // 7
 
         // 2a. Cerrar OC estándar vencidas (10+ días desde created_at, aún OPEN)
-        $overduePos = PurchaseOrder::where('status', 'OPEN')
+        $closedCount = 0;
+        PurchaseOrder::where('status', 'OPEN')
             ->where('created_at', '<=', $now->copy()->subDays($inactivityDays))
             ->with(['creator', 'supplier', 'requisition'])
-            ->get();
+            ->chunk(200, function ($pos) use ($now, $dryRun, &$closedCount) {
+                foreach ($pos as $po) {
+                    $this->closeStandardPurchaseOrder($po, $now, $dryRun);
+                    $closedCount++;
+                }
+            });
 
-        if ($overduePos->isEmpty()) {
+        if ($closedCount === 0) {
             $this->line('  • No hay OC estándar vencidas para cerrar.');
         } else {
-            $this->line("  • Cerrando {$overduePos->count()} OC estándar vencida(s)...");
-            foreach ($overduePos as $po) {
-                $this->closeStandardPurchaseOrder($po, $now, $dryRun);
-            }
+            $this->line("  • Cerrando {$closedCount} OC estándar vencida(s)...");
         }
 
         // 2b. Enviar alerta preventiva (7-10 días desde created_at, warning no enviado)
-        $warningPos = PurchaseOrder::where('status', 'OPEN')
+        $alertCount = 0;
+        PurchaseOrder::where('status', 'OPEN')
             ->where('created_at', '<=', $now->copy()->subDays($warningThreshold))
             ->where('created_at', '>', $now->copy()->subDays($inactivityDays))
             ->whereNull('inactivity_warning_sent_at')
             ->with(['creator', 'supplier'])
-            ->get();
+            ->chunk(200, function ($pos) use ($dryRun, &$alertCount) {
+                foreach ($pos as $po) {
+                    $this->sendStandardPurchaseOrderWarning($po, $dryRun);
+                    $alertCount++;
+                }
+            });
 
-        if ($warningPos->isEmpty()) {
+        if ($alertCount === 0) {
             $this->line('  • No hay OC estándar en zona de alerta (3 días antes del cierre).');
         } else {
-            $this->line("  • Enviando alerta preventiva a {$warningPos->count()} OC estándar...");
-            foreach ($warningPos as $po) {
-                $this->sendStandardPurchaseOrderWarning($po, $dryRun);
-            }
+            $this->line("  • Enviando alerta preventiva a {$alertCount} OC estándar...");
         }
     }
 

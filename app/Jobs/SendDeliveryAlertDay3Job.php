@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Mail\DeliveryAlertDay3Mail;
 use App\Models\PurchaseOrder;
 use App\Models\DirectPurchaseOrder;
-use App\Models\User;
+use App\Services\AlertRecipientService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -46,9 +46,9 @@ class SendDeliveryAlertDay3Job implements ShouldQueue
 
         $mail = new DeliveryAlertDay3Mail($order, $supplierName, $deliveryDate, $locationName);
 
-        // Destinatarios: superadmin (Director de Administración y Finanzas) + buyers (Compras)
-        $superadmins = User::role('superadmin')->pluck('email')->filter()->toArray();
-        $buyers = User::role('buyer')->pluck('email')->filter()->toArray();
+        // Destinatarios: superadmin (Director de Administración y Finanzas) + buyers (Compras) - CACHEADO
+        $superadmins = AlertRecipientService::getSuperadmins();
+        $buyers = AlertRecipientService::getBuyers();
         $recipients = array_unique(array_merge($superadmins, $buyers));
 
         if (empty($recipients)) {

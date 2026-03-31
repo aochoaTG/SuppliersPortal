@@ -611,7 +611,10 @@ class Requisition extends Model
      */
     public function scopeByYear($query, int $year)
     {
-        return $query->whereYear('created_at', $year);
+        return $query->whereBetween('created_at', [
+            "{$year}-01-01 00:00:00",
+            "{$year}-12-31 23:59:59"
+        ]);
     }
 
 
