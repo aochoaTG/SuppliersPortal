@@ -439,6 +439,44 @@ class ReceivingLocation extends Model
 
 
     /**
+     * Verifica si esta ubicación tiene OCs en estado DELIVERED_PENDING_RECEPTION.
+     * Si hay al menos una, NINGÚN proveedor puede registrar nuevas entregas aquí.
+     */
+    public function hasDeliveryPendingReception(): bool
+    {
+        $hasPO = PurchaseOrder::where('receiving_location_id', $this->id)
+            ->where('status', 'DELIVERED_PENDING_RECEPTION')
+            ->exists();
+
+        if ($hasPO) {
+            return true;
+        }
+
+        return DirectPurchaseOrder::where('receiving_location_id', $this->id)
+            ->where('status', 'DELIVERED_PENDING_RECEPTION')
+            ->exists();
+    }
+
+    /**
+     * Obtiene las OCs en estado DELIVERED_PENDING_RECEPTION para esta ubicación.
+     * Útil para mostrar al proveedor cuáles OCs están bloqueando.
+     */
+    public function getOrdersPendingReception()
+    {
+        $pos = PurchaseOrder::where('receiving_location_id', $this->id)
+            ->where('status', 'DELIVERED_PENDING_RECEPTION')
+            ->with('supplier')
+            ->get();
+
+        $dpos = DirectPurchaseOrder::where('receiving_location_id', $this->id)
+            ->where('status', 'DELIVERED_PENDING_RECEPTION')
+            ->with('supplier')
+            ->get();
+
+        return $pos->merge($dpos);
+    }
+
+    /**
      * VALIDACIÓN
      */
 

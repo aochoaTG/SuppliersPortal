@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Carbon\Carbon;
 
 class PurchaseOrder extends Model
 {
@@ -36,6 +37,10 @@ class PurchaseOrder extends Model
         'closed_at',
         'inactivity_warning_sent_at',
         'reception_notes',
+        'supplier_delivered_at',
+        'reception_deadline_at',
+        'physical_receiver_name',
+        'delivery_observations',
     ];
 
     protected $casts = [
@@ -44,6 +49,8 @@ class PurchaseOrder extends Model
         'received_at' => 'datetime',
         'closed_at' => 'datetime',
         'inactivity_warning_sent_at' => 'datetime',
+        'supplier_delivered_at' => 'datetime',
+        'reception_deadline_at' => 'datetime',
     ];
 
     // Relación con el creador (el Superadmin que autorizó)
@@ -74,6 +81,12 @@ class PurchaseOrder extends Model
     public function receptions(): MorphMany
     {
         return $this->morphMany(Reception::class, 'receivable');
+    }
+
+    // Evidencias de entrega subidas por el proveedor
+    public function deliveryEvidences(): MorphMany
+    {
+        return $this->morphMany(SupplierDeliveryEvidence::class, 'evidenceable');
     }
 
     public function budgetCommitment(): HasOne
@@ -132,6 +145,23 @@ class PurchaseOrder extends Model
         return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
     }
 
+    /**
+     * La OC puede recibir entrega de proveedor si está emitida o parcialmente recibida
+     * y NO está ya en estado de entrega pendiente de captura.
+     */
+    public function canReceiveSupplierDelivery(): bool
+    {
+        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
+    }
+
+    /**
+     * La OC está en estado "entregada pero sin captura de recepción por la estación"
+     */
+    public function isDeliveredPendingReception(): bool
+    {
+        return $this->status === 'DELIVERED_PENDING_RECEPTION';
+    }
+
     public function getStatusLabel(): string
     {
         return match ($this->status) {
@@ -142,6 +172,7 @@ class PurchaseOrder extends Model
             'CANCELLED'          => 'Cancelada',
             'PAID'               => 'Pagada',
             'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
+            'DELIVERED_PENDING_RECEPTION' => 'Entregada — Pendiente de Captura',
             default              => 'Desconocido',
         };
     }
@@ -156,6 +187,7 @@ class PurchaseOrder extends Model
             'CANCELLED'          => 'danger',
             'PAID'               => 'success',
             'CLOSED_BY_INACTIVITY' => 'dark',
+            'DELIVERED_PENDING_RECEPTION' => 'danger',
             default              => 'secondary',
         };
     }

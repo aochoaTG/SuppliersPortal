@@ -555,6 +555,15 @@
                         <span class="menu-text">Comunicados</span>
                     </a>
                 </li>
+
+                {{-- Entregas --}}
+                <li class="side-nav-item">
+                    <a href="{{ route('supplier.deliveries.index') }}"
+                        class="side-nav-link {{ request()->routeIs('supplier.deliveries.*') ? 'active' : '' }}">
+                        <span class="menu-icon"><i class="ti ti-truck-delivery"></i></span>
+                        <span class="menu-text">Mis Entregas</span>
+                    </a>
+                </li>
             @endif
             @endhasanyrole
 

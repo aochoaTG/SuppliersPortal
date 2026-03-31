@@ -41,6 +41,7 @@ use App\Http\Controllers\{
     ReceivingLocationController,
     ReceptionController,
     LogViewerController,
+    SupplierDeliveryController,
 };
 
 // ============================================================================
@@ -455,6 +456,13 @@ Route::middleware(['auth', 'role:supplier'])->prefix('supplier')->name('supplier
 
     // Delete draft
     Route::delete('/quotation/{response}/draft', [SupplierPortalController::class, 'deleteDraft'])->name('quotation.draft.delete');
+
+    // Deliveries (registro de entrega física con remisión)
+    Route::prefix('deliveries')->name('deliveries.')->group(function () {
+        Route::get('/', [SupplierDeliveryController::class, 'index'])->name('index');   // supplier.deliveries.index
+        Route::get('/create', [SupplierDeliveryController::class, 'create'])->name('create'); // supplier.deliveries.create
+        Route::post('/', [SupplierDeliveryController::class, 'store'])->name('store');  // supplier.deliveries.store
+    });
 });
 
 // ============================================================================

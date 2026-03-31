@@ -8,7 +8,8 @@
       "Bash(find \"C:\\\\Users\\\\alfo.ochoa\\\\Documents\\\\Desarrollo\\\\SuppliersPortal/resources/views\" -name \"*index.blade.php\" -exec grep -l \"DataTable\\\\|Swal\\\\.\" {})",
       "Bash(ls -la /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Notifications/*.php)",
       "Bash(grep -n \"class.*Purchase.*Order\" /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Models/*.php)",
-      "Bash(php artisan:*)"
+      "Bash(php artisan:*)",
+      "Bash(find /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/database/migrations -name *delivery* -o -name *reception*)"
     ]
   }
 }

@@ -51,6 +51,10 @@ class DirectPurchaseOrder extends Model
         'received_at',
         'closed_at',
         'inactivity_warning_sent_at',
+        'supplier_delivered_at',
+        'reception_deadline_at',
+        'physical_receiver_name',
+        'delivery_observations',
     ];
 
     protected $casts = [
@@ -65,6 +69,8 @@ class DirectPurchaseOrder extends Model
         'received_at' => 'datetime',
         'closed_at' => 'datetime',
         'inactivity_warning_sent_at' => 'datetime',
+        'supplier_delivered_at' => 'datetime',
+        'reception_deadline_at' => 'datetime',
     ];
 
     /**
@@ -137,6 +143,12 @@ class DirectPurchaseOrder extends Model
     public function receptions(): MorphMany
     {
         return $this->morphMany(Reception::class, 'receivable');
+    }
+
+    // Evidencias de entrega subidas por el proveedor
+    public function deliveryEvidences(): MorphMany
+    {
+        return $this->morphMany(SupplierDeliveryEvidence::class, 'evidenceable');
     }
 
     /**
@@ -305,6 +317,22 @@ class DirectPurchaseOrder extends Model
         return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
     }
 
+    /**
+     * La OCD puede recibir entrega de proveedor si está emitida o parcialmente recibida
+     */
+    public function canReceiveSupplierDelivery(): bool
+    {
+        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
+    }
+
+    /**
+     * La OCD está en estado "entregada pero sin captura de recepción por la estación"
+     */
+    public function isDeliveredPendingReception(): bool
+    {
+        return $this->status === 'DELIVERED_PENDING_RECEPTION';
+    }
+
     public function canBeReturnedToRevision(): bool
     {
         return $this->status === 'ISSUED' && $this->receptions()->count() === 0;
@@ -328,6 +356,7 @@ class DirectPurchaseOrder extends Model
             'RECEIVED'           => 'success',
             'CANCELLED'          => 'dark',
             'CLOSED_BY_INACTIVITY' => 'dark',
+            'DELIVERED_PENDING_RECEPTION' => 'danger',
             default              => 'secondary',
         };
     }
@@ -345,6 +374,7 @@ class DirectPurchaseOrder extends Model
             'RECEIVED'           => 'Recibida',
             'CANCELLED'          => 'Cancelada',
             'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
+            'DELIVERED_PENDING_RECEPTION' => 'Entregada — Pendiente de Captura',
             default              => 'Desconocido',
         };
     }
