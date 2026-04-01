@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Notifications\NewDirectPurchaseOrderNotification;
 use App\Http\Requests\SaveDirectPurchaseOrderRequest;
 use App\Services\ApprovalService;
+use App\Services\PricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -22,8 +23,10 @@ use Illuminate\Support\Facades\Auth;
 
 class DirectPurchaseOrderController extends Controller
 {
-    public function __construct(private ApprovalService $approvalService)
-    {
+    public function __construct(
+        private ApprovalService $approvalService,
+        private PricingService $pricingService
+    ) {
     }
 
     /**
@@ -81,7 +84,7 @@ class DirectPurchaseOrderController extends Controller
             DB::beginTransaction();
 
             // 1. Calcular totales iniciales
-            $totals = $this->calculateTotals($request->items);
+            $totals = $this->pricingService->calculateTotals($request->items);
 
             // 2. Obtener datos del proveedor para heredar condiciones
             $supplier = Supplier::active()->find($request->supplier_id);
@@ -94,6 +97,10 @@ class DirectPurchaseOrderController extends Controller
             $totalAmount = $totals['total'];
             $approvalLevel = $this->approvalService->getLevelForAmount($totalAmount);
             $levelNumber = $approvalLevel ? $approvalLevel->level_number : 1;
+
+            // Obtener aprobador por rol (purchasing_manager)
+            $approver = User::role('purchasing_manager')->first();
+            $approverId = $approver?->id ?? 1;
 
             // 3. Crear la OCD
             $ocd = DirectPurchaseOrder::create([
@@ -111,7 +118,7 @@ class DirectPurchaseOrderController extends Controller
                 'estimated_delivery_days' => $estimatedDays,
                 'status' => 'PENDING_APPROVAL', // ✅ CAMBIO: Directo a pendiente de aprobación
                 'required_approval_level' => $levelNumber, // ✅ NUEVO
-                'assigned_approver_id' => 1, // ✅ NUEVO: Según requerimiento temporal
+                'assigned_approver_id' => $approverId, // ✅ Basado en rol, con fallback a 1
                 'created_by' => Auth::id(),
                 'submitted_at' => now(),
             ]);
@@ -145,8 +152,8 @@ class DirectPurchaseOrderController extends Controller
                 }
             }
 
-            // ✅ NUEVO: Notificar al aprobador (User ID 1 por ahora)
-            $approver = User::find(1);
+            // ✅ Notificar al aprobador asignado
+            $approver = User::find($ocd->assigned_approver_id);
             if ($approver) {
                 $approver->notify(new NewDirectPurchaseOrderNotification($ocd));
             }
@@ -494,7 +501,7 @@ class DirectPurchaseOrderController extends Controller
             $wasReturned = $directPurchaseOrder->isReturned();
 
             // 1. Calcular nuevos totales
-            $totals = $this->calculateTotals($request->items);
+            $totals = $this->pricingService->calculateTotals($request->items);
 
             // 2. Obtener datos del proveedor para heredar condiciones
             $supplier = Supplier::active()->find($request->supplier_id);
@@ -594,29 +601,6 @@ class DirectPurchaseOrderController extends Controller
                 ->withInput()
                 ->withErrors(['error' => 'Error al actualizar la OCD: ' . $e->getMessage()]);
         }
-    }
-
-    /**
-     * Calcular totales (subtotal, IVA, total)
-     */
-    private function calculateTotals(array $items): array
-    {
-        $subtotal = 0;
-
-        foreach ($items as $item) {
-            $quantity = floatval($item['quantity']);
-            $unitPrice = floatval($item['unit_price']);
-            $subtotal += ($quantity * $unitPrice);
-        }
-
-        $iva = $subtotal * 0.16;
-        $total = $subtotal + $iva;
-
-        return [
-            'subtotal' => round($subtotal, 2),
-            'iva' => round($iva, 2),
-            'total' => round($total, 2),
-        ];
     }
 
     /**

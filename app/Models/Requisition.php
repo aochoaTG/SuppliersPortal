@@ -10,10 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\Log;
-use App\Models\QuotationGroup;
-use App\Models\ReceivingLocation;
-use App\Models\Rfq;
-use App\Models\QuotationSummary;
 
 
 class Requisition extends Model

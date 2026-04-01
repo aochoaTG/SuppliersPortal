@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(php *)"
+      "Bash(php *)",
+      "Bash(del *)"
     ]
-  }
+  },
+  "$version": 3
 }

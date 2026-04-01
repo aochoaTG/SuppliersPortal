@@ -15,6 +15,266 @@ use Illuminate\Support\Facades\Storage;
 class SupplierPortalController extends Controller
 {
     /**
+     * Verifica que el proveedor tenga acceso a la RFQ
+     */
+    private function verifySupplierAccess(Rfq $rfq): void
+    {
+        $supplier = Auth::user()->supplier;
+
+        if (!$supplier) {
+            abort(403, 'No tienes un perfil de proveedor asociado');
+        }
+
+        if (!$rfq->suppliers->contains($supplier->id)) {
+            abort(403, 'No tienes acceso a esta RFQ');
+        }
+    }
+
+    /**
+     * Valida los datos del formulario de cotización
+     *
+     * @return array<string, mixed>
+     */
+    private function validateQuotationData(Request $request): array
+    {
+        return $request->validate([
+            'items' => 'nullable|array',
+            'items.*.item_id' => 'required|exists:requisition_items,id',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.iva_rate' => 'required|numeric|in:0,8,16',
+            'items.*.currency' => 'nullable|string|in:MXN,USD,EUR',
+            'items.*.delivery_days' => 'nullable|integer|min:0',
+            'items.*.payment_terms' => 'nullable|string|max:255',
+            'items.*.warranty_terms' => 'nullable|string|max:500',
+            'items.*.brand' => 'nullable|string|max:100',
+            'items.*.model' => 'nullable|string|max:100',
+            'items.*.specifications' => 'nullable|string',
+            'items.*.notes' => 'nullable|string',
+            'items.*.attachment' => 'nullable|file|mimes:pdf|max:5120',
+            'supplier_quotation_number' => 'nullable|string|max:100',
+            'validity_days' => 'nullable|integer|min:1|max:365',
+            'quotation_pdf_file' => 'nullable|file|mimes:pdf|max:5120',
+            'action' => 'required|in:save_draft,submit',
+        ]);
+    }
+
+    /**
+     * Calcula los totales financieros de una partida
+     *
+     * @return array<string, float>
+     */
+    private function calculateItemTotals(array $itemData): array
+    {
+        $unitPrice = $itemData['unit_price'];
+        $quantity = $itemData['quantity'];
+        $ivaRate = $itemData['iva_rate'];
+
+        $subtotal = $unitPrice * $quantity;
+        $ivaAmount = $subtotal * ($ivaRate / 100);
+        $total = $subtotal + $ivaAmount;
+
+        return [
+            'unit_price' => $unitPrice,
+            'quantity' => $quantity,
+            'subtotal' => $subtotal,
+            'iva_rate' => $ivaRate,
+            'iva_amount' => $ivaAmount,
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * Guarda o actualiza una respuesta de cotización
+     */
+    private function saveQuotationItem(
+        Rfq $rfq,
+        int $supplierId,
+        int $itemId,
+        array $itemData,
+        string $action
+    ): RfqResponse {
+        $totals = $this->calculateItemTotals($itemData);
+
+        return RfqResponse::updateOrCreate(
+            [
+                'rfq_id' => $rfq->id,
+                'supplier_id' => $supplierId,
+                'requisition_item_id' => $itemId,
+            ],
+            [
+                'unit_price' => $totals['unit_price'],
+                'quantity' => $totals['quantity'],
+                'subtotal' => $totals['subtotal'],
+                'iva_rate' => $totals['iva_rate'],
+                'iva_amount' => $totals['iva_amount'],
+                'total' => $totals['total'],
+                'currency' => $itemData['currency'] ?? 'MXN',
+                'delivery_days' => $itemData['delivery_days'] ?? null,
+                'payment_terms' => $itemData['payment_terms'] ?? null,
+                'warranty_terms' => $itemData['warranty_terms'] ?? null,
+                'brand' => $itemData['brand'] ?? null,
+                'model' => $itemData['model'] ?? null,
+                'specifications' => $itemData['specifications'] ?? null,
+                'notes' => $itemData['notes'] ?? null,
+                'supplier_quotation_number' => $itemData['supplier_quotation_number'] ?? null,
+                'validity_days' => $itemData['validity_days'] ?? 30,
+                'status' => $action === 'submit' ? 'SUBMITTED' : 'DRAFT',
+                'submitted_at' => $action === 'submit' ? now() : null,
+                'quotation_date' => $action === 'submit' ? now() : null,
+            ]
+        );
+    }
+
+    /**
+     * Maneja la subida de archivos adjuntos por partida
+     */
+    private function handleItemAttachment(RfqResponse $response, array $itemData, int $supplierId): void
+    {
+        if (!isset($itemData['attachment'])) {
+            return;
+        }
+
+        if ($response->attachment_path && Storage::disk('public')->exists($response->attachment_path)) {
+            Storage::disk('public')->delete($response->attachment_path);
+        }
+
+        $path = $itemData['attachment']->store("suppliers/{$supplierId}/quotations", 'public');
+        $response->update(['attachment_path' => $path]);
+    }
+
+    /**
+     * Maneja el PDF de cotización global del proveedor
+     */
+    private function handleQuotationPdf(Request $request, Rfq $rfq, int $supplierId): void
+    {
+        $pivot = DB::table('rfq_suppliers')
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $supplierId)
+            ->first();
+
+        if (!$pivot) {
+            return;
+        }
+
+        // Eliminar PDF si se marcó
+        if ($request->input('delete_pdf_flag') == '1') {
+            $this->deleteQuotationPdf($pivot);
+            Log::info("PDF de cotización eliminado para Proveedor {$supplierId} en RFQ {$rfq->id}");
+            return;
+        }
+
+        // Guardar nuevo PDF
+        if ($request->hasFile('quotation_pdf_file')) {
+            $this->saveNewQuotationPdf($pivot, $request, $rfq, $supplierId);
+            Log::info("PDF de cotización guardado para Proveedor {$supplierId} en RFQ {$rfq->id}");
+        }
+    }
+
+    /**
+     * Elimina el PDF de cotización existente
+     */
+    private function deleteQuotationPdf(object $pivot): void
+    {
+        if ($pivot->quotation_pdf_path && Storage::disk('public')->exists($pivot->quotation_pdf_path)) {
+            Storage::disk('public')->delete($pivot->quotation_pdf_path);
+        }
+
+        DB::table('rfq_suppliers')
+            ->where('rfq_id', $pivot->rfq_id)
+            ->where('supplier_id', $pivot->supplier_id)
+            ->update([
+                'quotation_pdf_path' => null,
+                'updated_at' => now()
+            ]);
+    }
+
+    /**
+     * Guarda un nuevo PDF de cotización
+     */
+    private function saveNewQuotationPdf(object $pivot, Request $request, Rfq $rfq, int $supplierId): void
+    {
+        if ($pivot->quotation_pdf_path && Storage::disk('public')->exists($pivot->quotation_pdf_path)) {
+            Storage::disk('public')->delete($pivot->quotation_pdf_path);
+        }
+
+        $pdfPath = $request->file('quotation_pdf_file')->store(
+            "suppliers/{$supplierId}/rfq_{$rfq->id}",
+            'public'
+        );
+
+        DB::table('rfq_suppliers')
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $supplierId)
+            ->update([
+                'quotation_pdf_path' => $pdfPath,
+                'updated_at' => now()
+            ]);
+    }
+
+    /**
+     * Actualiza el pivote rfq_suppliers cuando se envía una cotización
+     */
+    private function updateRfqPivot(Rfq $rfq, int $supplierId): void
+    {
+        $rfq->suppliers()->updateExistingPivot($supplierId, [
+            'responded_at' => now(),
+            'updated_at' => now()
+        ]);
+    }
+
+    /**
+     * Verifica si todos los proveedores respondieron y actualiza el estado de la RFQ
+     */
+    private function checkRfqCompletion(Rfq $rfq): void
+    {
+        $totalInvited = $rfq->suppliers()->count();
+        $totalResponded = $rfq->suppliers()->whereNotNull('responded_at')->count();
+
+        if ($totalInvited > 0 && $totalResponded >= $totalInvited) {
+            $rfq->update([
+                'status' => 'RECEIVED',
+                'updated_at' => now()
+            ]);
+            Log::info("RFQ Folio {$rfq->folio}: Todos los proveedores respondieron. Estado actualizado a RECEIVED.");
+        } else {
+            Log::info("RFQ Folio {$rfq->folio}: Respuesta recibida ({$totalResponded}/{$totalInvited})");
+        }
+    }
+
+    /**
+     * Procesa todas las partidas de la cotización
+     */
+    private function processQuotationItems(
+        Rfq $rfq,
+        int $supplierId,
+        array $items,
+        string $action
+    ): void {
+        foreach ($items as $itemData) {
+            $itemId = $itemData['item_id'];
+
+            // Verificar estatus actual en BD
+            $existingResponse = RfqResponse::where([
+                'rfq_id' => $rfq->id,
+                'supplier_id' => $supplierId,
+                'requisition_item_id' => $itemId,
+            ])->first();
+
+            // Si ya existe y NO es borrador, saltamos esta partida
+            if ($existingResponse && $existingResponse->status !== 'DRAFT') {
+                continue;
+            }
+
+            // Agregar datos comunes a todas las partidas
+            $itemData['supplier_quotation_number'] = $itemData['supplier_quotation_number'] ?? null;
+            $itemData['validity_days'] = $itemData['validity_days'] ?? 30;
+
+            $response = $this->saveQuotationItem($rfq, $supplierId, $itemId, $itemData, $action);
+            $this->handleItemAttachment($response, $itemData, $supplierId);
+        }
+    }
+    /**
      * Dashboard del proveedor - Lista de RFQs asignadas
      * 
      * @return \Illuminate\View\View
@@ -108,15 +368,15 @@ class SupplierPortalController extends Controller
 
     /**
      * Guardar cotización (borrador o envío final)
-     * 
+     *
      * Esta función maneja AMBAS acciones:
      * 1. Guardar como BORRADOR (sin enviar)
      * 2. Enviar cotización FINAL (ya no se puede editar)
-     * 
+     *
      * La diferencia está en el campo 'action' que viene del formulario:
      * - action='save_draft' → Guarda como BORRADOR (status='DRAFT', submitted_at=null)
      * - action='submit' → Envía cotización (status='SUBMITTED', submitted_at=ahora)
-     * 
+     *
      * @param Request $request - Datos del formulario
      * @param Rfq $rfq - RFQ a la que se está respondiendo
      * @return \Illuminate\Http\RedirectResponse
@@ -126,46 +386,13 @@ class SupplierPortalController extends Controller
         // =========================================================================
         // PASO 1: VERIFICAR ACCESO DEL PROVEEDOR
         // =========================================================================
+        $this->verifySupplierAccess($rfq);
         $supplier = Auth::user()->supplier;
-
-        if (!$rfq->suppliers->contains($supplier->id)) {
-            abort(403, 'No tienes acceso a esta RFQ');
-        }
 
         // =========================================================================
         // PASO 2: VALIDAR DATOS DEL FORMULARIO
         // =========================================================================
-        $validated = $request->validate([
-            // Cambiamos a nullable porque si todas las partidas están bloqueadas (disabled), 
-            // el array 'items' no se enviará en el POST.
-            'items' => 'nullable|array',
-
-            // Reglas para las partidas que SÍ vienen en el request
-            'items.*.item_id' => 'required|exists:requisition_items,id',
-            'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.iva_rate' => 'required|numeric|in:0,8,16',
-            'items.*.currency' => 'nullable|string|in:MXN,USD,EUR',
-
-            // Campos opcionales
-            'items.*.delivery_days' => 'nullable|integer|min:0',
-            'items.*.payment_terms' => 'nullable|string|max:255',
-            'items.*.warranty_terms' => 'nullable|string|max:500',
-            'items.*.brand' => 'nullable|string|max:100',
-            'items.*.model' => 'nullable|string|max:100',
-            'items.*.specifications' => 'nullable|string',
-            'items.*.notes' => 'nullable|string',
-            'items.*.attachment' => 'nullable|file|mimes:pdf|max:5120',
-
-            // Datos generales
-            'supplier_quotation_number' => 'nullable|string|max:100',
-            'validity_days' => 'nullable|integer|min:1|max:365',
-
-            // 📄 PDF de cotización global del proveedor
-            'quotation_pdf_file' => 'nullable|file|mimes:pdf|max:5120', // 5MB
-
-            'action' => 'required|in:save_draft,submit',
-        ]);
+        $validated = $this->validateQuotationData($request);
 
         // Si no hay nada que procesar y es un envío, avisamos al usuario
         if (empty($validated['items']) && $validated['action'] === 'submit') {
@@ -173,167 +400,22 @@ class SupplierPortalController extends Controller
         }
 
         // =========================================================================
-        // PASO 3: GUARDAR/ACTUALIZAR CADA PARTIDA
+        // PASO 3: PROCESAR COTIZACIÓN
         // =========================================================================
         DB::beginTransaction();
         try {
+            // Procesar partidas
             if (!empty($validated['items'])) {
-                foreach ($validated['items'] as $itemData) {
-                    $itemId = $itemData['item_id'];
-
-                    // -------------------------------------------------------------
-                    // 🛡️ FILTRO DE SEGURIDAD: Verificar estatus actual en BD
-                    // -------------------------------------------------------------
-                    $existingResponse = RfqResponse::where([
-                        'rfq_id' => $rfq->id,
-                        'supplier_id' => $supplier->id,
-                        'requisition_item_id' => $itemId,
-                    ])->first();
-
-                    // Si ya existe y NO es borrador, saltamos esta partida (está bloqueada)
-                    if ($existingResponse && $existingResponse->status !== 'DRAFT') {
-                        continue;
-                    }
-
-                    // -------------------------------------------------------------
-                    // CÁLCULOS FINANCIEROS
-                    // -------------------------------------------------------------
-                    $unitPrice = $itemData['unit_price'];
-                    $quantity = $itemData['quantity'];
-                    $ivaRate = $itemData['iva_rate'];
-
-                    $subtotal = $unitPrice * $quantity;
-                    $ivaAmount = $subtotal * ($ivaRate / 100);
-                    $total = $subtotal + $ivaAmount;
-
-                    // -------------------------------------------------------------
-                    // GUARDAR O ACTUALIZAR (Solo para partidas DRAFT o nuevas)
-                    // -------------------------------------------------------------
-                    $response = RfqResponse::updateOrCreate(
-                        [
-                            'rfq_id' => $rfq->id,
-                            'supplier_id' => $supplier->id,
-                            'requisition_item_id' => $itemId,
-                        ],
-                        [
-                            'unit_price' => $unitPrice,
-                            'quantity' => $quantity,
-                            'subtotal' => $subtotal,
-                            'iva_rate' => $ivaRate,
-                            'iva_amount' => $ivaAmount,
-                            'total' => $total,
-                            'currency' => $itemData['currency'] ?? 'MXN',
-                            'delivery_days' => $itemData['delivery_days'] ?? null,
-                            'payment_terms' => $itemData['payment_terms'] ?? null,
-                            'warranty_terms' => $itemData['warranty_terms'] ?? null,
-                            'brand' => $itemData['brand'] ?? null,
-                            'model' => $itemData['model'] ?? null,
-                            'specifications' => $itemData['specifications'] ?? null,
-                            'notes' => $itemData['notes'] ?? null,
-                            'supplier_quotation_number' => $validated['supplier_quotation_number'] ?? null,
-                            'validity_days' => $validated['validity_days'] ?? 30,
-
-                            // 🎯 Actualizar estatus solo si se presionó enviar
-                            'status' => $validated['action'] === 'submit' ? 'SUBMITTED' : 'DRAFT',
-                            'submitted_at' => $validated['action'] === 'submit' ? now() : null,
-                            'quotation_date' => $validated['action'] === 'submit' ? now() : null,
-                        ]
-                    );
-
-                    // Manejo de adjuntos por partida
-                    if (isset($itemData['attachment'])) {
-                        if ($response->attachment_path && Storage::disk('public')->exists($response->attachment_path)) {
-                            Storage::disk('public')->delete($response->attachment_path);
-                        }
-                        $path = $itemData['attachment']->store("suppliers/{$supplier->id}/quotations", 'public');
-                        $response->update(['attachment_path' => $path]);
-                    }
-                }
+                $this->processQuotationItems($rfq, $supplier->id, $validated['items'], $validated['action']);
             }
 
-            // =========================================================================
-            // 📄 PASO 3.5: MANEJAR PDF GLOBAL DE COTIZACIÓN
-            // =========================================================================
+            // Manejar PDF global de cotización
+            $this->handleQuotationPdf($request, $rfq, $supplier->id);
 
-            // Obtener el pivote
-            $pivot = DB::table('rfq_suppliers')
-                ->where('rfq_id', $rfq->id)
-                ->where('supplier_id', $supplier->id)
-                ->first();
-
-            if ($pivot) {
-                // Verificar si se marcó para eliminación
-                if ($request->input('delete_pdf_flag') == '1') {
-                    if ($pivot->quotation_pdf_path && Storage::disk('public')->exists($pivot->quotation_pdf_path)) {
-                        Storage::disk('public')->delete($pivot->quotation_pdf_path);
-                    }
-
-                    DB::table('rfq_suppliers')
-                        ->where('rfq_id', $rfq->id)
-                        ->where('supplier_id', $supplier->id)
-                        ->update([
-                            'quotation_pdf_path' => null,
-                            'updated_at' => now()
-                        ]);
-
-                    Log::info("PDF de cotización eliminado para Proveedor {$supplier->id} en RFQ {$rfq->id}");
-                }
-                // Si hay un nuevo archivo
-                elseif ($request->hasFile('quotation_pdf_file')) {
-                    // Eliminar PDF anterior si existe
-                    if ($pivot->quotation_pdf_path && Storage::disk('public')->exists($pivot->quotation_pdf_path)) {
-                        Storage::disk('public')->delete($pivot->quotation_pdf_path);
-                    }
-
-                    // Guardar nuevo PDF
-                    $pdfPath = $request->file('quotation_pdf_file')->store(
-                        "suppliers/{$supplier->id}/rfq_{$rfq->id}",
-                        'public'
-                    );
-
-                    DB::table('rfq_suppliers')
-                        ->where('rfq_id', $rfq->id)
-                        ->where('supplier_id', $supplier->id)
-                        ->update([
-                            'quotation_pdf_path' => $pdfPath,
-                            'updated_at' => now()
-                        ]);
-
-                    Log::info("PDF de cotización guardado para Proveedor {$supplier->id} en RFQ {$rfq->id}: {$pdfPath}");
-                }
-            }
-
-            // =========================================================================
-            // 🎯 PASO 4: ACTUALIZAR EL PIVOTE rfq_suppliers
-            // =========================================================================
+            // Actualizar pivote y verificar completado si se envió
             if ($validated['action'] === 'submit') {
-                // Sincronizamos la fecha de respuesta en la tabla pivote
-                // Esto es vital para saber quién ya cumplió y quién no
-                $rfq->suppliers()->updateExistingPivot($supplier->id, [
-                    'responded_at' => now(),
-                    'updated_at' => now()
-                ]);
-
-                // =========================================================================
-                // 🎯 PASO 5: VERIFICAR SI LA RFQ ESTÁ COMPLETADA POR TODOS
-                // =========================================================================
-
-                // Contamos cuántos proveedores fueron invitados
-                $totalInvited = $rfq->suppliers()->count();
-
-                // Contamos cuántos han respondido (tienen responded_at)
-                $totalResponded = $rfq->suppliers()->whereNotNull('responded_at')->count();
-
-                // Si el conteo coincide, la RFQ cambia de estado global
-                if ($totalInvited > 0 && $totalResponded >= $totalInvited) {
-                    $rfq->update([
-                        'status' => 'RECEIVED', // O 'COMPLETED_BY_SUPPLIERS' según tu nomenclatura
-                        'updated_at' => now()
-                    ]);
-                    Log::info("RFQ Folio {$rfq->folio}: Todos los proveedores respondieron. Estado actualizado a RECEIVED.");
-                } else {
-                    Log::info("RFQ Folio {$rfq->folio}: Respuesta recibida de Proveedor ID {$supplier->id}. ({$totalResponded}/{$totalInvited})");
-                }
+                $this->updateRfqPivot($rfq, $supplier->id);
+                $this->checkRfqCompletion($rfq);
             }
 
             DB::commit();
