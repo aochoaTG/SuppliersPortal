@@ -135,6 +135,33 @@ class EmployeeController extends Controller
     // ── Lógica de eventos ─────────────────────────────────────────────────────
 
     /**
+     * Campos que NO se comparan para detectar cambios.
+     */
+    private const CAMPOS_EXCLUIDOS_COMPARACION = [
+        'hire_date',
+        'savings_fund',
+        'seniority_premium',
+    ];
+
+    /**
+     * Campos de fecha que deben normalizarse a Y-m-dd para comparación.
+     */
+    private const CAMPOS_FECHA = [
+        'hire_date',
+        'termination_date',
+    ];
+
+    /**
+     * Campos decimales que deben normalizarse para comparación.
+     */
+    private const CAMPOS_DECIMALES = [
+        'daily_salary',
+        'severance_bonus',
+        'indemnization',
+        'seniority_premium',
+    ];
+
+    /**
      * Compara los valores RAW anteriores contra los guardados
      * e inserta un EmployeeEvent por cada campo que haya cambiado.
      *
@@ -145,8 +172,25 @@ class EmployeeController extends Controller
         $eventos = [];
 
         foreach (self::CAMPOS_RASTREADOS as $campo => $etiqueta) {
-            $valorAntes   = $this->normalizar($antes[$campo] ?? null);
-            $valorDespues = $this->normalizar($despues->getRawOriginal($campo));
+            // Saltar campos excluidos de la comparación
+            if (in_array($campo, self::CAMPOS_EXCLUIDOS_COMPARACION, true)) {
+                continue;
+            }
+
+            $valorAntes   = $antes[$campo] ?? null;
+            $valorDespues = $despues->getRawOriginal($campo);
+
+            // Normalizar según tipo de campo
+            if (in_array($campo, self::CAMPOS_FECHA, true)) {
+                $valorAntes   = $this->normalizarFecha($valorAntes);
+                $valorDespues = $this->normalizarFecha($valorDespues);
+            } elseif (in_array($campo, self::CAMPOS_DECIMALES, true)) {
+                $valorAntes   = $this->normalizarDecimal($valorAntes);
+                $valorDespues = $this->normalizarDecimal($valorDespues);
+            } else {
+                $valorAntes   = $this->normalizar($valorAntes);
+                $valorDespues = $this->normalizar($valorDespues);
+            }
 
             if ($valorAntes === $valorDespues) {
                 continue;
@@ -185,6 +229,58 @@ class EmployeeController extends Controller
         }
 
         return (string) $value;
+    }
+
+    /**
+     * Normaliza fechas a formato Y-m-d para evitar falsos positivos
+     * por diferencias de hora o formato (ej: "2024-01-15" vs "2024-01-15 00:00:00").
+     */
+    private function normalizarFecha(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        // Carbon instance
+        if ($value instanceof \Carbon\Carbon) {
+            return $value->format('Y-m-d');
+        }
+
+        // String con fecha (puede incluir hora)
+        if (is_string($value)) {
+            $value = trim($value);
+            if ($value === '') {
+                return null;
+            }
+            // Intentar parsear y extraer solo la fecha
+            try {
+                $dt = new \DateTime($value);
+                return $dt->format('Y-m-d');
+            } catch (\Exception $e) {
+                return $value;
+            }
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * Normaliza decimales para evitar falsos positivos por diferencia de precisión.
+     * Ej: "1000.50" vs "1000.50000" → ambos se convierten a "1000.50"
+     */
+    private function normalizarDecimal(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $str = trim((string) $value);
+        if ($str === '' || !is_numeric($str)) {
+            return $str;
+        }
+
+        // Formatear con 2 decimales para estandarizar
+        return number_format((float) $str, 2, '.', '');
     }
 
     // ── Helpers de parseo ─────────────────────────────────────────────────────
