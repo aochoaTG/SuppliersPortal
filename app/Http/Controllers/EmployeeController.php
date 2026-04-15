@@ -107,7 +107,7 @@ class EmployeeController extends Controller
             'email'              => $this->str($data, 'Correo'),
             'education'          => $this->str($data, 'Estudios'),
             'responsible'        => $this->str($data, 'Responsable'),
-            'leader'             => $this->str($data, 'Lider'),
+            'leader'             => $this->limpiarLider($this->str($data, 'Lider')),
             'vacation_balance'   => $this->decimal($data, 'SaldoVacaciones'),
             'savings_fund'       => $this->decimal($data, 'FondoAhorro'),
             'daily_salary'       => $this->decimal($data, 'SalarioDiario'),
@@ -312,6 +312,33 @@ class EmployeeController extends Controller
     }
 
     // ── Helpers de parseo ─────────────────────────────────────────────────────
+
+    /**
+     * Limpia el nombre del líder recibido del archivo externo.
+     *
+     * - Elimina el prefijo de clave del empleado, e.g. "EST01 - " o "MX02 - ".
+     * - Retorna null para valores sin información útil:
+     *   vacío, "-", "no aplica", "desconocido", "vacante", "vacant", "sin jefe".
+     */
+    private function limpiarLider(?string $valor): ?string
+    {
+        if ($valor === null) {
+            return null;
+        }
+
+        // Quitar prefijo tipo "ABC01 - " o "MX02 - " al inicio
+        $nombre = preg_replace('/^[A-Z]{2,4}\d{2,3}\s*-\s*/i', '', $valor);
+        $nombre = trim($nombre);
+
+        // Valores sin información útil → sin líder registrado
+        $sinLider = ['no aplica', 'desconocido', 'vacante', 'vacant', 'sin jefe', '-'];
+
+        if ($nombre === '' || in_array(mb_strtolower($nombre), $sinLider, true)) {
+            return null;
+        }
+
+        return $nombre;
+    }
 
     private function str(array $data, string $key): ?string
     {
