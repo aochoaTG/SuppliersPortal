@@ -90,6 +90,8 @@ class EmployeeController extends Controller
         ['first_name' => $firstName, 'last_name' => $lastName] =
             $this->parsearNombre($this->str($data, 'Nombre'));
 
+        $rawLider = $this->str($data, 'Lider');
+
         $employee->fill([
             'archivo_origen'     => $this->str($data, 'archivo_origen'),
             'first_name'         => $firstName,
@@ -112,7 +114,7 @@ class EmployeeController extends Controller
             'email'              => $this->str($data, 'Correo'),
             'education'          => $this->str($data, 'Estudios'),
             'responsible'        => $this->str($data, 'Responsable'),
-            'leader'             => $this->limpiarLider($this->str($data, 'Lider')),
+            'leader'             => $this->resolverLider($this->limpiarLider($rawLider), $rawLider),
             'vacation_balance'   => $this->decimal($data, 'SaldoVacaciones'),
             'savings_fund'       => $this->decimal($data, 'FondoAhorro'),
             'daily_salary'       => $this->decimal($data, 'SalarioDiario'),
@@ -365,11 +367,27 @@ class EmployeeController extends Controller
     }
 
     /**
+     * Quita el prefijo tipo "9235 - " o "Jarudo - " al inicio del valor.
+     * Reutilizado por limpiarLider y resolverLider.
+     */
+    private function quitarPrefijo(?string $valor): ?string
+    {
+        if ($valor === null) {
+            return null;
+        }
+
+        return str_contains($valor, ' - ')
+            ? trim(substr($valor, strpos($valor, ' - ') + 3))
+            : trim($valor);
+    }
+
+    /**
      * Limpia el nombre del líder recibido del archivo externo.
      *
-     * - Elimina el prefijo de clave del empleado, e.g. "EST01 - " o "MX02 - ".
+     * - Elimina el prefijo de clave (e.g. "9235 - ", "Jarudo - ").
      * - Retorna null para valores sin información útil:
      *   vacío, "-", "no aplica", "desconocido", "vacante", "vacant", "sin jefe".
+     * - Reordena "Apellidos, Nombre" → "Nombre Apellidos".
      */
     private function limpiarLider(?string $valor): ?string
     {
@@ -377,13 +395,8 @@ class EmployeeController extends Controller
             return null;
         }
 
-        // Quitar prefijo al inicio: todo lo que precede al primer " - "
-        // Cubre números (9235 - ...), siglas (Ch - ...) y palabras (Jarudo - ...).
-        $nombre = str_contains($valor, ' - ')
-            ? trim(substr($valor, strpos($valor, ' - ') + 3))
-            : trim($valor);
+        $nombre = $this->quitarPrefijo($valor) ?? '';
 
-        // Valores sin información útil → sin líder registrado
         $sinLider = ['no aplica', 'desconocido', 'vacante', 'vacant', 'sin jefe', '-', 'null'];
 
         if ($nombre === '' || in_array(mb_strtolower($nombre), $sinLider, true)) {
@@ -391,6 +404,66 @@ class EmployeeController extends Controller
         }
 
         return $this->reordenarNombre($nombre);
+    }
+
+    /**
+     * Intenta resolver el nombre del líder a su número de empleado.
+     *
+     * Usa el valor crudo para extraer apellidos y nombre por separado
+     * y hacer una búsqueda LIKE doble contra first_name / last_name.
+     * Solo sustituye si encuentra exactamente un resultado (evita ambigüedad).
+     * Si no hay match, devuelve el nombre limpio como fallback.
+     *
+     * @param string|null $nombreLimpio  Nombre ya limpio y reordenado (fallback)
+     * @param string|null $rawLider      Valor original del campo Lider
+     */
+    private function resolverLider(?string $nombreLimpio, ?string $rawLider): ?string
+    {
+        if ($nombreLimpio === null || $rawLider === null) {
+            return $nombreLimpio;
+        }
+
+        // Quitar prefijo para obtener "Apellidos, Nombre" o "Nombre Apellidos"
+        $sinPrefijo = $this->quitarPrefijo($rawLider) ?? '';
+
+        if ($sinPrefijo === '') {
+            return $nombreLimpio;
+        }
+
+        // Separar partes para la búsqueda:
+        // - Con coma: formato origen "Apellidos, Nombre" → split exacto
+        // - Sin coma: primer token = nombre, resto = apellidos
+        if (str_contains($sinPrefijo, ',')) {
+            [$apellidos, $nombres] = explode(',', $sinPrefijo, 2);
+        } else {
+            $partes    = preg_split('/\s+/', $sinPrefijo, 2);
+            $nombres   = $partes[0] ?? '';
+            $apellidos = $partes[1] ?? '';
+        }
+
+        $apellidos = trim($apellidos);
+        $nombres   = trim($nombres);
+
+        if ($apellidos === '' && $nombres === '') {
+            return $nombreLimpio;
+        }
+
+        // LIKE con el fragmento disponible (puede estar truncado en el origen)
+        $query = Employee::whereNotNull('employee_number');
+
+        if ($nombres !== '') {
+            $query->where('first_name', 'like', $nombres . '%');
+        }
+        if ($apellidos !== '') {
+            $query->where('last_name', 'like', $apellidos . '%');
+        }
+
+        $resultados = $query->get(['employee_number']);
+
+        // Solo resuelve si el match es inequívoco
+        return $resultados->count() === 1
+            ? $resultados->first()->employee_number
+            : $nombreLimpio;
     }
 
     private function str(array $data, string $key): ?string
