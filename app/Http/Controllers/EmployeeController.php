@@ -458,11 +458,23 @@ class EmployeeController extends Controller
 
         $numeros = $query->pluck('employee_number')->unique()->values();
 
-        // Resuelve si todos los matches apuntan al mismo número de empleado
-        // (la misma persona puede aparecer en varios archivos/empresas)
-        return $numeros->count() === 1
-            ? $numeros->first()
-            : $nombreLimpio;
+        // Un solo número → puede aparecer en varios archivos/empresas, es la misma persona
+        if ($numeros->count() === 1) {
+            return $numeros->first();
+        }
+
+        // Varios candidatos con distinto número → desempatar por activo
+        // Clonamos la query agregando el filtro is_active = 'SI'
+        $numerosActivos = (clone $query)->where('is_active', 'SI')
+            ->pluck('employee_number')
+            ->unique()
+            ->values();
+
+        if ($numerosActivos->count() >= 1) {
+            return $numerosActivos->sort()->last();
+        }
+
+        return $nombreLimpio;
     }
 
     private function str(array $data, string $key): ?string
