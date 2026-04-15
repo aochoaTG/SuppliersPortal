@@ -162,6 +162,13 @@ class EmployeeController extends Controller
     ];
 
     /**
+     * Campos que se comparan como números enteros.
+     */
+    private const CAMPOS_ENTEROS = [
+        'vacation_balance',
+    ];
+
+    /**
      * Compara los valores RAW anteriores contra los guardados
      * e inserta un EmployeeEvent por cada campo que haya cambiado.
      *
@@ -187,6 +194,9 @@ class EmployeeController extends Controller
             } elseif (in_array($campo, self::CAMPOS_DECIMALES, true)) {
                 $valorAntes   = $this->normalizarDecimal($valorAntes);
                 $valorDespues = $this->normalizarDecimal($valorDespues);
+            } elseif (in_array($campo, self::CAMPOS_ENTEROS, true)) {
+                $valorAntes   = $this->normalizarEntero($valorAntes);
+                $valorDespues = $this->normalizarEntero($valorDespues);
             } else {
                 $valorAntes   = $this->normalizar($valorAntes);
                 $valorDespues = $this->normalizar($valorDespues);
@@ -281,6 +291,24 @@ class EmployeeController extends Controller
 
         // Formatear con 2 decimales para estandarizar
         return number_format((float) $str, 2, '.', '');
+    }
+
+    /**
+     * Normaliza valores enteros para evitar falsos positivos.
+     * Ej: "9" vs "9.0000" → ambos se convierten a "9".
+     */
+    private function normalizarEntero(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $str = trim((string) $value);
+        if ($str === '' || !is_numeric($str)) {
+            return $str;
+        }
+
+        return (string) (int) round((float) $str);
     }
 
     // ── Helpers de parseo ─────────────────────────────────────────────────────
