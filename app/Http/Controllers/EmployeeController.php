@@ -15,7 +15,8 @@ class EmployeeController extends Controller
      */
     private const CAMPOS_RASTREADOS = [
         'archivo_origen'     => 'archivo de origen',
-        'full_name'          => 'nombre completo',
+        'first_name'         => 'nombre',
+        'last_name'          => 'apellidos',
         'department'         => 'departamento',
         'job_title'          => 'puesto',
         'hire_date'          => 'fecha de ingreso',
@@ -86,9 +87,13 @@ class EmployeeController extends Controller
         // Capturar valores RAW antes de cualquier cambio
         $valoresAnteriores = $esNuevo ? [] : $employee->getRawOriginal();
 
+        ['first_name' => $firstName, 'last_name' => $lastName] =
+            $this->parsearNombre($this->str($data, 'Nombre'));
+
         $employee->fill([
             'archivo_origen'     => $this->str($data, 'archivo_origen'),
-            'full_name'          => trim($data['Nombre']),
+            'first_name'         => $firstName,
+            'last_name'          => $lastName,
             'department'         => $this->str($data, 'Departamento'),
             'job_title'          => $this->str($data, 'Puesto'),
             'hire_date'          => $this->date($data, 'FechaIngreso'),
@@ -314,6 +319,52 @@ class EmployeeController extends Controller
     // ── Helpers de parseo ─────────────────────────────────────────────────────
 
     /**
+     * Divide el nombre del empleado en first_name y last_name.
+     *
+     * - Con coma ("Apellidos, Nombre(s)"): separación exacta.
+     * - Sin coma (ya en orden natural): primer token = first_name, resto = last_name.
+     *
+     * @return array{first_name: string|null, last_name: string|null}
+     */
+    private function parsearNombre(?string $valor): array
+    {
+        if ($valor === null || trim($valor) === '') {
+            return ['first_name' => null, 'last_name' => null];
+        }
+
+        $valor = trim($valor);
+
+        if (str_contains($valor, ',')) {
+            [$apellidos, $nombres] = explode(',', $valor, 2);
+            return [
+                'first_name' => trim($nombres) ?: null,
+                'last_name'  => trim($apellidos) ?: null,
+            ];
+        }
+
+        // Sin coma: primer token = nombre(s), resto = apellidos
+        $partes = preg_split('/\s+/', $valor, 2);
+        return [
+            'first_name' => $partes[0] ?? null,
+            'last_name'  => isset($partes[1]) ? $partes[1] : null,
+        ];
+    }
+
+    /**
+     * Convierte "Apellidos, Nombre" → "Nombre Apellidos".
+     * Si no hay coma, devuelve el valor sin cambios.
+     */
+    private function reordenarNombre(string $nombre): string
+    {
+        if (!str_contains($nombre, ',')) {
+            return $nombre;
+        }
+
+        [$apellidos, $nombres] = explode(',', $nombre, 2);
+        return trim($nombres) . ' ' . trim($apellidos);
+    }
+
+    /**
      * Limpia el nombre del líder recibido del archivo externo.
      *
      * - Elimina el prefijo de clave del empleado, e.g. "EST01 - " o "MX02 - ".
@@ -339,7 +390,7 @@ class EmployeeController extends Controller
             return null;
         }
 
-        return $nombre;
+        return $this->reordenarNombre($nombre);
     }
 
     private function str(array $data, string $key): ?string

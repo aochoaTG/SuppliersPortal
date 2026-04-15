@@ -16,7 +16,8 @@ return new class extends Migration {
 
             // Datos del empleado
             $table->string('employee_number', 50)->nullable()->index();
-            $table->string('full_name', 255);                           // NOT nullable
+            $table->string('first_name', 150);                          // NOT nullable
+            $table->string('last_name', 150)->nullable();
             $table->string('department', 150)->nullable();
             $table->string('job_title', 150)->nullable();
             $table->date('hire_date')->nullable();

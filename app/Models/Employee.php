@@ -10,7 +10,8 @@ class Employee extends Model
         'user_id',
         'archivo_origen',
         'employee_number',
-        'full_name',
+        'first_name',
+        'last_name',
         'department',
         'job_title',
         'hire_date',
@@ -49,6 +50,15 @@ class Employee extends Model
         'indemnization'     => 'decimal:4',
         'seniority_premium' => 'decimal:4',
     ];
+
+    /**
+     * Nombre completo calculado: "Nombre(s) Apellido(s)".
+     * Útil para mostrar en vistas sin tener que concatenar manualmente.
+     */
+    public function getFullNameAttribute(): string
+    {
+        return trim($this->first_name . ' ' . ($this->last_name ?? ''));
+    }
 
     public function user()
     {
