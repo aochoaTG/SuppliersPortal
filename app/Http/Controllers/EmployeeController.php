@@ -456,11 +456,12 @@ class EmployeeController extends Controller
             );
         }
 
-        $resultados = $query->get(['employee_number']);
+        $numeros = $query->pluck('employee_number')->unique()->values();
 
-        // Solo resuelve si el match es inequívoco
-        return $resultados->count() === 1
-            ? $resultados->first()->employee_number
+        // Resuelve si todos los matches apuntan al mismo número de empleado
+        // (la misma persona puede aparecer en varios archivos/empresas)
+        return $numeros->count() === 1
+            ? $numeros->first()
             : $nombreLimpio;
     }
 
