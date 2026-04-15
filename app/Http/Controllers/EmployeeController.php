@@ -326,12 +326,14 @@ class EmployeeController extends Controller
             return null;
         }
 
-        // Quitar prefijo tipo "ABC01 - " o "MX02 - " al inicio
-        $nombre = preg_replace('/^[A-Z]{2,4}\d{2,3}\s*-\s*/i', '', $valor);
-        $nombre = trim($nombre);
+        // Quitar prefijo al inicio: todo lo que precede al primer " - "
+        // Cubre números (9235 - ...), siglas (Ch - ...) y palabras (Jarudo - ...).
+        $nombre = str_contains($valor, ' - ')
+            ? trim(substr($valor, strpos($valor, ' - ') + 3))
+            : trim($valor);
 
         // Valores sin información útil → sin líder registrado
-        $sinLider = ['no aplica', 'desconocido', 'vacante', 'vacant', 'sin jefe', '-'];
+        $sinLider = ['no aplica', 'desconocido', 'vacante', 'vacant', 'sin jefe', '-', 'null'];
 
         if ($nombre === '' || in_array(mb_strtolower($nombre), $sinLider, true)) {
             return null;
