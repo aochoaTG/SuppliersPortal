@@ -430,32 +430,30 @@ class EmployeeController extends Controller
             return $nombreLimpio;
         }
 
-        // Separar partes para la búsqueda:
-        // - Con coma: formato origen "Apellidos, Nombre" → split exacto
-        // - Sin coma: primer token = nombre, resto = apellidos
-        if (str_contains($sinPrefijo, ',')) {
-            [$apellidos, $nombres] = explode(',', $sinPrefijo, 2);
-        } else {
-            $partes    = preg_split('/\s+/', $sinPrefijo, 2);
-            $nombres   = $partes[0] ?? '';
-            $apellidos = $partes[1] ?? '';
-        }
-
-        $apellidos = trim($apellidos);
-        $nombres   = trim($nombres);
-
-        if ($apellidos === '' && $nombres === '') {
-            return $nombreLimpio;
-        }
-
         // LIKE con el fragmento disponible (puede estar truncado en el origen)
         $query = Employee::whereNotNull('employee_number');
 
-        if ($nombres !== '') {
-            $query->where('first_name', 'like', $nombres . '%');
-        }
-        if ($apellidos !== '') {
-            $query->where('last_name', 'like', $apellidos . '%');
+        if (str_contains($sinPrefijo, ',')) {
+            // Formato origen "Apellidos, Nombre" → split exacto, LIKE por separado
+            [$apellidos, $nombres] = explode(',', $sinPrefijo, 2);
+            $apellidos = trim($apellidos);
+            $nombres   = trim($nombres);
+
+            if ($nombres !== '') {
+                $query->where('first_name', 'like', $nombres . '%');
+            }
+            if ($apellidos !== '') {
+                $query->where('last_name', 'like', $apellidos . '%');
+            }
+        } else {
+            // Sin coma: el valor ya está en orden natural "Nombre Apellidos".
+            // Buscar contra el nombre completo concatenado para evitar el problema
+            // de split asimétrico (e.g. "Vicente Alejandro Carril" no parte igual
+            // que first_name="Vicente Alejandro" / last_name="Carrillo").
+            $query->whereRaw(
+                "(first_name + ' ' + ISNULL(last_name, '')) LIKE ?",
+                [$sinPrefijo . '%']
+            );
         }
 
         $resultados = $query->get(['employee_number']);
