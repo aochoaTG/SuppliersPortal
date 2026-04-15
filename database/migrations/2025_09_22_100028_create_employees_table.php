@@ -2,13 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id')->nullable()->unique();
+            $table->unsignedBigInteger('user_id')->nullable(); // unique filtrado se crea abajo
 
             // Origen del registro
             $table->string('archivo_origen', 255)->nullable();
@@ -56,6 +57,12 @@ return new class extends Migration {
             $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();
             $table->unique(['company', 'employee_number']);
         });
+
+        // Índice único filtrado: SQL Server permite múltiples NULLs, pero
+        // garantiza que ningún user_id real se asigne a dos empleados.
+        DB::statement(
+            'CREATE UNIQUE INDEX employees_user_id_unique ON employees (user_id) WHERE user_id IS NOT NULL'
+        );
     }
 
     public function down(): void {
