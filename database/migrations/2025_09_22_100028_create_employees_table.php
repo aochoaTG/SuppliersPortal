@@ -55,13 +55,16 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();
-            $table->unique(['company', 'employee_number']);
         });
 
-        // Índice único filtrado: SQL Server permite múltiples NULLs, pero
-        // garantiza que ningún user_id real se asigne a dos empleados.
+        // Índices únicos filtrados: SQL Server no permite múltiples (NULL, NULL)
+        // en índices únicos normales, así que se filtra para que solo aplique
+        // cuando los campos tienen valor real.
         DB::statement(
             'CREATE UNIQUE INDEX employees_user_id_unique ON employees (user_id) WHERE user_id IS NOT NULL'
+        );
+        DB::statement(
+            'CREATE UNIQUE INDEX employees_company_employee_number_unique ON employees (company, employee_number) WHERE company IS NOT NULL AND employee_number IS NOT NULL'
         );
     }
 

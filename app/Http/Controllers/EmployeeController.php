@@ -60,11 +60,19 @@ class EmployeeController extends Controller
         $empresa = $this->str($data, 'Empresa');
         $rfc     = $this->str($data, 'RFC');
 
-        // Buscar explícitamente por los tres campos clave
-        $employee = Employee::where('employee_number', $numero)
-            ->where('company', $empresa)
-            ->where('rfc', $rfc)
-            ->first();
+        // Estrategia de búsqueda:
+        // 1. Si tiene número y empresa → buscar por ambos (caso normal)
+        // 2. Si falta alguno pero tiene RFC → buscar solo por RFC
+        // 3. Sin ningún identificador → siempre crear (no se puede deduplicar)
+        if ($numero !== null && $empresa !== null) {
+            $employee = Employee::where('employee_number', $numero)
+                ->where('company', $empresa)
+                ->first();
+        } elseif ($rfc !== null) {
+            $employee = Employee::where('rfc', $rfc)->first();
+        } else {
+            $employee = null;
+        }
 
         $esNuevo = $employee === null;
 
