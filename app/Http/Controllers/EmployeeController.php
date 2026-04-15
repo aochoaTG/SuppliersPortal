@@ -139,6 +139,48 @@ class EmployeeController extends Controller
         ], $esNuevo ? 201 : 200);
     }
 
+    // ── Segunda pasada: resolución de líderes pendientes ─────────────────────
+
+    /**
+     * Recorre todos los empleados cuyo leader aún es un nombre (no un número)
+     * e intenta resolverlo ahora que la tabla está completa.
+     *
+     * Agrupa por nombre único para hacer una sola consulta por líder distinto
+     * y luego actualiza en batch. Ideal para llamar al final del script de importación.
+     *
+     * POST /api/empleados/resolver-lideres
+     */
+    public function resolverLideresPendientes(): JsonResponse
+    {
+        // Obtener nombres únicos pendientes: leader no nulo y no puramente numérico
+        $pendientes = Employee::whereNotNull('leader')
+            ->whereRaw("leader LIKE '%[^0-9]%'")
+            ->distinct()
+            ->pluck('leader');
+
+        $resueltos   = 0;
+        $sinResolver = 0;
+
+        foreach ($pendientes as $nombre) {
+            // Reutilizar resolverLider: el nombre limpio ya no tiene prefijo,
+            // así que se pasa como rawLider también (quitarPrefijo lo devuelve igual)
+            $numero = $this->resolverLider($nombre, $nombre);
+
+            if ($numero !== $nombre) {
+                Employee::where('leader', $nombre)->update(['leader' => $numero]);
+                $resueltos++;
+            } else {
+                $sinResolver++;
+            }
+        }
+
+        return response()->json([
+            'success'      => true,
+            'resueltos'    => $resueltos,
+            'sin_resolver' => $sinResolver,
+        ]);
+    }
+
     // ── Lógica de eventos ─────────────────────────────────────────────────────
 
     /**
