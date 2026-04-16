@@ -19,6 +19,7 @@ class EmployeeFactory extends Factory
             'company'         => $this->faker->company(),
             'is_active'       => 'SI',
             'user_id'         => null,
+            'photo'           => null,
         ];
     }
 }

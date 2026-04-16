@@ -53,6 +53,8 @@ return new class extends Migration {
             $table->decimal('indemnization', 10, 4)->nullable();
             $table->decimal('seniority_premium', 10, 4)->nullable();
 
+            $table->string('photo', 500)->nullable();
+
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();

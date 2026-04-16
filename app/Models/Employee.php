@@ -40,6 +40,7 @@ class Employee extends Model
         'severance_bonus',
         'indemnization',
         'seniority_premium',
+        'photo',
     ];
 
     protected $casts = [
