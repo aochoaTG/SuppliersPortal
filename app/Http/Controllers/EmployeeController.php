@@ -4,9 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\EmployeeEvent;
+use App\Models\User;
+use App\Notifications\StaffWelcomeNotification;
+use App\Rules\AllowedEmailDomain;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
 use Yajra\DataTables\Facades\DataTables;
 
 class EmployeeController extends Controller
@@ -47,6 +52,63 @@ class EmployeeController extends Controller
         'seniority_premium'  => 'prima de antigüedad',
     ];
 
+    public function promoteForm(Employee $employee): JsonResponse|View
+    {
+        if ($employee->user_id !== null) {
+            return response()->json(['error' => 'Este empleado ya tiene un usuario asignado.'], 409);
+        }
+
+        $roles = Role::orderBy('name')->get(['id', 'name']);
+
+        return view('employees.partials.promote-form', compact('employee', 'roles'));
+    }
+
+    public function promote(Employee $employee): JsonResponse
+    {
+        if ($employee->user_id !== null) {
+            return response()->json(['error' => 'Este empleado ya tiene un usuario asignado.'], 409);
+        }
+
+        $validated = request()->validate([
+            'name'      => ['required', 'string', 'max:180'],
+            'email'     => ['required', 'email', 'max:180', 'unique:users,email', new AllowedEmailDomain],
+            'password'  => ['required', 'string', 'min:8'],
+            'phone'     => ['nullable', 'string', 'max:30'],
+            'job_title' => ['nullable', 'string', 'max:120'],
+            'roles'     => ['nullable', 'array'],
+            'roles.*'   => ['string', 'exists:roles,name'],
+            'avatar'    => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+        ]);
+
+        $plainPassword = $validated['password'];
+
+        DB::transaction(function () use ($validated, $employee, $plainPassword) {
+            $user = User::create([
+                'name'      => $validated['name'],
+                'email'     => $validated['email'],
+                'password'  => $validated['password'],
+                'phone'     => $validated['phone'] ?? null,
+                'job_title' => $validated['job_title'] ?? null,
+                'is_active' => true,
+            ]);
+
+            if (request()->hasFile('avatar')) {
+                $path = request()->file('avatar')->store("users/{$user->id}/avatar", 'public');
+                $user->update(['avatar' => $path]);
+            }
+
+            if (!empty($validated['roles'])) {
+                $user->syncRoles($validated['roles']);
+            }
+
+            $employee->update(['user_id' => $user->id]);
+
+            $user->notify(new StaffWelcomeNotification($plainPassword));
+        });
+
+        return response()->json(['success' => true, 'message' => 'Usuario creado y notificado correctamente.']);
+    }
+
     public function index(): View
     {
         return view('employees.index');
@@ -67,7 +129,22 @@ class EmployeeController extends Controller
                     : '<span class="badge bg-danger">NO</span>';
             })
             ->orderColumn('employee_number', 'CAST(employee_number AS BIGINT) $1')
-            ->rawColumns(['is_active'])
+            ->addColumn('actions', function (Employee $row) {
+                if ($row->user_id !== null) {
+                    return '<span class="btn btn-sm btn-outline-secondary disabled"
+                                  data-bs-toggle="tooltip"
+                                  title="Ya tiene usuario asignado">
+                                <i class="ti ti-user-check"></i>
+                            </span>';
+                }
+                return '<button class="btn btn-sm btn-outline-primary js-promote-btn"
+                                data-id="' . $row->id . '"
+                                data-bs-toggle="tooltip"
+                                title="Crear usuario staff">
+                            <i class="ti ti-user-plus"></i>
+                        </button>';
+            })
+            ->rawColumns(['is_active', 'actions'])
             ->make(true);
     }
 

@@ -227,6 +227,8 @@ Route::middleware(['auth', 'lock'])->group(function () {
     Route::middleware('role:superadmin')->group(function () {
         Route::get('employees/datatable', [EmployeeController::class, 'datatable'])->name('employees.datatable');
         Route::get('employees', [EmployeeController::class, 'index'])->name('employees.index');
+        Route::get('employees/{employee}/promote-form', [EmployeeController::class, 'promoteForm'])->name('employees.promote-form');
+        Route::post('employees/{employee}/promote', [EmployeeController::class, 'promote'])->name('employees.promote');
     });
 
     // ========================================================================
