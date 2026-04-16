@@ -15,6 +15,26 @@
         </div>
 
         <div class="card-body">
+            <div class="row mb-3 g-2">
+                <div class="col-md-3">
+                    <label class="form-label mb-1" style="font-size: 12px;">Filtrar por Empresa</label>
+                    <select id="filterCompany" class="form-select form-select-sm">
+                        <option value="">Todas las empresas</option>
+                        @foreach($companies as $company)
+                            <option value="{{ $company }}">{{ $company }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size: 12px;">Estado</label>
+                    <select id="filterStatus" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="SI">Activos</option>
+                        <option value="NO">Inactivos</option>
+                    </select>
+                </div>
+            </div>
+
             @if (session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     <i class="ti ti-check"></i> {{ session('success') }}
@@ -87,6 +107,10 @@
                 ajax: {
                     url: "{{ route('employees.datatable') }}",
                     type: "GET",
+                    data: function (d) {
+                        d.is_active = $('#filterStatus').val();
+                        d.company = $('#filterCompany').val();
+                    },
                     error: function (xhr) {
                         console.error('Error en DataTable:', xhr.responseText);
                     }
@@ -94,7 +118,7 @@
                 columns: [
                     { data: 'id',              name: 'id',              width: '60px' },
                     { data: 'employee_number', name: 'employee_number' },
-                    { data: 'full_name',       name: 'full_name',       searchable: false, orderable: false },
+                    { data: 'full_name',       name: 'full_name',       searchable: true, orderable: false },
                     { data: 'company',         name: 'company' },
                     { data: 'department',      name: 'department' },
                     { data: 'job_title',       name: 'job_title' },
@@ -121,6 +145,10 @@
                     $(".dataTables_paginate > .pagination").addClass("pagination-rounded");
                     $('[data-bs-toggle="tooltip"]').tooltip();
                 }
+            });
+
+            $('#filterStatus, #filterCompany').on('change', function() {
+                employeesTable.ajax.reload();
             });
 
             // ── Promote Employee to User ──────────────────────────────────────

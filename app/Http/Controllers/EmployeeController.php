@@ -111,17 +111,44 @@ class EmployeeController extends Controller
 
     public function index(): View
     {
-        return view('employees.index');
+        $companies = Employee::distinct()->orderBy('company')->pluck('company')->filter()->values();
+        return view('employees.index', compact('companies'));
     }
 
     public function datatable(): JsonResponse
     {
         $query = Employee::query()
-            ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active']);
+            ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active', 'user_id']);
 
         return DataTables::of($query)
+            ->filter(function ($query) {
+                if (request()->filled('is_active')) {
+                    $query->where('is_active', request('is_active'));
+                }
+
+                if (request()->filled('company')) {
+                    $query->where('company', request('company'));
+                }
+
+                if (request()->filled('search.value')) {
+                    $search = request('search.value');
+                    $query->where(function($q) use ($search) {
+                        $q->where('employee_number', 'like', "%{$search}%")
+                          ->orWhere('first_name', 'like', "%{$search}%")
+                          ->orWhere('last_name', 'like', "%{$search}%")
+                          ->orWhere('company', 'like', "%{$search}%")
+                          ->orWhere('department', 'like', "%{$search}%")
+                          ->orWhere('job_title', 'like', "%{$search}%")
+                          ->orWhere('leader', 'like', "%{$search}%")
+                          ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"]);
+                    });
+                }
+            }, true)
             ->addColumn('full_name', function (Employee $row) {
                 return e(trim($row->first_name . ' ' . ($row->last_name ?? '')));
+            })
+            ->filterColumn('full_name', function($query, $keyword) {
+                $query->whereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$keyword}%"]);
             })
             ->editColumn('is_active', function (Employee $row) {
                 return $row->is_active === 'SI'
