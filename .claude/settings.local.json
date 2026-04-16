@@ -9,7 +9,12 @@
       "Bash(ls -la /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Notifications/*.php)",
       "Bash(grep -n \"class.*Purchase.*Order\" /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/app/Models/*.php)",
       "Bash(php artisan:*)",
-      "Bash(find /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/database/migrations -name *delivery* -o -name *reception*)"
+      "Bash(find /c/Users/alfo.ochoa/Documents/Desarrollo/SuppliersPortal/database/migrations -name *delivery* -o -name *reception*)",
+      "Skill(update-config)",
+      "Bash(claude mcp *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(php -r \"echo file_exists\\('resources/views/employees/index.blade.php'\\) ? 'OK' : 'MISSING';\")"
     ]
   }
 }

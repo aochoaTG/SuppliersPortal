@@ -52,6 +52,7 @@
                 serverSide: true,
                 dom: '<"top"Bf>rt<"bottom"lip>',
                 pageLength: 50,
+                order: [[1, 'asc']],
                 buttons: [
                     {
                         extend: 'excel',

@@ -55,8 +55,7 @@ class EmployeeController extends Controller
     public function datatable(): JsonResponse
     {
         $query = Employee::query()
-            ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active'])
-            ->orderBy('employee_number');
+            ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active']);
 
         return DataTables::of($query)
             ->addColumn('full_name', function (Employee $row) {
@@ -67,6 +66,7 @@ class EmployeeController extends Controller
                     ? '<span class="badge bg-success">SI</span>'
                     : '<span class="badge bg-danger">NO</span>';
             })
+            ->orderColumn('employee_number', 'CAST(employee_number AS BIGINT) $1')
             ->rawColumns(['is_active'])
             ->make(true);
     }
