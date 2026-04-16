@@ -150,6 +150,9 @@ class EmployeeController extends Controller
             ->filterColumn('full_name', function($query, $keyword) {
                 $query->whereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$keyword}%"]);
             })
+            ->orderColumn('full_name', function ($query, $order) {
+                $query->orderByRaw("CONCAT(first_name, ' ', last_name) $order");
+            })
             ->editColumn('is_active', function (Employee $row) {
                 return $row->is_active === 'SI'
                     ? '<span class="badge bg-success">SI</span>'

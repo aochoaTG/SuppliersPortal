@@ -118,7 +118,7 @@
                 columns: [
                     { data: 'id',              name: 'id',              width: '60px' },
                     { data: 'employee_number', name: 'employee_number' },
-                    { data: 'full_name',       name: 'full_name',       searchable: true, orderable: false },
+                    { data: 'full_name',       name: 'full_name',       searchable: true, orderable: true },
                     { data: 'company',         name: 'company' },
                     { data: 'department',      name: 'department' },
                     { data: 'job_title',       name: 'job_title' },

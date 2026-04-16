@@ -115,4 +115,23 @@ class EmployeeCatalogTest extends TestCase
         $response = $this->actingAs($user)->getJson('/employees/datatable?search[value]=Alberto Perez');
         $response->assertJsonCount(1, 'data');
     }
+
+    public function test_datatable_orders_by_full_name(): void
+    {
+        Employee::factory()->create(['first_name' => 'Zacarias', 'last_name' => 'Abad']);
+        Employee::factory()->create(['first_name' => 'Abel', 'last_name' => 'Zapata']);
+
+        $user = User::factory()->create();
+        $user->assignRole('superadmin');
+
+        // Order by full_name ASC
+        $response = $this->actingAs($user)->getJson('/employees/datatable?order[0][column]=2&order[0][dir]=asc&columns[2][data]=full_name');
+        $response->assertOk();
+        $this->assertEquals('Abel Zapata', $response->json('data.0.full_name'));
+
+        // Order by full_name DESC
+        $response = $this->actingAs($user)->getJson('/employees/datatable?order[0][column]=2&order[0][dir]=desc&columns[2][data]=full_name');
+        $response->assertOk();
+        $this->assertEquals('Zacarias Abad', $response->json('data.0.full_name'));
+    }
 }
