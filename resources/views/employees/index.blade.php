@@ -46,6 +46,7 @@
                 <table id="employeesTable" class="table table-bordered table-hover w-100">
                     <thead class="table-light">
                         <tr>
+                            <th style="width:52px;"></th>
                             <th style="width: 60px;">#</th>
                             <th>No. Empleado</th>
                             <th>Nombre Completo</th>
@@ -54,7 +55,7 @@
                             <th>Puesto</th>
                             <th>Líder</th>
                             <th class="text-center" style="width: 80px;">Activo</th>
-                            <th class="text-end" style="width: 80px;">Acciones</th>
+                            <th class="text-end" style="width: 110px;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -73,6 +74,28 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal: Preview de foto grande --}}
+    <div class="modal fade" id="photoPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-transparent border-0">
+                <div class="modal-body text-center p-2">
+                    <img id="photoPreviewImg" src="" class="img-fluid rounded" style="max-height:80vh;" alt="Foto">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal: Carga de foto del empleado --}}
+    <div class="modal fade" id="photoUploadModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content" id="photoUploadModalContent">
+                <div class="modal-body text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -84,7 +107,7 @@
                 serverSide: true,
                 dom: '<"top"Bf>rt<"bottom"lip>',
                 pageLength: 50,
-                order: [[1, 'asc']],
+                order: [[2, 'asc']],
                 buttons: [
                     {
                         extend: 'excel',
@@ -116,6 +139,13 @@
                     }
                 },
                 columns: [
+                    {
+                        data: 'photo',
+                        name: 'photo',
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center'
+                    },
                     { data: 'id',              name: 'id',              width: '60px' },
                     { data: 'employee_number', name: 'employee_number' },
                     { data: 'full_name',       name: 'full_name',       searchable: true, orderable: true },
@@ -149,6 +179,81 @@
 
             $('#filterStatus, #filterCompany').on('change', function() {
                 employeesTable.ajax.reload();
+            });
+
+            // ── Photo Preview ─────────────────────────────────────────────────
+            const photoPreviewModal = new bootstrap.Modal(document.getElementById('photoPreviewModal'));
+
+            $(document).on('click', '.js-photo-preview', function () {
+                document.getElementById('photoPreviewImg').src = $(this).data('url');
+                photoPreviewModal.show();
+            });
+
+            // ── Photo Upload ──────────────────────────────────────────────────
+            const photoUploadModal = new bootstrap.Modal(document.getElementById('photoUploadModal'));
+
+            $(document).on('click', '.js-photo-btn', function () {
+                const employeeId = $(this).data('id');
+
+                $('#photoUploadModalContent').html(
+                    '<div class="modal-body text-center py-5"><div class="spinner-border text-primary" role="status"></div></div>'
+                );
+                photoUploadModal.show();
+
+                fetch(`/employees/${employeeId}/photo-form`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(res => res.text().then(html => {
+                    $('#photoUploadModalContent').html(html);
+                }))
+                .catch(() => {
+                    photoUploadModal.hide();
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar el formulario.' });
+                });
+            });
+
+            $(document).on('submit', '#photoForm', function (e) {
+                e.preventDefault();
+
+                const form      = this;
+                const url       = form.action;
+                const formData  = new FormData(form);
+                const submitBtn = document.getElementById('photoSubmitBtn');
+
+                form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+                const errEl = document.getElementById('err-photo');
+                if (errEl) errEl.textContent = '';
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: formData
+                })
+                .then(res => res.json().then(data => ({ status: res.status, data })))
+                .then(({ status, data }) => {
+                    if (status === 200 && data.success) {
+                        photoUploadModal.hide();
+                        employeesTable.ajax.reload(null, false);
+                        Swal.fire({ icon: 'success', title: '¡Listo!', text: 'Fotografía actualizada.', timer: 2500, showConfirmButton: false });
+                    } else if (status === 422 && data.errors) {
+                        const input = form.querySelector('[name="photo"]');
+                        if (input) input.classList.add('is-invalid');
+                        if (errEl) errEl.textContent = Object.values(data.errors).flat()[0];
+                    }
+                })
+                .catch(() => {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar la fotografía.' });
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="ti ti-device-floppy me-1"></i>Guardar foto';
+                });
             });
 
             // ── Promote Employee to User ──────────────────────────────────────

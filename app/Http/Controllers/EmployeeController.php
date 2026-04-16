@@ -143,9 +143,22 @@ class EmployeeController extends Controller
     public function datatable(): JsonResponse
     {
         $query = Employee::query()
-            ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active', 'user_id']);
+            ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active', 'user_id', 'photo']);
 
         return DataTables::of($query)
+            ->addColumn('photo', function (Employee $row) {
+                if ($row->photo) {
+                    $url = Storage::url($row->photo);
+                    return '<img src="' . e($url) . '"
+                                 class="rounded-circle js-photo-preview"
+                                 data-url="' . e($url) . '"
+                                 style="width:36px;height:36px;object-fit:cover;cursor:pointer;"
+                                 alt="Foto">';
+                }
+                $initial = strtoupper(mb_substr($row->first_name ?? '?', 0, 1));
+                return '<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white mx-auto"
+                             style="width:36px;height:36px;font-size:14px;font-weight:600;">' . e($initial) . '</div>';
+            })
             ->filter(function ($query) {
                 if (request()->filled('is_active')) {
                     $query->where('is_active', request('is_active'));
@@ -185,21 +198,31 @@ class EmployeeController extends Controller
             })
             ->orderColumn('employee_number', 'CAST(employee_number AS BIGINT) $1')
             ->addColumn('actions', function (Employee $row) {
+                $photoBtn = '<button class="btn btn-sm btn-outline-info js-photo-btn me-1"
+                                     data-id="' . $row->id . '"
+                                     data-bs-toggle="tooltip"
+                                     title="Cargar fotografía">
+                                 <i class="ti ti-camera"></i>
+                             </button>';
+
                 if ($row->user_id !== null) {
-                    return '<span class="btn btn-sm btn-outline-secondary disabled"
-                                  data-bs-toggle="tooltip"
-                                  title="Ya tiene usuario asignado">
-                                <i class="ti ti-user-check"></i>
-                            </span>';
+                    $promoteBtn = '<span class="btn btn-sm btn-outline-secondary disabled"
+                                        data-bs-toggle="tooltip"
+                                        title="Ya tiene usuario asignado">
+                                      <i class="ti ti-user-check"></i>
+                                  </span>';
+                } else {
+                    $promoteBtn = '<button class="btn btn-sm btn-outline-primary js-promote-btn"
+                                          data-id="' . $row->id . '"
+                                          data-bs-toggle="tooltip"
+                                          title="Crear usuario staff">
+                                      <i class="ti ti-user-plus"></i>
+                                  </button>';
                 }
-                return '<button class="btn btn-sm btn-outline-primary js-promote-btn"
-                                data-id="' . $row->id . '"
-                                data-bs-toggle="tooltip"
-                                title="Crear usuario staff">
-                            <i class="ti ti-user-plus"></i>
-                        </button>';
+
+                return $photoBtn . $promoteBtn;
             })
-            ->rawColumns(['is_active', 'actions'])
+            ->rawColumns(['photo', 'is_active', 'actions'])
             ->make(true);
     }
 
