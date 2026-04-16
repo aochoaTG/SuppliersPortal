@@ -203,9 +203,13 @@
                 fetch(`/employees/${employeeId}/photo-form`, {
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 })
-                .then(res => res.text().then(html => {
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.text();
+                })
+                .then(html => {
                     $('#photoUploadModalContent').html(html);
-                }))
+                })
                 .catch(() => {
                     photoUploadModal.hide();
                     Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar el formulario.' });

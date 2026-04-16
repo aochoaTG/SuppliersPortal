@@ -146,19 +146,6 @@ class EmployeeController extends Controller
             ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active', 'user_id', 'photo']);
 
         return DataTables::of($query)
-            ->addColumn('photo', function (Employee $row) {
-                if ($row->photo) {
-                    $url = Storage::url($row->photo);
-                    return '<img src="' . e($url) . '"
-                                 class="rounded-circle js-photo-preview"
-                                 data-url="' . e($url) . '"
-                                 style="width:36px;height:36px;object-fit:cover;cursor:pointer;"
-                                 alt="Foto">';
-                }
-                $initial = strtoupper(mb_substr($row->first_name ?? '?', 0, 1));
-                return '<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white mx-auto"
-                             style="width:36px;height:36px;font-size:14px;font-weight:600;">' . e($initial) . '</div>';
-            })
             ->filter(function ($query) {
                 if (request()->filled('is_active')) {
                     $query->where('is_active', request('is_active'));
@@ -182,6 +169,19 @@ class EmployeeController extends Controller
                     });
                 }
             }, true)
+            ->addColumn('photo', function (Employee $row) {
+                if ($row->photo) {
+                    $url = Storage::url($row->photo);
+                    return '<img src="' . e($url) . '"
+                                 class="rounded-circle js-photo-preview"
+                                 data-url="' . e($url) . '"
+                                 style="width:36px;height:36px;object-fit:cover;cursor:pointer;"
+                                 alt="Foto">';
+                }
+                $initial = strtoupper(mb_substr($row->first_name ?? '?', 0, 1));
+                return '<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white mx-auto"
+                             style="width:36px;height:36px;font-size:14px;font-weight:600;">' . e($initial) . '</div>';
+            })
             ->addColumn('full_name', function (Employee $row) {
                 return e(trim($row->first_name . ' ' . ($row->last_name ?? '')));
             })
@@ -199,7 +199,7 @@ class EmployeeController extends Controller
             ->orderColumn('employee_number', 'CAST(employee_number AS BIGINT) $1')
             ->addColumn('actions', function (Employee $row) {
                 $photoBtn = '<button class="btn btn-sm btn-outline-info js-photo-btn me-1"
-                                     data-id="' . $row->id . '"
+                                     data-id="' . e($row->id) . '"
                                      data-bs-toggle="tooltip"
                                      title="Cargar fotografía">
                                  <i class="ti ti-camera"></i>
@@ -213,7 +213,7 @@ class EmployeeController extends Controller
                                   </span>';
                 } else {
                     $promoteBtn = '<button class="btn btn-sm btn-outline-primary js-promote-btn"
-                                          data-id="' . $row->id . '"
+                                          data-id="' . e($row->id) . '"
                                           data-bs-toggle="tooltip"
                                           title="Crear usuario staff">
                                       <i class="ti ti-user-plus"></i>
