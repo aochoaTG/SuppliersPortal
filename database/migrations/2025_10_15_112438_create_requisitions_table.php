@@ -102,82 +102,87 @@ return new class extends Migration {
             $table->index('required_date');
         });
 
-        // Comentario para SQL Server
-        DB::statement("EXEC sp_addextendedproperty
-            @name = N'MS_Description',
-            @value = 'Requisiciones - Pasan directamente a Compras sin aprobación interna. La aprobación se realiza sobre la cotización.',
-            @level0type = N'SCHEMA', @level0name = 'dbo',
-            @level1type = N'TABLE',  @level1name = 'requisitions'");
+        // SQL Server-specific statements (skipped on SQLite / testing environments)
+        if (DB::getDriverName() === 'sqlsrv') {
+            // Comentario para SQL Server
+            DB::statement("EXEC sp_addextendedproperty
+                @name = N'MS_Description',
+                @value = 'Requisiciones - Pasan directamente a Compras sin aprobación interna. La aprobación se realiza sobre la cotización.',
+                @level0type = N'SCHEMA', @level0name = 'dbo',
+                @level1type = N'TABLE',  @level1name = 'requisitions'");
 
-        // Constraints manuales
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_requested_by
-            FOREIGN KEY (requested_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            // Constraints manuales
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_requested_by
+                FOREIGN KEY (requested_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
 
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_paused_by
-            FOREIGN KEY (paused_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_paused_by
+                FOREIGN KEY (paused_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
 
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_reactivated_by
-            FOREIGN KEY (reactivated_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_reactivated_by
+                FOREIGN KEY (reactivated_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
 
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_cancelled_by
-            FOREIGN KEY (cancelled_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_cancelled_by
+                FOREIGN KEY (cancelled_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
 
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_rejected_by
-            FOREIGN KEY (rejected_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_rejected_by
+                FOREIGN KEY (rejected_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
 
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_created_by
-            FOREIGN KEY (created_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_created_by
+                FOREIGN KEY (created_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
 
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_updated_by
-            FOREIGN KEY (updated_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_updated_by
+                FOREIGN KEY (updated_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
 
-        // ======= NUEVO: Constraint para validated_by =======
-        DB::statement("
-            ALTER TABLE requisitions
-            ADD CONSTRAINT fk_requisitions_validated_by
-            FOREIGN KEY (validated_by) REFERENCES users(id)
-            ON DELETE NO ACTION ON UPDATE NO ACTION
-        ");
+            // ======= NUEVO: Constraint para validated_by =======
+            DB::statement("
+                ALTER TABLE requisitions
+                ADD CONSTRAINT fk_requisitions_validated_by
+                FOREIGN KEY (validated_by) REFERENCES users(id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+            ");
+        }
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_requested_by");
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_paused_by");
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_reactivated_by");
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_cancelled_by");
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_rejected_by");
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_created_by");
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_updated_by");
-        DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_validated_by");
+        if (DB::getDriverName() === 'sqlsrv') {
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_requested_by");
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_paused_by");
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_reactivated_by");
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_cancelled_by");
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_rejected_by");
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_created_by");
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_updated_by");
+            DB::statement("ALTER TABLE requisitions DROP CONSTRAINT IF EXISTS fk_requisitions_validated_by");
+        }
 
         Schema::dropIfExists('requisitions');
     }

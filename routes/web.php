@@ -24,6 +24,7 @@ use App\Http\Controllers\{
     AnnualBudgetController,
     RequisitionController,
     DepartmentController,
+    EmployeeController,
     BudgetMovementController,
     RequisitionWorkflowController,
     ProductServiceController,
@@ -222,6 +223,9 @@ Route::middleware(['auth', 'lock'])->group(function () {
 
     Route::get('departments/datatable', [DepartmentController::class, 'datatable'])->name('departments.datatable');
     Route::resource('departments', DepartmentController::class)->except(['show']);
+
+    Route::get('employees/datatable', [EmployeeController::class, 'datatable'])->name('employees.datatable');
+    Route::get('employees', [EmployeeController::class, 'index'])->name('employees.index');
 
     // ========================================================================
     //  Annual Budgets

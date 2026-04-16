@@ -6,6 +6,8 @@ use App\Models\Employee;
 use App\Models\EmployeeEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Yajra\DataTables\Facades\DataTables;
 
 class EmployeeController extends Controller
 {
@@ -44,6 +46,28 @@ class EmployeeController extends Controller
         'indemnization'      => 'indemnización',
         'seniority_premium'  => 'prima de antigüedad',
     ];
+
+    public function index(): View
+    {
+        return view('employees.index');
+    }
+
+    public function datatable(): JsonResponse
+    {
+        $query = Employee::query()->orderBy('employee_number');
+
+        return DataTables::of($query)
+            ->addColumn('full_name', function (Employee $row) {
+                return e(trim($row->first_name . ' ' . ($row->last_name ?? '')));
+            })
+            ->editColumn('is_active', function (Employee $row) {
+                return $row->is_active === 'SI'
+                    ? '<span class="badge bg-success">SI</span>'
+                    : '<span class="badge bg-danger">NO</span>';
+            })
+            ->rawColumns(['is_active'])
+            ->make(true);
+    }
 
     /**
      * Recibe datos de un empleado desde el script Python y los persiste.

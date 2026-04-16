@@ -75,6 +75,16 @@
                 </a>
             </li>
 
+            @hasrole('superadmin')
+            <li class="side-nav-item">
+                <a class="side-nav-link {{ request()->routeIs('employees.index') ? 'active' : '' }}"
+                    href="{{ route('employees.index') }}">
+                    <span class="menu-icon"><i class="ti ti-id-badge"></i></span>
+                    <span class="menu-text">Empleados</span>
+                </a>
+            </li>
+            @endhasrole
+
             <li class="side-nav-item">
                 <a class="side-nav-link {{ request()->routeIs('users.suppliers.index') ? 'active' : '' }}"
                     href="{{ route('users.suppliers.index') }}">
