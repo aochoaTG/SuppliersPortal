@@ -10,6 +10,7 @@ use App\Rules\AllowedEmailDomain;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
 use Yajra\DataTables\Facades\DataTables;
@@ -51,6 +52,32 @@ class EmployeeController extends Controller
         'indemnization'      => 'indemnización',
         'seniority_premium'  => 'prima de antigüedad',
     ];
+
+    public function photoForm(Employee $employee): View
+    {
+        return view('employees.partials.photo-form', compact('employee'));
+    }
+
+    public function uploadPhoto(Employee $employee): JsonResponse
+    {
+        $request = request();
+
+        $request->validate([
+            'photo' => ['required', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+        ]);
+
+        if ($employee->photo) {
+            Storage::disk('public')->delete($employee->photo);
+        }
+
+        $path = $request->file('photo')->store("employees/{$employee->id}/photo", 'public');
+        $employee->update(['photo' => $path]);
+
+        return response()->json([
+            'success'   => true,
+            'photo_url' => Storage::url($path),
+        ]);
+    }
 
     public function promoteForm(Employee $employee): JsonResponse|View
     {

@@ -6,7 +6,9 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Notifications\StaffWelcomeNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -147,6 +149,76 @@ class EmployeePromoteTest extends TestCase
                 'email'    => 'juan.perez@petrotal.com.mx',
                 'password' => 'Password123!',
             ]);
+
+        $response->assertForbidden();
+    }
+
+    public function test_photo_form_returns_view(): void
+    {
+        $response = $this->actingAs($this->superadmin())
+            ->get(route('employees.photo-form', $this->employee()));
+
+        $response->assertOk()
+                 ->assertViewIs('employees.partials.photo-form');
+    }
+
+    public function test_upload_photo_stores_file_and_updates_employee(): void
+    {
+        Storage::fake('public');
+
+        $employee = $this->employee();
+        $file     = UploadedFile::fake()->image('photo.jpg', 200, 200);
+
+        $response = $this->actingAs($this->superadmin())
+            ->post(route('employees.upload-photo', $employee), ['photo' => $file]);
+
+        $response->assertOk()->assertJsonFragment(['success' => true]);
+
+        $employee->refresh();
+        $this->assertNotNull($employee->photo);
+        Storage::disk('public')->assertExists($employee->photo);
+    }
+
+    public function test_upload_photo_deletes_old_file_when_replacing(): void
+    {
+        Storage::fake('public');
+
+        Storage::disk('public')->put('employees/1/photo/old.jpg', 'old-content');
+        $employee = $this->employee(['photo' => 'employees/1/photo/old.jpg']);
+
+        $newFile = UploadedFile::fake()->image('new.jpg', 200, 200);
+
+        $this->actingAs($this->superadmin())
+            ->post(route('employees.upload-photo', $employee), ['photo' => $newFile]);
+
+        Storage::disk('public')->assertMissing('employees/1/photo/old.jpg');
+    }
+
+    public function test_upload_photo_rejects_non_image(): void
+    {
+        Storage::fake('public');
+
+        $employee = $this->employee();
+        $file     = UploadedFile::fake()->create('document.pdf', 100, 'application/pdf');
+
+        $response = $this->actingAs($this->superadmin())
+            ->postJson(route('employees.upload-photo', $employee), ['photo' => $file]);
+
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['photo']);
+    }
+
+    public function test_upload_photo_is_forbidden_for_non_superadmin(): void
+    {
+        Storage::fake('public');
+
+        $buyer = User::factory()->create();
+        $buyer->assignRole('buyer');
+
+        $file = UploadedFile::fake()->image('photo.jpg');
+
+        $response = $this->actingAs($buyer)
+            ->post(route('employees.upload-photo', $this->employee()), ['photo' => $file]);
 
         $response->assertForbidden();
     }
