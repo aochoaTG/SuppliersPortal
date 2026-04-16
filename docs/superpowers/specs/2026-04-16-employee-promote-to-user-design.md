@@ -58,7 +58,7 @@ public function promoteForm(Employee $employee): JsonResponse|View
 
 Validaciones:
 - `name`: required, string, max:180
-- `email`: required, email, max:180, unique:users,email
+- `email`: required, email, max:180, unique:users,email, dominio en lista permitida (Rule personalizada `AllowedEmailDomain`)
 - `password`: required, string, min:8
 - `phone`: nullable, string, max:30
 - `job_title`: nullable, string, max:120
@@ -77,6 +77,42 @@ Lógica (dentro de `DB::transaction`):
 Respuesta éxito: `response()->json(['success' => true, 'message' => 'Usuario creado y notificado correctamente.'])`
 
 Respuesta error validación: Laravel retorna 422 automáticamente con `errors`.
+
+---
+
+## Regla de Validación — Dominios Permitidos
+
+**Archivo:** `app/Rules/AllowedEmailDomain.php`
+
+Implementa `ValidationRule`. Extrae el dominio del email con `Str::after($value, '@')` y verifica que esté en la lista de dominios corporativos permitidos. Si no coincide, el mensaje de error es:
+
+> "El dominio del correo no está permitido. Solo se aceptan correos corporativos del grupo TotalGas."
+
+**Dominios permitidos:**
+```php
+private const ALLOWED_DOMAINS = [
+    'petrotal.com.mx',
+    'totalgasolineras.com',
+    'totalgasonline.mx',
+    'rendilitrosjuarez.com',
+    'prlsc.com',
+    'rapigas.com',
+    'aquacarwashclub.com',
+    'aquacarclub.com',
+    'energmedia.com',
+    'petrodigitalmedia.com',
+    'totaldigitalmedia.com',
+    'fuelmedia.com.mx',
+    'petrodigital.com.mx',
+    'petromedia.com.mx',
+    'totalmedia.mx',
+    'masquegas.com',
+    'gasolucion.com',
+    'totalgasonline.com',
+    'totalgasonline.net',
+    'totalgasonline-ags.com',
+];
+```
 
 ---
 
