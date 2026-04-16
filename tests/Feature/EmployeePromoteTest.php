@@ -183,15 +183,17 @@ class EmployeePromoteTest extends TestCase
     {
         Storage::fake('public');
 
-        Storage::disk('public')->put('employees/1/photo/old.jpg', 'old-content');
-        $employee = $this->employee(['photo' => 'employees/1/photo/old.jpg']);
+        $employee = $this->employee();
+        $oldPath  = "employees/{$employee->id}/photo/old.jpg";
+        Storage::disk('public')->put($oldPath, 'old-content');
+        $employee->update(['photo' => $oldPath]);
 
         $newFile = UploadedFile::fake()->image('new.jpg', 200, 200);
 
         $this->actingAs($this->superadmin())
             ->post(route('employees.upload-photo', $employee), ['photo' => $newFile]);
 
-        Storage::disk('public')->assertMissing('employees/1/photo/old.jpg');
+        Storage::disk('public')->assertMissing($oldPath);
     }
 
     public function test_upload_photo_rejects_non_image(): void

@@ -58,10 +58,8 @@ class EmployeeController extends Controller
         return view('employees.partials.photo-form', compact('employee'));
     }
 
-    public function uploadPhoto(Employee $employee): JsonResponse
+    public function uploadPhoto(Employee $employee, Request $request): JsonResponse
     {
-        $request = request();
-
         $request->validate([
             'photo' => ['required', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
         ]);
