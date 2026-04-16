@@ -28,14 +28,24 @@ class EmployeeCatalogTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_buyer_can_access_employees_url_directly(): void
+    public function test_buyer_is_forbidden_from_employees_index(): void
     {
         $user = User::factory()->create();
         $user->assignRole('buyer');
 
         $response = $this->actingAs($user)->get('/employees');
 
-        $response->assertStatus(200);
+        $response->assertForbidden();
+    }
+
+    public function test_buyer_is_forbidden_from_employees_datatable(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('buyer');
+
+        $response = $this->actingAs($user)->getJson('/employees/datatable');
+
+        $response->assertForbidden();
     }
 
     public function test_unauthenticated_user_is_redirected(): void

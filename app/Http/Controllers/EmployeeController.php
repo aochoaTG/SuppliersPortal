@@ -54,7 +54,9 @@ class EmployeeController extends Controller
 
     public function datatable(): JsonResponse
     {
-        $query = Employee::query()->orderBy('employee_number');
+        $query = Employee::query()
+            ->select(['id', 'employee_number', 'first_name', 'last_name', 'company', 'department', 'job_title', 'leader', 'is_active'])
+            ->orderBy('employee_number');
 
         return DataTables::of($query)
             ->addColumn('full_name', function (Employee $row) {
