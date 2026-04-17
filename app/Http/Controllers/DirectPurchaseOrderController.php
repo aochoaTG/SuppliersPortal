@@ -98,8 +98,8 @@ class DirectPurchaseOrderController extends Controller
             $approvalLevel = $this->approvalService->getLevelForAmount($totalAmount);
             $levelNumber = $approvalLevel ? $approvalLevel->level_number : 1;
 
-            // Obtener aprobador por rol (purchasing_manager)
-            $approver = User::role('purchasing_manager')->first();
+            // Obtener aprobador por rol (authorizer)
+            $approver = User::role('authorizer')->first();
             $approverId = $approver?->id ?? 1;
 
             // 3. Crear la OCD

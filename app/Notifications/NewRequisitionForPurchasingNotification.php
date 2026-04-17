@@ -45,10 +45,10 @@ class NewRequisitionForPurchasingNotification extends Notification
             ->line('')
             ->line('**Detalles de la requisición:**')
             ->line('• **Folio:** ' . $this->requisition->folio)
-            ->line('• **Solicitante:** ' . $this->requisition->requester->name)
-            ->line('• **Departamento:** ' . $this->requisition->department->name)
-            ->line('• **Centro de costo:** ' . $this->requisition->costCenter->name)
-            ->line('• **Compañía:** ' . $this->requisition->company->name)
+            ->line('• **Solicitante:** ' . ($this->requisition->requester?->name ?? '—'))
+            ->line('• **Departamento:** ' . ($this->requisition->department?->name ?? '—'))
+            ->line('• **Centro de costo:** ' . ($this->requisition->costCenter?->name ?? '—'))
+            ->line('• **Compañía:** ' . ($this->requisition->company?->name ?? '—'))
             ->line('• **Número de partidas:** ' . $this->requisition->items()->count())
             ->line('• **Fecha requerida:** ' . ($this->requisition->required_date ? $this->requisition->required_date->format('d/m/Y') : 'No especificada'))
             ->line('')
@@ -68,9 +68,9 @@ class NewRequisitionForPurchasingNotification extends Notification
             'type' => 'new_requisition_for_purchasing',
             'requisition_id' => $this->requisition->id,
             'requisition_folio' => $this->requisition->folio,
-            'requester_name' => $this->requisition->requester->name,
+            'requester_name' => $this->requisition->requester?->name ?? '—',
             'url' => route('requisitions.show', $this->requisition->id),
-            'message' => 'Nueva requisición ' . $this->requisition->folio . ' recibida de ' . $this->requisition->requester->name,
+            'message' => 'Nueva requisición ' . $this->requisition->folio . ' recibida de ' . ($this->requisition->requester?->name ?? '—'),
         ];
     }
 }

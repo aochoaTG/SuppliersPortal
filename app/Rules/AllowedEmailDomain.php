@@ -29,6 +29,7 @@ class AllowedEmailDomain implements ValidationRule
         'totalgasonline.com',
         'totalgasonline.net',
         'totalgasonline-ags.com',
+        'totalgas.com',
     ];
 
     public function validate(string $attribute, mixed $value, Closure $fail): void

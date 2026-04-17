@@ -224,4 +224,71 @@ class EmployeePromoteTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_promote_copies_employee_photo_to_user_avatar_when_no_avatar_uploaded(): void
+    {
+        Storage::fake('public');
+        Notification::fake();
+
+        Storage::disk('public')->put('employees/1/photo/face.jpg', 'fake-content');
+        $employee = $this->employee(['photo' => 'employees/1/photo/face.jpg']);
+
+        $response = $this->actingAs($this->superadmin())
+            ->postJson(route('employees.promote', $employee), [
+                'name'     => 'Juan Pérez',
+                'email'    => 'juan.perez@petrotal.com.mx',
+                'password' => 'Password123!',
+            ]);
+
+        $response->assertOk();
+
+        $user = User::where('email', 'juan.perez@petrotal.com.mx')->first();
+        $this->assertNotNull($user->avatar);
+        $this->assertStringContainsString('face.jpg', $user->avatar);
+        Storage::disk('public')->assertExists($user->avatar);
+    }
+
+    public function test_promote_uses_uploaded_avatar_over_employee_photo(): void
+    {
+        Storage::fake('public');
+        Notification::fake();
+
+        Storage::disk('public')->put('employees/1/photo/employee-face.jpg', 'fake-content');
+        $employee  = $this->employee(['photo' => 'employees/1/photo/employee-face.jpg']);
+        $newAvatar = UploadedFile::fake()->image('uploaded-avatar.jpg', 100, 100);
+
+        $response = $this->actingAs($this->superadmin())
+            ->post(route('employees.promote', $employee), [
+                'name'     => 'Juan Pérez',
+                'email'    => 'juan.perez@petrotal.com.mx',
+                'password' => 'Password123!',
+                'avatar'   => $newAvatar,
+            ]);
+
+        $response->assertOk();
+
+        $user = User::where('email', 'juan.perez@petrotal.com.mx')->first();
+        $this->assertStringContainsString('uploaded-avatar', $user->avatar);
+        Storage::disk('public')->assertExists($user->avatar);
+    }
+
+    public function test_promote_leaves_avatar_null_when_no_photo_and_no_upload(): void
+    {
+        Storage::fake('public');
+        Notification::fake();
+
+        $employee = $this->employee(['photo' => null]);
+
+        $response = $this->actingAs($this->superadmin())
+            ->postJson(route('employees.promote', $employee), [
+                'name'     => 'Juan Pérez',
+                'email'    => 'juan.perez@petrotal.com.mx',
+                'password' => 'Password123!',
+            ]);
+
+        $response->assertOk();
+
+        $user = User::where('email', 'juan.perez@petrotal.com.mx')->first();
+        $this->assertNull($user->avatar);
+    }
 }

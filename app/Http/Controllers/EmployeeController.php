@@ -118,8 +118,15 @@ class EmployeeController extends Controller
             ]);
 
             if (request()->hasFile('avatar')) {
-                $path = request()->file('avatar')->store("users/{$user->id}/avatar", 'public');
+                $file = request()->file('avatar');
+                $filename = $file->getClientOriginalName();
+                $path = $file->storeAs("users/{$user->id}/avatar", $filename, 'public');
                 $user->update(['avatar' => $path]);
+            } elseif ($employee->photo) {
+                $filename = basename($employee->photo);
+                $newPath  = "users/{$user->id}/avatar/{$filename}";
+                Storage::disk('public')->copy($employee->photo, $newPath);
+                $user->update(['avatar' => $newPath]);
             }
 
             if (!empty($validated['roles'])) {

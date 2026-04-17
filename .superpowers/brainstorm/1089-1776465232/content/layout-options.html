@@ -1,0 +1,174 @@
+<h2>¿Qué estructura de layout prefieres para el registro?</h2>
+<p class="subtitle">Las tres opciones usan el fondo oscuro animado y colores TotalGas del login existente</p>
+
+<div class="cards">
+
+  <!-- Opción A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f1419;padding:16px;border-radius:8px 8px 0 0;">
+      <!-- Mockup A: Tarjeta centrada -->
+      <div style="max-width:320px;margin:0 auto;background:white;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5);">
+        <!-- Header azul con logo -->
+        <div style="background:linear-gradient(135deg,#1a4b96,#2d5aa0);padding:14px 16px;text-align:center;">
+          <div style="background:rgba(255,255,255,.15);border-radius:4px;padding:4px 10px;display:inline-block;margin-bottom:6px;">
+            <span style="color:#A9CA48;font-weight:700;font-size:11px;letter-spacing:1px;">TOTALGAS</span>
+          </div>
+          <div style="color:white;font-size:13px;font-weight:600;">Registro de Proveedor</div>
+        </div>
+        <!-- Progress stepper -->
+        <div style="background:#f8f9fa;padding:10px 16px;border-bottom:1px solid #e9ecef;display:flex;align-items:center;gap:8px;">
+          <div style="width:22px;height:22px;border-radius:50%;background:#A9CA48;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:700;flex-shrink:0;">1</div>
+          <div style="flex:1;height:3px;background:#dee2e6;border-radius:2px;">
+            <div style="width:0%;height:100%;background:#A9CA48;border-radius:2px;"></div>
+          </div>
+          <div style="width:22px;height:22px;border-radius:50%;background:#dee2e6;display:flex;align-items:center;justify-content:center;color:#6c757d;font-size:10px;font-weight:700;flex-shrink:0;">2</div>
+        </div>
+        <!-- Form fields -->
+        <div style="padding:14px 16px;">
+          <div style="font-size:9px;color:#6c757d;margin-bottom:3px;">Nombre(s)</div>
+          <div style="border:1.5px solid #dee2e6;border-radius:6px;padding:6px 10px;margin-bottom:8px;font-size:9px;color:#495057;">Juan</div>
+          <div style="font-size:9px;color:#6c757d;margin-bottom:3px;">Correo electrónico</div>
+          <div style="border:1.5px solid #A9CA48;border-radius:6px;padding:6px 10px;margin-bottom:8px;font-size:9px;color:#495057;box-shadow:0 0 0 3px rgba(169,202,72,.15);">juan@empresa.com</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:9px;color:#6c757d;margin-bottom:3px;">Contraseña</div>
+              <div style="border:1.5px solid #dee2e6;border-radius:6px;padding:6px 10px;font-size:9px;color:#adb5bd;">••••••••</div>
+            </div>
+            <div>
+              <div style="font-size:9px;color:#6c757d;margin-bottom:3px;">Confirmar</div>
+              <div style="border:1.5px solid #dee2e6;border-radius:6px;padding:6px 10px;font-size:9px;color:#adb5bd;">••••••••</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:9px;color:#1a4b96;">¿Ya tienes cuenta?</span>
+            <button style="background:linear-gradient(135deg,#A9CA48,#7BC525);border:none;border-radius:6px;padding:6px 14px;color:white;font-size:9px;font-weight:700;">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Tarjeta centrada vertical</h3>
+      <p>Tarjeta blanca centrada sobre fondo oscuro (igual al login). Header azul TotalGas, stepper BS5, inputs con foco verde lima. Simple y coherente con la identidad.</p>
+    </div>
+  </div>
+
+  <!-- Opción B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f1419;padding:16px;border-radius:8px 8px 0 0;">
+      <!-- Mockup B: Split panel como login -->
+      <div style="max-width:340px;margin:0 auto;background:white;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5);display:flex;min-height:200px;">
+        <!-- Panel izquierdo: branding -->
+        <div style="width:110px;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;border-right:1px solid #f0f0f0;">
+          <div style="width:60px;height:60px;background:#f8f9fa;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;">
+            <span style="color:#1a4b96;font-weight:800;font-size:10px;text-align:center;line-height:1.2;">TOTAL<br>GAS</span>
+          </div>
+          <div style="font-size:8px;color:#6c757d;text-align:center;">Portal de<br>Proveedores</div>
+          <!-- Mini steps -->
+          <div style="margin-top:16px;width:100%;">
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+              <div style="width:16px;height:16px;border-radius:50%;background:#A9CA48;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                <span style="color:white;font-size:7px;font-weight:700;">1</span>
+              </div>
+              <span style="font-size:7.5px;color:#1a4b96;font-weight:600;">Mi cuenta</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:16px;height:16px;border-radius:50%;background:#dee2e6;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                <span style="color:#6c757d;font-size:7px;font-weight:700;">2</span>
+              </div>
+              <span style="font-size:7.5px;color:#6c757d;">Mi empresa</span>
+            </div>
+          </div>
+        </div>
+        <!-- Panel derecho: formulario azul -->
+        <div style="flex:1;background:linear-gradient(135deg,rgba(26,75,150,.95),rgba(45,90,160,.95));padding:14px;color:white;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:12px;color:#A9CA48;">Datos de la cuenta</div>
+          <div style="font-size:8px;color:rgba(255,255,255,.7);margin-bottom:3px;">Nombre(s)</div>
+          <div style="border:1px solid rgba(169,202,72,.4);border-radius:5px;padding:5px 8px;margin-bottom:7px;font-size:8px;background:rgba(255,255,255,.08);color:white;">Juan</div>
+          <div style="font-size:8px;color:rgba(255,255,255,.7);margin-bottom:3px;">Correo</div>
+          <div style="border:1px solid #A9CA48;border-radius:5px;padding:5px 8px;margin-bottom:7px;font-size:8px;background:rgba(169,202,72,.1);color:white;box-shadow:0 0 0 2px rgba(169,202,72,.2);">juan@empresa.com</div>
+          <div style="font-size:8px;color:rgba(255,255,255,.7);margin-bottom:3px;">Contraseña</div>
+          <div style="border:1px solid rgba(169,202,72,.3);border-radius:5px;padding:5px 8px;margin-bottom:12px;font-size:8px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);">••••••••</div>
+          <button style="width:100%;background:linear-gradient(45deg,#A9CA48,#7BC525);border:none;border-radius:6px;padding:7px;color:#1a4b96;font-size:8px;font-weight:700;">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Split panel (igual al login)</h3>
+      <p>Misma estructura que el login: panel blanco izquierdo con logo y pasos, panel azul derecho con el formulario. Máxima coherencia visual con el login actual.</p>
+    </div>
+  </div>
+
+  <!-- Opción C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f1419;padding:16px;border-radius:8px 8px 0 0;">
+      <!-- Mockup C: Card wide sin split, limpia -->
+      <div style="max-width:340px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5);">
+        <!-- Top bar con logo izq + título -->
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:white;border-bottom:2px solid #A9CA48;">
+          <div style="background:#1a4b96;border-radius:4px;padding:3px 7px;">
+            <span style="color:#A9CA48;font-weight:800;font-size:9px;">TG</span>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#1a4b96;">Registro de Proveedor</div>
+            <div style="font-size:8px;color:#6c757d;">Portal TotalGas</div>
+          </div>
+          <!-- Steps right -->
+          <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div style="width:18px;height:18px;border-radius:50%;background:#A9CA48;display:flex;align-items:center;justify-content:center;">
+                <span style="color:white;font-size:8px;font-weight:700;">1</span>
+              </div>
+              <span style="font-size:8px;color:#A9CA48;font-weight:600;">Cuenta</span>
+            </div>
+            <div style="width:20px;height:2px;background:#dee2e6;"></div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div style="width:18px;height:18px;border-radius:50%;border:2px solid #dee2e6;display:flex;align-items:center;justify-content:center;">
+                <span style="color:#6c757d;font-size:8px;font-weight:700;">2</span>
+              </div>
+              <span style="font-size:8px;color:#6c757d;">Empresa</span>
+            </div>
+          </div>
+        </div>
+        <!-- Section title -->
+        <div style="padding:10px 14px 4px;">
+          <div style="font-size:11px;font-weight:600;color:#212529;border-left:3px solid #A9CA48;padding-left:8px;">Datos de la cuenta</div>
+        </div>
+        <!-- Grid de campos -->
+        <div style="padding:6px 14px 14px;display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+          <div>
+            <div style="font-size:8px;color:#6c757d;margin-bottom:2px;">Nombre(s)</div>
+            <div style="border:1px solid #dee2e6;border-radius:5px;padding:5px 8px;font-size:8px;color:#495057;">Juan</div>
+          </div>
+          <div>
+            <div style="font-size:8px;color:#6c757d;margin-bottom:2px;">Apellidos</div>
+            <div style="border:1px solid #dee2e6;border-radius:5px;padding:5px 8px;font-size:8px;color:#495057;">García</div>
+          </div>
+          <div style="grid-column:1/-1;">
+            <div style="font-size:8px;color:#6c757d;margin-bottom:2px;">Correo electrónico</div>
+            <div style="border:1px solid #A9CA48;border-radius:5px;padding:5px 8px;font-size:8px;color:#495057;box-shadow:0 0 0 2px rgba(169,202,72,.12);">juan@empresa.com</div>
+          </div>
+          <div>
+            <div style="font-size:8px;color:#6c757d;margin-bottom:2px;">Contraseña</div>
+            <div style="border:1px solid #dee2e6;border-radius:5px;padding:5px 8px;font-size:8px;color:#adb5bd;">••••••••</div>
+          </div>
+          <div>
+            <div style="font-size:8px;color:#6c757d;margin-bottom:2px;">Confirmar</div>
+            <div style="border:1px solid #dee2e6;border-radius:5px;padding:5px 8px;font-size:8px;color:#adb5bd;">••••••••</div>
+          </div>
+        </div>
+        <!-- Footer -->
+        <div style="padding:8px 14px 12px;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:8px;color:#1a4b96;">¿Ya tienes cuenta?</span>
+          <button style="background:#1a4b96;border:none;border-radius:5px;padding:6px 12px;color:white;font-size:8px;font-weight:600;">Siguiente <span style="color:#A9CA48;">→</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Card limpia con top-bar corporativa</h3>
+      <p>Card blanca ancha sin header azul pesado. Top-bar con logo TG + steps en línea. Botón principal azul oscuro. Más formal/corporativo, menos "splash screen".</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Haz clic en la opción que prefieras y dime en el chat qué te gusta o cambiarías</p>

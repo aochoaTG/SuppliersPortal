@@ -77,7 +77,7 @@ class DocumentReviewController extends Controller
     {
         // Documentos agrupados por tipo (con eager loading para evitar N+1)
         $docs = $supplier->documents()
-            ->select('supplier_id', 'doc_type', 'status', 'uploaded_at')
+            ->select('id', 'supplier_id', 'doc_type', 'status', 'uploaded_at', 'path_file', 'rejection_reason', 'reviewed_by', 'reviewed_at')
             ->orderByDesc('uploaded_at')
             ->get()
             ->groupBy('doc_type');

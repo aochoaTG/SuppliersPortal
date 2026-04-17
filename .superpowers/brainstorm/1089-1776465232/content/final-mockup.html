@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup Final — Registro de Proveedor</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Poppins', sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0d2b5e 0%, #1a4b96 50%, #0d2b5e 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  overflow-x: hidden;
+}
+/* Círculos decorativos */
+body::before {
+  content: '';
+  position: fixed;
+  top: -80px; right: -80px;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: rgba(169,202,72,.07);
+  pointer-events: none;
+}
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -100px; left: -80px;
+  width: 400px; height: 400px;
+  border-radius: 50%;
+  background: rgba(169,202,72,.05);
+  pointer-events: none;
+}
+/* Tagline encima del card */
+.page-tagline {
+  color: rgba(255,255,255,.7);
+  font-size: 13px;
+  margin-bottom: 16px;
+  letter-spacing: .3px;
+}
+/* Card principal */
+.register-card {
+  width: 100%;
+  max-width: 780px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  overflow: hidden;
+}
+/* ── Top bar ── */
+.card-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: 3px solid #A9CA48;
+  background: #fff;
+}
+.tg-badge {
+  background: #1a4b96;
+  border-radius: 5px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+}
+.tg-badge span { color: #A9CA48; font-weight: 800; font-size: 14px; letter-spacing: 1px; }
+.topbar-title { flex: 1; }
+.topbar-title h1 { font-size: 15px; font-weight: 700; color: #1a4b96; line-height: 1.2; }
+.topbar-title p { font-size: 11px; color: #6c757d; }
+/* Step indicator */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.step-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.step-dot.active { background: #A9CA48; color: #fff; }
+.step-dot.inactive { background: #fff; border: 2px solid #dee2e6; color: #adb5bd; }
+.step-label { font-size: 11px; font-weight: 500; }
+.step-label.active { color: #A9CA48; }
+.step-label.inactive { color: #adb5bd; }
+.step-line { width: 28px; height: 2px; background: #dee2e6; }
+/* ── Card body ── */
+.card-body { padding: 24px; }
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #212529;
+  border-left: 3px solid #A9CA48;
+  padding-left: 10px;
+  margin-bottom: 18px;
+}
+/* Form grid */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.form-row.full { grid-template-columns: 1fr; }
+.form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 5px;
+}
+.form-control {
+  width: 100%;
+  border: 1.5px solid #dee2e6;
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: 'Poppins', sans-serif;
+  color: #495057;
+  background: #fff;
+  transition: border-color .2s, box-shadow .2s;
+}
+.form-control.focus {
+  border-color: #A9CA48;
+  box-shadow: 0 0 0 3px rgba(169,202,72,.15);
+  outline: none;
+}
+.form-control.filled { color: #212529; }
+.hint { font-size: 11px; color: #adb5bd; margin-top: 4px; }
+/* Card footer */
+.card-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+.link-secondary { font-size: 12px; color: #1a4b96; text-decoration: none; }
+.btn-primary-tg {
+  background: #1a4b96;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-primary-tg .arrow { color: #A9CA48; font-size: 15px; }
+/* Annotation */
+.annotation-bar {
+  margin-top: 16px;
+  display: flex; gap: 12px; flex-wrap: wrap;
+  justify-content: center;
+}
+.annotation {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 11px;
+  color: rgba(255,255,255,.85);
+  backdrop-filter: blur(4px);
+}
+.annotation span { color: #A9CA48; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<p class="page-tagline">Portal de Proveedores · TotalGas</p>
+
+<div class="register-card">
+
+  <!-- TOP BAR -->
+  <div class="card-topbar">
+    <div class="tg-badge"><span>TG</span></div>
+    <div class="topbar-title">
+      <h1>Registro de Proveedor</h1>
+      <p>Complete los datos para crear su cuenta empresarial</p>
+    </div>
+    <div class="step-indicator">
+      <div class="step-dot active">1</div>
+      <span class="step-label active">Cuenta</span>
+      <div class="step-line"></div>
+      <div class="step-dot inactive">2</div>
+      <span class="step-label inactive">Empresa</span>
+    </div>
+  </div>
+
+  <!-- STEP 1 BODY -->
+  <div class="card-body">
+    <div class="section-title">Datos de la cuenta</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre(s) <span style="color:#dc3545">*</span></label>
+        <input class="form-control filled" value="Juan" readonly>
+      </div>
+      <div class="form-group">
+        <label>Apellidos <span style="color:#dc3545">*</span></label>
+        <input class="form-control filled" value="García López" readonly>
+      </div>
+    </div>
+
+    <div class="form-row full">
+      <div class="form-group">
+        <label>Correo electrónico <span style="color:#dc3545">*</span></label>
+        <input class="form-control focus filled" value="juan.garcia@empresa.com" readonly>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Contraseña <span style="color:#dc3545">*</span></label>
+        <input class="form-control" type="password" value="password" readonly>
+      </div>
+      <div class="form-group">
+        <label>Confirmar contraseña <span style="color:#dc3545">*</span></label>
+        <input class="form-control" type="password" value="password" readonly>
+      </div>
+    </div>
+
+    <!-- Ejemplo de error inline -->
+    <div style="background:#fff5f5;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;font-size:12px;color:#dc2626;display:flex;align-items:center;gap:6px;margin-top:-6px;margin-bottom:14px;">
+      <span>⚠</span> Las contraseñas no coinciden — así luce un error de validación
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="card-footer-bar">
+    <a class="link-secondary" href="#">¿Ya tienes cuenta? Inicia sesión</a>
+    <button class="btn-primary-tg">Siguiente <span class="arrow">→</span></button>
+  </div>
+
+</div>
+
+<!-- Anotaciones de diseño -->
+<div class="annotation-bar">
+  <div class="annotation">Fondo: <span>gradiente azul TotalGas estático</span></div>
+  <div class="annotation">Top-bar: <span>borde verde lima #A9CA48</span></div>
+  <div class="annotation">Botón: <span>azul #1a4b96 · flecha verde lima</span></div>
+  <div class="annotation">Focus inputs: <span>ring verde lima</span></div>
+  <div class="annotation">Font: <span>Poppins (= login)</span></div>
+  <div class="annotation">CSS: <span>Bootstrap 5 base + variables TotalGas</span></div>
+</div>
+
+</body>
+</html>

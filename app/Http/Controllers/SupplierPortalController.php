@@ -295,7 +295,7 @@ class SupplierPortalController extends Controller
             ->with([
                 'requisition:id,folio,description,status',
                 'quotationGroup:id,name,requisition_id',
-                'quotationGroup.items:id,quotation_group_id,product_service_id',
+                'quotationGroup.items:id,product_service_id',
                 'rfqResponses' => function ($query) use ($supplier) {
                     $query->where('supplier_id', $supplier->id)
                           ->select('rfq_id', 'supplier_id', 'status', 'submitted_at');
@@ -331,6 +331,10 @@ class SupplierPortalController extends Controller
     public function showRfq(Rfq $rfq)
     {
         $supplier = Auth::user()->supplier;
+
+        if (!$supplier) {
+            abort(403, 'No tienes un perfil de proveedor asociado');
+        }
 
         // Verificar que el proveedor esté invitado a esta RFQ
         if (!$rfq->suppliers->contains($supplier->id)) {

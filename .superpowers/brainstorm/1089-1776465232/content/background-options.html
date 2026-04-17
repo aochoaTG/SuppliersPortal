@@ -1,0 +1,102 @@
+<h2>¿Qué fondo prefieres para la página de registro?</h2>
+<p class="subtitle">El login usa el fondo oscuro animado — ¿qué tanto coherencia quieres con él?</p>
+
+<div class="cards">
+
+  <!-- Opción A: mismo fondo oscuro que el login -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;border-radius:8px 8px 0 0;overflow:hidden;height:200px;position:relative;background:linear-gradient(-45deg,#0a0a0a,#1a1a2e,#16213e,#0f1419);">
+      <!-- Partículas simuladas -->
+      <div style="position:absolute;width:4px;height:4px;background:rgba(169,202,72,.6);border-radius:50%;top:30%;left:15%;box-shadow:0 0 8px rgba(169,202,72,.3);"></div>
+      <div style="position:absolute;width:6px;height:6px;background:rgba(169,202,72,.4);border-radius:50%;top:60%;left:80%;box-shadow:0 0 8px rgba(169,202,72,.3);"></div>
+      <div style="position:absolute;width:3px;height:3px;background:rgba(169,202,72,.5);border-radius:50%;top:20%;left:70%;"></div>
+      <!-- Card preview -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;background:white;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.6);overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:2px solid #A9CA48;">
+          <div style="background:#1a4b96;border-radius:3px;padding:2px 6px;"><span style="color:#A9CA48;font-weight:800;font-size:8px;">TG</span></div>
+          <div style="font-size:9px;font-weight:700;color:#1a4b96;">Registro de Proveedor</div>
+          <div style="margin-left:auto;display:flex;gap:5px;align-items:center;">
+            <div style="width:14px;height:14px;border-radius:50%;background:#A9CA48;display:flex;align-items:center;justify-content:center;"><span style="color:white;font-size:7px;font-weight:700;">1</span></div>
+            <div style="width:16px;height:2px;background:#dee2e6;"></div>
+            <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid #dee2e6;display:flex;align-items:center;justify-content:center;"><span style="color:#adb5bd;font-size:7px;font-weight:700;">2</span></div>
+          </div>
+        </div>
+        <div style="padding:8px 12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            <div style="border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;font-size:7px;color:#adb5bd;">Nombre</div>
+            <div style="border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;font-size:7px;color:#adb5bd;">Apellido</div>
+            <div style="grid-column:1/-1;border:1px solid #A9CA48;border-radius:4px;padding:4px 6px;font-size:7px;color:#495057;box-shadow:0 0 0 2px rgba(169,202,72,.1);">correo@empresa.com</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Fondo oscuro animado (= login)</h3>
+      <p>Misma identidad visual que el login. Fondo negro/azul marino con partículas verdes flotando. Máxima coherencia entre login y registro.</p>
+    </div>
+  </div>
+
+  <!-- Opción B: fondo gris claro neutro -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;border-radius:8px 8px 0 0;overflow:hidden;height:200px;position:relative;background:#f0f2f5;">
+      <!-- Card preview -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;background:white;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.12);overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:2px solid #A9CA48;">
+          <div style="background:#1a4b96;border-radius:3px;padding:2px 6px;"><span style="color:#A9CA48;font-weight:800;font-size:8px;">TG</span></div>
+          <div style="font-size:9px;font-weight:700;color:#1a4b96;">Registro de Proveedor</div>
+          <div style="margin-left:auto;display:flex;gap:5px;align-items:center;">
+            <div style="width:14px;height:14px;border-radius:50%;background:#A9CA48;display:flex;align-items:center;justify-content:center;"><span style="color:white;font-size:7px;font-weight:700;">1</span></div>
+            <div style="width:16px;height:2px;background:#dee2e6;"></div>
+            <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid #dee2e6;display:flex;align-items:center;justify-content:center;"><span style="color:#adb5bd;font-size:7px;font-weight:700;">2</span></div>
+          </div>
+        </div>
+        <div style="padding:8px 12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            <div style="border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;font-size:7px;color:#adb5bd;">Nombre</div>
+            <div style="border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;font-size:7px;color:#adb5bd;">Apellido</div>
+            <div style="grid-column:1/-1;border:1px solid #A9CA48;border-radius:4px;padding:4px 6px;font-size:7px;color:#495057;box-shadow:0 0 0 2px rgba(169,202,72,.1);">correo@empresa.com</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Fondo gris neutro (estilo admin Zircos)</h3>
+      <p>Fondo gris claro como el interior del panel admin. Más tranquilo, profesional y fácil de leer. Diferencia visualmente el registro del login oscuro.</p>
+    </div>
+  </div>
+
+  <!-- Opción C: gradiente azul TotalGas suave -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;border-radius:8px 8px 0 0;overflow:hidden;height:200px;position:relative;background:linear-gradient(135deg,#0d2b5e 0%,#1a4b96 50%,#0d2b5e 100%);">
+      <!-- Círculos decorativos -->
+      <div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:rgba(169,202,72,.08);"></div>
+      <div style="position:absolute;bottom:-30px;left:-20px;width:120px;height:120px;border-radius:50%;background:rgba(169,202,72,.05);"></div>
+      <!-- Card preview -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;background:white;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4);overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:2px solid #A9CA48;">
+          <div style="background:#1a4b96;border-radius:3px;padding:2px 6px;"><span style="color:#A9CA48;font-weight:800;font-size:8px;">TG</span></div>
+          <div style="font-size:9px;font-weight:700;color:#1a4b96;">Registro de Proveedor</div>
+          <div style="margin-left:auto;display:flex;gap:5px;align-items:center;">
+            <div style="width:14px;height:14px;border-radius:50%;background:#A9CA48;display:flex;align-items:center;justify-content:center;"><span style="color:white;font-size:7px;font-weight:700;">1</span></div>
+            <div style="width:16px;height:2px;background:#dee2e6;"></div>
+            <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid #dee2e6;display:flex;align-items:center;justify-content:center;"><span style="color:#adb5bd;font-size:7px;font-weight:700;">2</span></div>
+          </div>
+        </div>
+        <div style="padding:8px 12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            <div style="border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;font-size:7px;color:#adb5bd;">Nombre</div>
+            <div style="border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;font-size:7px;color:#adb5bd;">Apellido</div>
+            <div style="grid-column:1/-1;border:1px solid #A9CA48;border-radius:4px;padding:4px 6px;font-size:7px;color:#495057;box-shadow:0 0 0 2px rgba(169,202,72,.1);">correo@empresa.com</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Gradiente azul TotalGas sólido</h3>
+      <p>Fondo azul corporativo TotalGas estático (sin animación). Elegante y coherente con la marca, pero más sobrio que el login. Círculos decorativos sutiles.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">¿Cuál fondo complementa mejor el card blanca de la opción C?</p>
