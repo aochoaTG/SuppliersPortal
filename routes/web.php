@@ -191,7 +191,7 @@ Route::middleware(['auth', 'lock'])->group(function () {
     Route::prefix('sat-efos-69b')->name('sat_efos_69b.')->group(function () {
         Route::get('/', [SatEfos69bController::class, 'index'])->name('index');
         Route::get('/data', [SatEfos69bController::class, 'data'])->name('data');
-        Route::post('/sync', [SatEfos69bController::class, 'sync'])->name('sync');
+        Route::post('/sync', [SatEfos69bController::class, 'sync'])->name('sync')->middleware('role:superadmin');
         Route::get('/sync/{jobId}', [SatEfos69bController::class, 'syncStatus'])->name('sync.status');
     });
 

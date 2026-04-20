@@ -30,7 +30,7 @@ class SyncEfosJob implements ShouldQueue
 
         try {
             $url     = config('efos.csv_url');
-            $dirAbs  = storage_path('app/efos');
+            $dirAbs  = storage_path('app/' . config('efos.storage_dir', 'efos'));
             if (!is_dir($dirAbs)) mkdir($dirAbs, 0775, true);
             $fullPath = $dirAbs . '/Listado_Completo_69-B.csv';
 
@@ -134,7 +134,7 @@ class SyncEfosJob implements ShouldQueue
     {
         $now = Carbon::now();
         foreach ($rows as $row) {
-            if (count($row) < 8) continue;
+            if (count($row) < 16) continue;
             DB::statement("
                 MERGE sat_efos_69b AS target
                 USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
