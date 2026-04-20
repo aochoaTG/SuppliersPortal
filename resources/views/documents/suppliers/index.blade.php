@@ -302,16 +302,9 @@
         </div>
         <div class="tab-pane fade show" id="bankDetailsPane" role="tabpanel" aria-labelledby="bankDetails-tab" tabindex="0">
             {{-- Tabla principal --}}
-            <div class="card {{ !$needsBank ? 'border-top border-success border-3' : '' }}">
+            <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        Detalles bancarios
-                        @if(!$needsBank)
-                            <span class="badge bg-success-subtle text-success ms-2 fw-normal fs-12">
-                                <i class="ti ti-circle-check me-1"></i>Completo
-                            </span>
-                        @endif
-                    </h5>
+                    <h5 class="mb-0">Detalles bancarios</h5>
                     <div class="text-muted small">
                         Proveedor: <strong>ID {{ $supplier->id }}</strong> — {{ $supplier->company_name ?? $supplier->name ?? 'Proveedor' }}
                     </div>
@@ -320,11 +313,21 @@
                     {{-- Resumen de datos actuales --}}
                     <div id="bankSummary" class="mb-4">
                         <div class="row g-3">
+                            @php
+                                $bankMxComplete = !blank($supplier->bank_name) && !blank($supplier->clabe);
+                                $bankUsComplete = !blank($supplier->us_bank_name) && !blank($supplier->swift_bic);
+                            @endphp
                             <div class="col-md-6">
-                                <div class="border rounded p-3 h-100">
+                                <div class="border rounded p-3 h-100 {{ $bankMxComplete ? 'border-success' : '' }}">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h6 class="mb-0"><i class="ti ti-building-bank me-1"></i> Banco</h6>
-                                        <span class="badge bg-light text-dark">Actual</span>
+                                        @if($bankMxComplete)
+                                            <span class="badge bg-success-subtle text-success">
+                                                <i class="ti ti-circle-check me-1"></i>Completo
+                                            </span>
+                                        @else
+                                            <span class="badge bg-light text-dark">Actual</span>
+                                        @endif
                                     </div>
                                     <dl class="row mb-0 small">
                                         <dt class="col-5">Nombre del banco</dt>
@@ -340,10 +343,16 @@
                             </div>
 
                             <div class="col-md-6">
-                                <div class="border rounded p-3 h-100">
+                                <div class="border rounded p-3 h-100 {{ $bankUsComplete ? 'border-success' : '' }}">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h6 class="mb-0"><i class="ti ti-credit-card me-1"></i> Para pagos internacionales</h6>
-                                        <span class="badge bg-light text-dark">Actual</span>
+                                        @if($bankUsComplete)
+                                            <span class="badge bg-success-subtle text-success">
+                                                <i class="ti ti-circle-check me-1"></i>Completo
+                                            </span>
+                                        @else
+                                            <span class="badge bg-light text-dark">Actual</span>
+                                        @endif
                                     </div>
                                     <dl class="row mb-0 small">
                                         <dt class="col-5">Banco en EE.UU.</dt>
