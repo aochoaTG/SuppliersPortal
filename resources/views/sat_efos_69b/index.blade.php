@@ -95,15 +95,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Sync button ──────────────────────────────────────────────────────────
     const syncUrl       = "{{ route('sat_efos_69b.sync') }}";
     const syncStatusUrl = "{{ route('sat_efos_69b.sync.status', ':jobId') }}";
-    const csrfToken     = document.querySelector('meta[name="csrf-token"]').content;
+    const csrfToken     = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+    let activeSyncInterval = null;
 
     document.getElementById('btn-sync-efos').addEventListener('click', function () {
         Swal.fire({
-            title:            'Sincronización SAT EFOS',
-            html:             buildModalHtml('Iniciando descarga del CSV...', 0, 0),
+            title:             'Sincronización SAT EFOS',
+            html:              buildModalHtml('Iniciando descarga del CSV...', 0, 0),
             allowOutsideClick: false,
             showConfirmButton: false,
-            didOpen:          () => startSync(),
+            didOpen:           () => startSync(),
+            willClose:         () => { clearInterval(activeSyncInterval); activeSyncInterval = null; },
         });
     });
 
@@ -126,12 +129,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function startSync() {
+        const btn = document.getElementById('btn-sync-efos');
+        if (btn) btn.disabled = true;
         fetch(syncUrl, {
             method:  'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
         })
         .then(res => {
             if (res.status === 409) {
+                if (btn) btn.disabled = false;
                 Swal.fire('En curso', 'Ya hay una sincronización activa. Intenta más tarde.', 'warning');
                 return null;
             }
@@ -142,36 +148,48 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!data?.job_id) return;
             pollStatus(data.job_id);
         })
-        .catch(() => Swal.fire('Error', 'No se pudo iniciar la sincronización.', 'error'));
+        .catch(() => {
+            if (btn) btn.disabled = false;
+            Swal.fire('Error', 'No se pudo iniciar la sincronización.', 'error');
+        });
     }
 
     function pollStatus(jobId) {
         let networkErrors = 0;
         const url = syncStatusUrl.replace(':jobId', jobId);
 
-        const interval = setInterval(() => {
+        activeSyncInterval = setInterval(() => {
             fetch(url, { headers: { 'Accept': 'application/json' } })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
             .then(data => {
                 networkErrors = 0;
                 updateModal(data);
 
                 if (data.status === 'completed') {
-                    clearInterval(interval);
+                    clearInterval(activeSyncInterval);
+                    const b = document.getElementById('btn-sync-efos');
+                    if (b) b.disabled = false;
                     Swal.fire({
                         icon:  'success',
                         title: 'Sincronización completada',
                         text:  `${(data.processed || 0).toLocaleString('es-MX')} registros procesados.`,
                     }).then(() => window.efosTable.ajax.reload());
                 } else if (data.status === 'failed') {
-                    clearInterval(interval);
+                    clearInterval(activeSyncInterval);
+                    const b = document.getElementById('btn-sync-efos');
+                    if (b) b.disabled = false;
                     Swal.fire('Error en sincronización', data.message || 'El proceso falló.', 'error');
                 }
             })
             .catch(() => {
                 networkErrors++;
                 if (networkErrors >= 3) {
-                    clearInterval(interval);
+                    clearInterval(activeSyncInterval);
+                    const b = document.getElementById('btn-sync-efos');
+                    if (b) b.disabled = false;
                     Swal.fire('Error de red', 'No se pudo obtener el estado del proceso.', 'error');
                 }
             });
