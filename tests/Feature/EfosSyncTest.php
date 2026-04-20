@@ -34,7 +34,10 @@ class EfosSyncTest extends TestCase
         $response->assertOk()
                  ->assertJsonStructure(['job_id']);
 
-        Queue::assertPushed(SyncEfosJob::class);
+        $jobId = $response->json('job_id');
+        Queue::assertPushed(SyncEfosJob::class, function (SyncEfosJob $job) use ($jobId) {
+            return $job->jobId === $jobId;
+        });
     }
 
     public function test_sync_returns_409_when_job_already_running(): void
@@ -83,7 +86,7 @@ class EfosSyncTest extends TestCase
         $response->assertNotFound();
     }
 
-    public function test_sync_sets_completed_status_on_success(): void
+    public function test_sync_status_endpoint_returns_completed_state(): void
     {
         Queue::fake();
 
