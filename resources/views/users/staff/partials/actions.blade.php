@@ -1,22 +1,58 @@
-{{-- resources/views/users/partials/actions.blade.php --}}
-<div class="d-flex justify-content-end gap-1">
-    <a href="{{ route('users.staff.show', $user) }}" class="btn btn-sm btn-outline-secondary" title="Ver"><i class="ti ti-eye"></i></a>
-    <a class="btn btn-sm btn-outline-primary js-open-user-modal" href="#" data-url="{{ route('users.edit', $user) }}" data-title="Editar usuario #{{ $user->id }}" title="Editar"><i class="ti ti-pencil"></i></a>
-    <a class="btn btn-sm btn-outline-secondary js-open-user-modal" href="#" data-url="{{ route('users.roles.edit', $user) }}" title="Roles"><i class="ti ti-shield-lock"></i></a>
-    <a class="btn btn-sm btn-outline-secondary js-open-user-modal" href="#" data-url="{{ route('users.companies.edit', $user) }}" title="Empresas"><i class="ti ti-building"></i></a>
-    <a class="btn btn-sm btn-outline-secondary js-open-cost-centers-modal"
-        href="javascript:void(0)"
-        data-url="{{ route('users.cost-centers.edit', $user->id) }}"
-        data-has-companies="{{ $user->companies->isNotEmpty() ? 'true' : 'false' }}"
-        data-user-name="{{ $user->name }}"
-        title="Centros de Costo"><i class="ti ti-building-bank"></i></a>
-    <a href="#" class="btn btn-sm btn-outline-warning js-toggle-active" data-url="{{ route('users.toggle', $user) }}" title="{{ $user->is_active ? 'Desactivar' : 'Activar' }}">
-        @if($user->is_active)
-            <i class="ti ti-user-off"></i>
-        @else
-            <i class="ti ti-user-check"></i>
-        @endif
-    </a>
-    <a href="#" class="btn btn-sm btn-outline-secondary js-open-user-modal" data-url="{{ route('users.supplier.edit', $user) }}" data-title="Datos de Proveedor — Usuario #{{ $user->id }}" title="Datos de Proveedor"><i class="ti ti-building-store"></i></a>
-    <a href="#" class="btn btn-sm btn-outline-danger js-delete-user" data-url="{{ route('users.destroy', $user) }}" data-name="{{ $user->name }}" title="Eliminar"><i class="ti ti-trash"></i></a>
+<div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="ti ti-dots-vertical"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+            <a class="dropdown-item" href="{{ route('users.staff.show', $user) }}">
+                <i class="ti ti-eye me-2 text-secondary"></i> Ver
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item js-open-user-modal" href="#" data-url="{{ route('users.edit', $user) }}">
+                <i class="ti ti-pencil me-2 text-primary"></i> Editar
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item js-open-user-modal" href="#" data-url="{{ route('users.roles.edit', $user) }}">
+                <i class="ti ti-shield-lock me-2 text-secondary"></i> Roles
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item js-open-user-modal" href="#" data-url="{{ route('users.companies.edit', $user) }}">
+                <i class="ti ti-building me-2 text-secondary"></i> Empresas
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item js-open-cost-centers-modal"
+                href="javascript:void(0)"
+                data-url="{{ route('users.cost-centers.edit', $user->id) }}"
+                data-has-companies="{{ $user->companies->isNotEmpty() ? 'true' : 'false' }}"
+                data-user-name="{{ $user->name }}">
+                <i class="ti ti-building-bank me-2 text-secondary"></i> Centros de Costo
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item js-open-user-modal" href="#" data-url="{{ route('users.supplier.edit', $user) }}">
+                <i class="ti ti-building-store me-2 text-secondary"></i> Datos de Proveedor
+            </a>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+            <a class="dropdown-item js-toggle-active" href="#" data-url="{{ route('users.toggle', $user) }}">
+                @if($user->is_active)
+                    <i class="ti ti-user-off me-2 text-warning"></i> Desactivar
+                @else
+                    <i class="ti ti-user-check me-2 text-success"></i> Activar
+                @endif
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item text-danger js-delete-user" href="#"
+                data-url="{{ route('users.destroy', $user) }}"
+                data-name="{{ $user->name }}">
+                <i class="ti ti-trash me-2"></i> Eliminar
+            </a>
+        </li>
+    </ul>
 </div>
