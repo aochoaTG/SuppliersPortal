@@ -120,6 +120,27 @@ Facturación section is added as a placeholder now (hidden until the feature exi
 
 ---
 
+## Commenting Convention
+
+Each sidebar file must include a header comment block explaining the file's purpose, the roles it serves, and how to add new items. Every section (`COMPRAS`, `FINANZAS`, etc.) must have an inline comment listing which roles can see it. Every individual menu item that has role restrictions must have a short inline comment with the allowed roles.
+
+Example:
+
+```blade
+{{--
+    sidebar-staff.blade.php
+    Sidebar for all TotalGas staff roles.
+    Roles: superadmin, staff, accounting, general_director, authorizer, catalog_admin, requester
+    To add a new section: wrap it with @hasanyrole('role1|role2') and add a comment listing the roles.
+--}}
+
+{{-- COMPRAS — visible to: superadmin, staff, requester, general_director, authorizer, catalog_admin --}}
+```
+
+The goal is that any developer or AI reading the file can instantly understand who sees what without tracing role logic through multiple conditions.
+
+---
+
 ## Out of Scope
 
 - Changing routes, controllers, or permissions
