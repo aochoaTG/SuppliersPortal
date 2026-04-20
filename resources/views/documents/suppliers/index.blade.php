@@ -741,13 +741,18 @@
                                         <label class="form-label">Número de registro SIROC</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="ti ti-hash"></i></span>
-                                            <input type="text" name="siroc_number" class="form-control text-uppercase"
+                                            <input type="text" name="siroc_number" id="siroc_number" class="form-control text-uppercase"
                                                 maxlength="50"
                                                 placeholder="Ej. IMSS-OBRA-00012345" value="{{ old('siroc_number') }}">
                                         </div>
                                         <div class="form-text">
                                             Número de registro emitido al dar de alta la obra ante el IMSS.
                                         </div>
+                                    </div>
+
+                                    <div id="sirocDisabledNotice" class="alert alert-light border text-muted small py-2 {{ old('siroc_number') ? 'd-none' : '' }}">
+                                        <i class="ti ti-lock me-1"></i>
+                                        Ingresa el número de registro SIROC para habilitar los demás campos.
                                     </div>
 
                                     {{-- Número de contrato (opcional) --}}
@@ -1932,6 +1937,31 @@ $(function () {
 
 <script>
 (() => {
+    // ── SIROC: habilitar campos cuando se escribe el número de registro ────
+    (function () {
+        const numInput = document.getElementById('siroc_number');
+        const notice   = document.getElementById('sirocDisabledNotice');
+        if (!numInput) return;
+
+        function applySirocState(active) {
+            document.querySelectorAll(
+                '#sirocForm input:not(#siroc_number):not([name="_token"]):not([type="hidden"]), ' +
+                '#sirocForm select, ' +
+                '#sirocForm textarea, ' +
+                '#sirocForm button'
+            ).forEach(el => { el.disabled = !active; });
+
+            notice?.classList.toggle('d-none', active);
+        }
+
+        numInput.addEventListener('input', function () {
+            applySirocState(this.value.trim().length > 0);
+        });
+
+        applySirocState(numInput.value.trim().length > 0);
+    })();
+    // ────────────────────────────────────────────────────────────────────────
+
     const form      = document.getElementById('sirocForm');
     const btnSave   = document.getElementById('btnSaveSiroc');
     const btnClear  = document.getElementById('btnClearSiroc');
