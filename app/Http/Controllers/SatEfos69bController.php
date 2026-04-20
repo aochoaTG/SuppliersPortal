@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncEfosJob;
 use App\Models\SatEfos69b;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class SatEfos69bController extends Controller
 {
@@ -27,6 +30,41 @@ class SatEfos69bController extends Controller
         ])->orderBy('rfc')->get();
 
         return response()->json(['data' => $rows]);
+    }
+
+    public function sync(): JsonResponse
+    {
+        $currentJobId = Cache::get('efos_sync_current');
+        if ($currentJobId) {
+            $state = Cache::get("efos_sync_{$currentJobId}", []);
+            if (($state['status'] ?? '') === 'running') {
+                return response()->json(['message' => 'Ya hay una sincronización en curso'], 409);
+            }
+        }
+
+        $jobId = uniqid('efos_', true);
+        Cache::put('efos_sync_current', $jobId, now()->addHours(2));
+        Cache::put("efos_sync_{$jobId}", [
+            'status'      => 'pending',
+            'processed'   => 0,
+            'total'       => 0,
+            'message'     => 'Iniciando sincronización...',
+            'started_at'  => now()->toDateTimeString(),
+            'finished_at' => null,
+        ], now()->addHours(2));
+
+        SyncEfosJob::dispatch($jobId);
+
+        return response()->json(['job_id' => $jobId]);
+    }
+
+    public function syncStatus(string $jobId): JsonResponse
+    {
+        $state = Cache::get("efos_sync_{$jobId}");
+        if (!$state) {
+            return response()->json(['message' => 'Job no encontrado'], 404);
+        }
+        return response()->json($state);
     }
 
     public function create()
