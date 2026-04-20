@@ -302,9 +302,16 @@
         </div>
         <div class="tab-pane fade show" id="bankDetailsPane" role="tabpanel" aria-labelledby="bankDetails-tab" tabindex="0">
             {{-- Tabla principal --}}
-            <div class="card">
+            <div class="card {{ !$needsBank ? 'border-top border-success border-3' : '' }}">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Detalles bancarios</h5>
+                    <h5 class="mb-0">
+                        Detalles bancarios
+                        @if(!$needsBank)
+                            <span class="badge bg-success-subtle text-success ms-2 fw-normal fs-12">
+                                <i class="ti ti-circle-check me-1"></i>Completo
+                            </span>
+                        @endif
+                    </h5>
                     <div class="text-muted small">
                         Proveedor: <strong>ID {{ $supplier->id }}</strong> — {{ $supplier->company_name ?? $supplier->name ?? 'Proveedor' }}
                     </div>
