@@ -574,6 +574,11 @@
                                         </div>
                                     </div>
 
+                                    <div id="repseDisabledNotice" class="alert alert-light border text-muted small py-2 {{ $provides ? 'd-none' : '' }}">
+                                        <i class="ti ti-lock me-1"></i>
+                                        Activa el switch para habilitar los campos REPSE.
+                                    </div>
+
                                     {{-- Número de registro REPSE --}}
                                     <div class="mb-3">
                                         <label class="form-label">Número de registro REPSE</label>
@@ -1666,6 +1671,32 @@ $(function () {
     // Tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
+
+    // ── REPSE: habilitar/deshabilitar campos según el switch ────────────────
+    (function () {
+        const sw     = document.getElementById('provides_specialized_services');
+        const notice = document.getElementById('repseDisabledNotice');
+        if (!sw) return;
+
+        function applyRepseState(active) {
+            document.querySelectorAll(
+                '#repseForm input:not(#provides_specialized_services):not([name="_token"]):not([type="hidden"]), ' +
+                '#repseForm select, ' +
+                '#repseForm textarea, ' +
+                '#repseForm button'
+            ).forEach(el => { el.disabled = !active; });
+
+            notice?.classList.toggle('d-none', active);
+        }
+
+        sw.addEventListener('change', function () {
+            this.nextElementSibling.textContent = this.checked ? 'Sí' : 'No';
+            applyRepseState(this.checked);
+        });
+
+        applyRepseState(sw.checked);
+    })();
+    // ────────────────────────────────────────────────────────────────────────
 
     // Guardar
     $('#btnSaveRepse').on('click', function() {
