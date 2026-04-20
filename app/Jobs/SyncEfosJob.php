@@ -29,16 +29,15 @@ class SyncEfosJob implements ShouldQueue
         $this->patch($key, ['status' => 'running', 'started_at' => now()->toDateTimeString()]);
 
         try {
-            $url     = config('efos.csv_url', env('EFOS_CSV_URL'));
+            $url     = config('efos.csv_url');
             $dirAbs  = storage_path('app/efos');
             if (!is_dir($dirAbs)) mkdir($dirAbs, 0775, true);
             $fullPath = $dirAbs . '/Listado_Completo_69-B.csv';
 
-            $response = Http::timeout(120)->retry(3, 2000)->get($url);
+            $response = Http::withOptions(['sink' => $fullPath])->timeout(120)->retry(3, 2000)->get($url);
             if (!$response->ok()) {
                 throw new \RuntimeException("No se pudo descargar el CSV (HTTP {$response->status()})");
             }
-            file_put_contents($fullPath, $response->body());
 
             $total = $this->countDataLines($fullPath);
             $this->patch($key, ['total' => $total, 'message' => 'Procesando registros...']);
@@ -87,12 +86,15 @@ class SyncEfosJob implements ShouldQueue
             ]);
             Log::info("SyncEfosJob completado: {$processed} registros procesados.");
         } catch (\Throwable $e) {
-            $this->patch($key, [
-                'status'      => 'failed',
-                'message'     => $e->getMessage(),
-                'finished_at' => now()->toDateTimeString(),
-            ]);
+            try {
+                $this->patch($key, [
+                    'status'      => 'failed',
+                    'message'     => $e->getMessage(),
+                    'finished_at' => now()->toDateTimeString(),
+                ]);
+            } catch (\Throwable) {}
             Log::error("SyncEfosJob falló: " . $e->getMessage());
+            throw $e;
         }
     }
 
