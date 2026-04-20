@@ -66,6 +66,71 @@
     .stat-card .value { font-size: 1.35rem; font-weight: 700; }
     .stat-card .label { font-size: .85rem; color: #6c757d; }
     .table td, .table th { vertical-align: middle; }
+
+    /* ===== DROP ZONE ===== */
+    .drop-zone {
+        border: 2px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 32px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color .2s, background .2s;
+        background: #fafafa;
+        outline: none;
+        user-select: none;
+    }
+    .drop-zone:hover { border-color: #86b7fe; background: #f0f6ff; }
+    .drop-zone.drag-over { border-color: #0d6efd; background: rgba(13,110,253,.06); }
+    .drop-zone.has-file { border-color: #198754; background: #f0fdf4; border-style: solid; padding: 18px 20px; }
+
+    .drop-zone-icon {
+        font-size: 2.4rem;
+        color: #adb5bd;
+        display: block;
+        margin-bottom: 8px;
+        line-height: 1;
+        transition: color .2s;
+    }
+    .drop-zone:hover .drop-zone-icon,
+    .drop-zone.drag-over .drop-zone-icon { color: #0d6efd; }
+
+    .drop-zone-text { font-size: 14px; font-weight: 600; color: #495057; margin-bottom: 3px; }
+    .drop-zone-sub  { font-size: 12px; color: #6c757d; }
+    .drop-zone-link { color: #0d6efd; text-decoration: underline; }
+
+    /* File preview card */
+    .file-preview {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-align: left;
+    }
+    .file-preview-icon {
+        width: 46px; height: 46px;
+        border-radius: 8px;
+        background: #e9ecef;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+        color: #6c757d;
+    }
+    .file-preview-icon.is-pdf   { background: #fee2e2; color: #dc2626; }
+    .file-preview-icon.is-image { background: #d1fae5; color: #059669; }
+
+    .file-preview-info { flex: 1; min-width: 0; }
+    .file-preview-name {
+        font-size: 13px; font-weight: 600; color: #212529;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .file-preview-size { font-size: 12px; color: #6c757d; }
+
+    .file-preview-remove {
+        background: none; border: none; color: #adb5bd;
+        cursor: pointer; padding: 5px 6px; border-radius: 6px;
+        flex-shrink: 0; line-height: 1; font-size: 1rem;
+        transition: color .15s, background .15s;
+    }
+    .file-preview-remove:hover { color: #dc2626; background: #fee2e2; }
 </style>
 @endpush
 
@@ -998,11 +1063,42 @@
                         <div id="formErrors" class="d-none"></div>
 
                         <input type="hidden" name="doc_type" id="docTypeInput" value="">
+
                         <div class="mb-3">
-                            <label class="form-label">Documento a cargar</label>
-                            <input type="file" name="file" id="fileInput" class="form-control" accept=".jpg,.jpeg,.png,.pdf" required>
-                            <div class="form-text" id="sizeHelp">
-                                Formatos comunes (PDF/JPG/PNG). Máx. <span id="maxMb">10</span>MB.
+                            <label class="form-label fw-semibold">Documento a cargar</label>
+
+                            {{-- Drop zone --}}
+                            <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Área de carga de archivo">
+                                {{-- Estado: sin archivo --}}
+                                <div id="dropZonePrompt">
+                                    <i class="ti ti-cloud-upload drop-zone-icon"></i>
+                                    <div class="drop-zone-text">Arrastra el archivo aquí</div>
+                                    <div class="drop-zone-sub">o <span class="drop-zone-link">haz clic para seleccionar</span></div>
+                                </div>
+                                {{-- Estado: archivo seleccionado --}}
+                                <div id="dropZonePreview" class="d-none">
+                                    <div class="file-preview">
+                                        <div class="file-preview-icon" id="previewIcon">
+                                            <i class="ti ti-file"></i>
+                                        </div>
+                                        <div class="file-preview-info">
+                                            <div class="file-preview-name" id="previewName"></div>
+                                            <div class="file-preview-size" id="previewSize"></div>
+                                        </div>
+                                        <button type="button" class="file-preview-remove" id="removeFile" title="Quitar archivo">
+                                            <i class="ti ti-x"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Input real (oculto, lo usa el formulario) --}}
+                            <input type="file" name="file" id="fileInput" class="d-none"
+                                   accept=".jpg,.jpeg,.png,.pdf" required>
+
+                            <div class="form-text mt-2" id="sizeHelp">
+                                <i class="ti ti-info-circle me-1"></i>
+                                PDF / JPG / PNG &nbsp;·&nbsp; Máx. <span id="maxMb">10</span> MB
                             </div>
                         </div>
 
@@ -1425,6 +1521,128 @@ $(function () {
     };
 });
 
+
+// ===== DRAG AND DROP =====
+(function () {
+    const dropZone       = document.getElementById('dropZone');
+    const fileInput      = document.getElementById('fileInput');
+    const dropZonePrompt = document.getElementById('dropZonePrompt');
+    const dropZonePreview= document.getElementById('dropZonePreview');
+    const previewName    = document.getElementById('previewName');
+    const previewSize    = document.getElementById('previewSize');
+    const previewIcon    = document.getElementById('previewIcon');
+    const removeFile     = document.getElementById('removeFile');
+    const docModal       = document.getElementById('docModal');
+
+    if (!dropZone || !fileInput) return;
+
+    // Clic en la zona → abre el selector de archivo
+    dropZone.addEventListener('click', function (e) {
+        if (e.target.closest('#removeFile')) return;
+        fileInput.click();
+    });
+
+    // Accesibilidad teclado
+    dropZone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+
+    // Drag events
+    ['dragenter', 'dragover'].forEach(evt => {
+        dropZone.addEventListener(evt, function (e) {
+            e.preventDefault(); e.stopPropagation();
+            dropZone.classList.add('drag-over');
+        });
+    });
+
+    ['dragleave', 'dragend'].forEach(evt => {
+        dropZone.addEventListener(evt, function (e) {
+            // Ignorar si el cursor sigue dentro de la zona
+            if (dropZone.contains(e.relatedTarget)) return;
+            dropZone.classList.remove('drag-over');
+        });
+    });
+
+    dropZone.addEventListener('drop', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        dropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (!files.length) return;
+
+        // Asignar al input real
+        const dt = new DataTransfer();
+        dt.items.add(files[0]);
+        fileInput.files = dt.files;
+
+        // Disparar change para que la validación existente de tamaño se ejecute
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    // Cuando cambia el input (click o drop)
+    fileInput.addEventListener('change', function () {
+        const file = this.files && this.files[0];
+        if (file) {
+            showPreview(file);
+        } else {
+            clearPreview();
+        }
+    });
+
+    // Botón quitar archivo
+    if (removeFile) {
+        removeFile.addEventListener('click', function (e) {
+            e.stopPropagation();
+            fileInput.value = '';
+            clearPreview();
+            document.getElementById('formErrors').classList.add('d-none');
+            document.getElementById('formErrors').innerHTML = '';
+        });
+    }
+
+    function showPreview(file) {
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const isPdf   = ext === 'pdf';
+        const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+
+        previewName.textContent = file.name;
+        previewSize.textContent = formatBytes(file.size);
+
+        previewIcon.className = 'file-preview-icon';
+        if (isPdf) {
+            previewIcon.classList.add('is-pdf');
+            previewIcon.innerHTML = '<i class="ti ti-file-type-pdf"></i>';
+        } else if (isImage) {
+            previewIcon.classList.add('is-image');
+            previewIcon.innerHTML = '<i class="ti ti-photo"></i>';
+        } else {
+            previewIcon.innerHTML = '<i class="ti ti-file-text"></i>';
+        }
+
+        dropZonePrompt.classList.add('d-none');
+        dropZonePreview.classList.remove('d-none');
+        dropZone.classList.add('has-file');
+        dropZone.classList.remove('drag-over');
+    }
+
+    function clearPreview() {
+        dropZonePrompt.classList.remove('d-none');
+        dropZonePreview.classList.add('d-none');
+        dropZone.classList.remove('has-file', 'drag-over');
+    }
+
+    function formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        const k = 1024, sizes = ['B','KB','MB','GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // Limpiar preview cada vez que el modal se abre o cierra
+    if (docModal) {
+        docModal.addEventListener('show.bs.modal',   clearPreview);
+        docModal.addEventListener('hidden.bs.modal', clearPreview);
+    }
+})();
 
 </script>
 <script>
