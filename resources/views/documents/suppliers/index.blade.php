@@ -313,11 +313,21 @@
                     {{-- Resumen de datos actuales --}}
                     <div id="bankSummary" class="mb-4">
                         <div class="row g-3">
+                            @php
+                                $bankMxComplete = !blank($supplier->bank_name) && !blank($supplier->clabe);
+                                $bankUsComplete = !blank($supplier->us_bank_name) && !blank($supplier->swift_bic);
+                            @endphp
                             <div class="col-md-6">
-                                <div class="border rounded p-3 h-100">
+                                <div class="border rounded p-3 h-100 {{ $bankMxComplete ? 'border-success' : '' }}">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h6 class="mb-0"><i class="ti ti-building-bank me-1"></i> Banco</h6>
-                                        <span class="badge bg-light text-dark">Actual</span>
+                                        @if($bankMxComplete)
+                                            <span class="badge bg-success-subtle text-success">
+                                                <i class="ti ti-circle-check me-1"></i>Completo
+                                            </span>
+                                        @else
+                                            <span class="badge bg-light text-dark">Actual</span>
+                                        @endif
                                     </div>
                                     <dl class="row mb-0 small">
                                         <dt class="col-5">Nombre del banco</dt>
@@ -333,10 +343,16 @@
                             </div>
 
                             <div class="col-md-6">
-                                <div class="border rounded p-3 h-100">
+                                <div class="border rounded p-3 h-100 {{ $bankUsComplete ? 'border-success' : '' }}">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h6 class="mb-0"><i class="ti ti-credit-card me-1"></i> Para pagos internacionales</h6>
-                                        <span class="badge bg-light text-dark">Actual</span>
+                                        @if($bankUsComplete)
+                                            <span class="badge bg-success-subtle text-success">
+                                                <i class="ti ti-circle-check me-1"></i>Completo
+                                            </span>
+                                        @else
+                                            <span class="badge bg-light text-dark">Actual</span>
+                                        @endif
                                     </div>
                                     <dl class="row mb-0 small">
                                         <dt class="col-5">Banco en EE.UU.</dt>
@@ -558,6 +574,11 @@
                                         </div>
                                     </div>
 
+                                    <div id="repseDisabledNotice" class="alert alert-light border text-muted small py-2 {{ $provides ? 'd-none' : '' }}">
+                                        <i class="ti ti-lock me-1"></i>
+                                        Activa el switch para habilitar los campos REPSE.
+                                    </div>
+
                                     {{-- Número de registro REPSE --}}
                                     <div class="mb-3">
                                         <label class="form-label">Número de registro REPSE</label>
@@ -720,13 +741,18 @@
                                         <label class="form-label">Número de registro SIROC</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="ti ti-hash"></i></span>
-                                            <input type="text" name="siroc_number" class="form-control text-uppercase"
+                                            <input type="text" name="siroc_number" id="siroc_number" class="form-control text-uppercase"
                                                 maxlength="50"
                                                 placeholder="Ej. IMSS-OBRA-00012345" value="{{ old('siroc_number') }}">
                                         </div>
                                         <div class="form-text">
                                             Número de registro emitido al dar de alta la obra ante el IMSS.
                                         </div>
+                                    </div>
+
+                                    <div id="sirocDisabledNotice" class="alert alert-light border text-muted small py-2 {{ old('siroc_number') ? 'd-none' : '' }}">
+                                        <i class="ti ti-lock me-1"></i>
+                                        Ingresa el número de registro SIROC para habilitar los demás campos.
                                     </div>
 
                                     {{-- Número de contrato (opcional) --}}
@@ -1651,6 +1677,32 @@ $(function () {
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
 
+    // ── REPSE: habilitar/deshabilitar campos según el switch ────────────────
+    (function () {
+        const sw     = document.getElementById('provides_specialized_services');
+        const notice = document.getElementById('repseDisabledNotice');
+        if (!sw) return;
+
+        function applyRepseState(active) {
+            document.querySelectorAll(
+                '#repseForm input:not(#provides_specialized_services):not([name="_token"]):not([type="hidden"]), ' +
+                '#repseForm select, ' +
+                '#repseForm textarea, ' +
+                '#repseForm button'
+            ).forEach(el => { el.disabled = !active; });
+
+            notice?.classList.toggle('d-none', active);
+        }
+
+        sw.addEventListener('change', function () {
+            this.nextElementSibling.textContent = this.checked ? 'Sí' : 'No';
+            applyRepseState(this.checked);
+        });
+
+        applyRepseState(sw.checked);
+    })();
+    // ────────────────────────────────────────────────────────────────────────
+
     // Guardar
     $('#btnSaveRepse').on('click', function() {
         const form   = document.getElementById('repseForm');
@@ -1885,6 +1937,31 @@ $(function () {
 
 <script>
 (() => {
+    // ── SIROC: habilitar campos cuando se escribe el número de registro ────
+    (function () {
+        const numInput = document.getElementById('siroc_number');
+        const notice   = document.getElementById('sirocDisabledNotice');
+        if (!numInput) return;
+
+        function applySirocState(active) {
+            document.querySelectorAll(
+                '#sirocForm input:not(#siroc_number):not([name="_token"]):not([type="hidden"]), ' +
+                '#sirocForm select, ' +
+                '#sirocForm textarea, ' +
+                '#sirocForm button'
+            ).forEach(el => { el.disabled = !active; });
+
+            notice?.classList.toggle('d-none', active);
+        }
+
+        numInput.addEventListener('input', function () {
+            applySirocState(this.value.trim().length > 0);
+        });
+
+        applySirocState(numInput.value.trim().length > 0);
+    })();
+    // ────────────────────────────────────────────────────────────────────────
+
     const form      = document.getElementById('sirocForm');
     const btnSave   = document.getElementById('btnSaveSiroc');
     const btnClear  = document.getElementById('btnClearSiroc');

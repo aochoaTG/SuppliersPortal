@@ -42,6 +42,8 @@
     .chip.ok { background:#e9f7ef; color:#198754; }
     .chip.bad { background:#fdecea; color:#dc3545; }
     .chip.wait { background:#fff3cd; color:#856404; }
+    /* SweetAlert2 debe quedar por encima del modal de Bootstrap */
+    .swal2-container { z-index: 99999 !important; }
 </style>
 @endpush
 
@@ -151,10 +153,19 @@
                                     <td>{!! badge_status($doc->status) !!}</td>
                                     <td>
                                         <div class="d-flex justify-content-end gap-1">
-                                            <a href="{{ $url }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Abrir"><i class="ti ti-eye"></i></a>
-                                            <a href="javascript:void(0);" class="btn btn-sm btn-outline-success js-accept-doc" data-url="{{ route('admin.review.documents.accept', $doc) }}" title="Aprobar"><i class="ti ti-check"></i></a>
-                                            <a href="javascript:void(0);" class="btn btn-sm btn-outline-danger js-reject-doc" data-url="{{ route('admin.review.documents.reject', $doc) }}" title="Rechazar"><i class="ti ti-x"></i></a>
-                                            <a href="javascript:void(0);" class="btn btn-sm btn-outline-info js-feedback-doc" data-url="{{ $feedbackUrl }}" data-supplier="{{ $prov->id }}" data-type="{{ $type }}" data-doc="{{ $doc->id ?? '' }}" title="Retroalimentación"><i class="ti ti-message-dots"></i></a>
+                                            <button type="button"
+                                                class="btn btn-sm btn-outline-primary js-review-doc"
+                                                data-file-url="{{ $url }}"
+                                                data-label="{{ $label }}"
+                                                data-accept-url="{{ route('admin.review.documents.accept', $doc) }}"
+                                                data-reject-url="{{ route('admin.review.documents.reject', $doc) }}"
+                                                data-feedback-url="{{ $feedbackUrl }}"
+                                                data-supplier="{{ $prov->id }}"
+                                                data-type="{{ $type }}"
+                                                data-doc="{{ $doc->id ?? '' }}"
+                                                title="Revisar">
+                                                <i class="ti ti-eye me-1"></i> Revisar
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -251,6 +262,113 @@
         </div>
 
     </div>
+{{-- Modal de revisión de documento --}}
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-labelledby="reviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reviewModalLabel">
+                    <i class="ti ti-file-search me-2"></i>
+                    <span id="reviewModalDocLabel">Revisar documento</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body p-0">
+                {{-- Visor del documento --}}
+                <div id="reviewViewer">
+                    <iframe id="reviewModalFrame" src="" style="width:100%;height:72vh;border:0;" allowfullscreen></iframe>
+                </div>
+
+                {{-- Panel de rechazo (inline) --}}
+                <div id="reviewRejectPanel" class="d-none p-4">
+                    <h6 class="mb-3">
+                        <i class="ti ti-alert-triangle me-2 text-danger"></i>Motivo de rechazo
+                    </h6>
+                    <textarea id="rejectReasonInput" class="form-control" rows="6"
+                        placeholder="Escribe el motivo (mín. 5 caracteres)…"></textarea>
+                    <div id="rejectReasonError" class="text-danger small mt-1 d-none">
+                        El motivo es obligatorio (mín. 5 caracteres).
+                    </div>
+                </div>
+
+                {{-- Panel de retroalimentación (inline) --}}
+                <div id="reviewFeedbackPanel" class="d-none p-4">
+                    <h6 class="mb-3">
+                        <i class="ti ti-message-dots me-2 text-info"></i>Retroalimentación para el proveedor
+                    </h6>
+                    <p class="small text-muted mb-2">
+                        Documento: <strong id="feedbackDocLabel"></strong>
+                    </p>
+                    <textarea id="feedbackMessageInput" class="form-control" rows="6"
+                        placeholder="Escribe el mensaje (mín. 5 caracteres)…"></textarea>
+                    <div id="feedbackMessageError" class="text-danger small mt-1 d-none">
+                        El mensaje es obligatorio (mín. 5 caracteres).
+                    </div>
+                    <div class="form-text mt-1">Este mensaje se enviará por correo al contacto del proveedor.</div>
+                </div>
+
+                {{-- Panel de confirmación de aprobación (inline) --}}
+                <div id="reviewAcceptPanel" class="d-none p-4 text-center">
+                    <i class="ti ti-circle-check text-success" style="font-size:3rem;"></i>
+                    <h6 class="mt-3">¿Confirmar aprobación?</h6>
+                    <p class="text-muted small">Esta acción no se puede deshacer.</p>
+                </div>
+            </div>
+
+            {{-- Footer: vista normal --}}
+            <div class="modal-footer justify-content-between" id="reviewFooterDefault">
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="ti ti-arrow-back me-1"></i> Cerrar
+                    </button>
+                    <button type="button" class="btn btn-outline-info js-show-feedback">
+                        <i class="ti ti-message-dots me-1"></i> Retroalimentación
+                    </button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-danger js-show-reject">
+                        <i class="ti ti-x me-1"></i> Rechazar
+                    </button>
+                    <button type="button" class="btn btn-success js-show-accept">
+                        <i class="ti ti-check me-1"></i> Aceptar
+                    </button>
+                </div>
+            </div>
+
+            {{-- Footer: rechazo --}}
+            <div class="modal-footer justify-content-between d-none" id="reviewFooterReject">
+                <button type="button" class="btn btn-outline-secondary js-cancel-subform">
+                    <i class="ti ti-arrow-back me-1"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-danger js-do-reject">
+                    <i class="ti ti-x me-1"></i> Confirmar rechazo
+                </button>
+            </div>
+
+            {{-- Footer: retroalimentación --}}
+            <div class="modal-footer justify-content-between d-none" id="reviewFooterFeedback">
+                <button type="button" class="btn btn-outline-secondary js-cancel-subform">
+                    <i class="ti ti-arrow-back me-1"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary js-do-feedback">
+                    <i class="ti ti-send me-1"></i> Enviar retroalimentación
+                </button>
+            </div>
+
+            {{-- Footer: confirmación de aprobación --}}
+            <div class="modal-footer justify-content-between d-none" id="reviewFooterAccept">
+                <button type="button" class="btn btn-outline-secondary js-cancel-subform">
+                    <i class="ti ti-arrow-back me-1"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-success js-do-accept">
+                    <i class="ti ti-check me-1"></i> Sí, aprobar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -258,177 +376,163 @@
 $.ajaxSetup({
     headers: {'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
 });
+
+// Toast SweetAlert2 (solo se usa FUERA del modal, para notificaciones de resultado)
+const toast = (icon, title, text) => Swal.fire({
+    icon, title, text,
+    toast: true,
+    position: 'top-end',
+    timer: 2000,
+    showConfirmButton: false,
+    timerProgressBar: true,
+});
+
 $(function () {
-    // Solo navegación de tabs (Bootstrap 5 ya hace el toggle; esto es por si quieres recordar la última pestaña)
-    const key = 'reviewTab';
-    const last = localStorage.getItem(key);
-    if (last) {
-        const triggerEl = document.querySelector(`[data-bs-target="${last}"]`);
-        if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+    // ── Recordar última pestaña ──────────────────────────────────────────────
+    const tabKey = 'reviewTab';
+    const lastTab = localStorage.getItem(tabKey);
+    if (lastTab) {
+        const el = document.querySelector(`[data-bs-target="${lastTab}"]`);
+        if (el) bootstrap.Tab.getOrCreateInstance(el).show();
     }
     document.querySelectorAll('#workModes [data-bs-toggle="pill"]').forEach(el => {
-        el.addEventListener('shown.bs.tab', function (e) {
-            const target = e.target.getAttribute('data-bs-target');
-            localStorage.setItem(key, target);
+        el.addEventListener('shown.bs.tab', e => localStorage.setItem(tabKey, e.target.getAttribute('data-bs-target')));
+    });
+
+    // ── Estado del modal ─────────────────────────────────────────────────────
+    let $activeRow = null;
+
+    function showPanel(panelId, footerId) {
+        $('#reviewViewer, #reviewRejectPanel, #reviewFeedbackPanel, #reviewAcceptPanel').addClass('d-none');
+        $('#reviewFooterDefault, #reviewFooterReject, #reviewFooterFeedback, #reviewFooterAccept').addClass('d-none');
+        $('#' + panelId).removeClass('d-none');
+        $('#' + footerId).removeClass('d-none');
+    }
+
+    function resetModal() {
+        showPanel('reviewViewer', 'reviewFooterDefault');
+        $('#rejectReasonInput').val('');
+        $('#rejectReasonError').addClass('d-none');
+        $('#feedbackMessageInput').val('');
+        $('#feedbackMessageError').addClass('d-none');
+    }
+
+    // ── Abrir modal ──────────────────────────────────────────────────────────
+    $(document).on('click', '.js-review-doc', function () {
+        $activeRow = $(this).closest('tr');
+        const btn = $(this);
+
+        resetModal();
+        $('#reviewModalFrame').attr('src', btn.data('file-url'));
+        $('#reviewModalDocLabel').text(btn.data('label'));
+        $('#feedbackDocLabel').text(btn.data('label'));
+        $('#reviewModal')
+            .data('accept-url',   btn.data('accept-url'))
+            .data('reject-url',   btn.data('reject-url'))
+            .data('feedback-url', btn.data('feedback-url'))
+            .data('type',         btn.data('type'))
+            .data('doc',          btn.data('doc'));
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal')).show();
+    });
+
+    document.getElementById('reviewModal').addEventListener('hidden.bs.modal', () => {
+        $('#reviewModalFrame').attr('src', '');
+        $activeRow = null;
+    });
+
+    // ── Navegar a subpaneles ─────────────────────────────────────────────────
+    $(document).on('click', '.js-show-reject', () => {
+        showPanel('reviewRejectPanel', 'reviewFooterReject');
+        $('#rejectReasonInput').trigger('focus');
+    });
+
+    $(document).on('click', '.js-show-feedback', () => {
+        showPanel('reviewFeedbackPanel', 'reviewFooterFeedback');
+        $('#feedbackMessageInput').trigger('focus');
+    });
+
+    $(document).on('click', '.js-show-accept', () => {
+        showPanel('reviewAcceptPanel', 'reviewFooterAccept');
+    });
+
+    $(document).on('click', '.js-cancel-subform', () => {
+        showPanel('reviewViewer', 'reviewFooterDefault');
+    });
+
+    // ── Confirmar aprobación ─────────────────────────────────────────────────
+    $(document).on('click', '.js-do-accept', function () {
+        const url = $('#reviewModal').data('accept-url');
+        const $btn = $(this).prop('disabled', true).text('Aprobando…');
+
+        $.post(url).done(() => {
+            bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+            if ($activeRow) $activeRow.find('td:nth-child(6)').html('<span class="badge bg-success">Aprobado</span>');
+            $('#kpiPendientes').text(Math.max(0, parseInt($('#kpiPendientes').text()) - 1));
+            $('#kpiAprobadosHoy').text(parseInt($('#kpiAprobadosHoy').text()) + 1);
+            toast('success', 'Aprobado');
+        }).fail(xhr => {
+            $btn.prop('disabled', false).html('<i class="ti ti-check me-1"></i> Sí, aprobar');
+            toast('error', 'Error', 'No se pudo aprobar.');
+            console.error(xhr?.responseText || xhr);
         });
     });
 
-    // Aceptar
-    $(document).on('click', '.js-accept-doc', function (e) {
-        e.preventDefault();
-        const url = $(this).data('url');
-        const $row = $(this).closest('tr');
-
-        Swal.fire({
-            title: '¿Aprobar documento?',
-            text: "Esta acción no se puede deshacer.",
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: '<i class="ti ti-check me-1"></i>Sí, aprobar',
-            cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
-            customClass: {
-                confirmButton: 'btn btn-success',
-                cancelButton: 'btn btn-secondary'
-            },
-            buttonsStyling: false,
-            reverseButtons: true
-        }).then(res => {
-            if (!res.isConfirmed) return;
-
-            $.post(url) // POST simple, con CSRF vía meta en tu layout
-            .done(function (json) {
-                // Actualiza la fila visualmente
-                $row.find('td:nth-child(6)').html('<span class="badge bg-success">Aprobado</span>'); // asumiendo col 6 = Status
-                Swal.fire({ icon: 'success', title: 'Aprobado', timer: 1400, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
-
-                // ACEPTAR
-                let pendientes = parseInt($('#kpiPendientes').text());
-                let aprobados  = parseInt($('#kpiAprobadosHoy').text());
-
-                $('#kpiPendientes').text(pendientes - 1);
-                $('#kpiAprobadosHoy').text(aprobados + 1);
-            })
-            .fail(function (xhr) {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo aprobar.', customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
-                console.error(xhr?.responseText || xhr);
-            });
-        });
-    });
-
-    // Rechazar
-    $(document).on('click', '.js-reject-doc', function (e) {
-        e.preventDefault();
-        const url = $(this).data('url');
-        const $row = $(this).closest('tr');
-
-        Swal.fire({
-            title: 'Rechazar documento',
-            input: 'textarea',
-            inputLabel: 'Motivo de rechazo',
-            inputPlaceholder: 'Escribe el motivo…',
-            inputAttributes: { 'aria-label': 'Motivo de rechazo' },
-            showCancelButton: true,
-            confirmButtonText: '<i class="ti ti-x me-1"></i>Rechazar',
-            cancelButtonText: '<i class="ti ti-arrow-back me-1"></i>Cancelar',
-            customClass: {
-                confirmButton: 'btn btn-danger',
-                cancelButton: 'btn btn-secondary'
-            },
-            buttonsStyling: false,
-            reverseButtons: true,
-            preConfirm: (reason) => {
-                if (!reason || reason.trim().length < 5) {
-                    Swal.showValidationMessage('El motivo es obligatorio (mín. 5 caracteres).');
-                }
-                return reason;
-            }
-        }).then(res => {
-            if (!res.isConfirmed) return;
-
-            $.post(url, { reason: res.value })
-            .done(function (json) {
-                // Actualiza la fila visualmente
-                $row.find('td:nth-child(6)').html('<span class="badge bg-danger">Rechazado</span>');
-                // Si tienes una columna de motivo (o tooltip), podrías añadirlo aquí
-                Swal.fire({ icon: 'success', title: 'Rechazado', timer: 1400, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
-
-                // RECHAZAR
-                let pendientes = parseInt($('#kpiPendientes').text());
-                let rechazados = parseInt($('#kpiRechazadosHoy').text());
-
-                $('#kpiPendientes').text(pendientes - 1);
-                $('#kpiRechazadosHoy').text(rechazados + 1);
-            })
-            .fail(function (xhr) {
-                let msg = 'No se pudo rechazar.';
-                if (xhr.status === 422 && xhr.responseJSON?.errors?.reason) {
-                    msg = xhr.responseJSON.errors.reason.join('\n');
-                }
-                Swal.fire({ icon: 'error', title: 'Error', text: msg, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
-                console.error(xhr?.responseText || xhr);
-            });
-        });
-    });
-
-});
-
-// RETROALIMENTACIÓN (envía correo al proveedor)
-$(document).on('click', '.js-feedback-doc', function (e) {
-    e.preventDefault();
-    const url       = $(this).data('url');      // ruta para enviar el correo
-    const type      = $(this).data('type');     // tipo de documento (string)
-    const docId     = $(this).data('doc') || ''; // id del doc (puede venir vacío)
-    const labelCell = $(this).closest('tr').find('.doc-label').text().trim();
-
-    Swal.fire({
-        title: 'Enviar retroalimentación',
-        html: `
-            <div class="text-start">
-                <div class="mb-2 small text-muted">
-                    <i class="ti ti-file-description me-1"></i>
-                    Documento / Tipo: <strong>${labelCell || type}</strong>
-                </div>
-                <textarea id="swal-feedback-message" class="form-control" rows="5" placeholder="Escribe la retroalimentación para el proveedor..."></textarea>
-                <div class="form-text mt-1">
-                    Este mensaje se enviará por correo al contacto del proveedor.
-                </div>
-            </div>
-        `,
-        focusConfirm: false,
-        showCancelButton: true,
-        confirmButtonText: '<i class="ti ti-send me-1"></i>Enviar',
-        cancelButtonText: '<i class="ti ti-x me-1"></i>Cancelar',
-        customClass: {
-            confirmButton: 'btn btn-primary',
-            cancelButton: 'btn btn-secondary'
-        },
-        buttonsStyling: false,
-        reverseButtons: true,
-        preConfirm: () => {
-            const message = document.getElementById('swal-feedback-message').value || '';
-            if (message.trim().length < 5) {
-                Swal.showValidationMessage('El mensaje es obligatorio (mín. 5 caracteres).');
-                return false;
-            }
-            return { message };
+    // ── Confirmar rechazo ────────────────────────────────────────────────────
+    $(document).on('click', '.js-do-reject', function () {
+        const reason = $('#rejectReasonInput').val().trim();
+        if (reason.length < 5) {
+            $('#rejectReasonError').removeClass('d-none');
+            $('#rejectReasonInput').trigger('focus');
+            return;
         }
-    }).then(res => {
-        if (!res.isConfirmed) return;
+        $('#rejectReasonError').addClass('d-none');
 
-        $.post(url, { feedback: res.value.message, doc_id: docId, type: type })
-            .done(() => {
-                Swal.fire({ icon: 'success', title: 'Enviado', text: 'La retroalimentación fue enviada al proveedor.', timer: 1600, showConfirmButton: false, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
-            })
-            .fail(xhr => {
-                let msg = 'No se pudo enviar la retroalimentación.';
-                if (xhr.status === 422 && xhr.responseJSON?.errors?.message) {
-                    msg = xhr.responseJSON.errors.message.join('\n');
-                }
-                Swal.fire({ icon: 'error', title: 'Error', text: msg, customClass: { confirmButton: 'btn btn-primary' }, buttonsStyling: false });
-                console.error(xhr?.responseText || xhr);
-            });
+        const url  = $('#reviewModal').data('reject-url');
+        const $btn = $(this).prop('disabled', true).text('Rechazando…');
+
+        $.post(url, { reason }).done(() => {
+            bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+            if ($activeRow) $activeRow.find('td:nth-child(6)').html('<span class="badge bg-danger">Rechazado</span>');
+            $('#kpiPendientes').text(Math.max(0, parseInt($('#kpiPendientes').text()) - 1));
+            $('#kpiRechazadosHoy').text(parseInt($('#kpiRechazadosHoy').text()) + 1);
+            toast('success', 'Rechazado');
+        }).fail(xhr => {
+            $btn.prop('disabled', false).html('<i class="ti ti-x me-1"></i> Confirmar rechazo');
+            let msg = 'No se pudo rechazar.';
+            if (xhr.status === 422 && xhr.responseJSON?.errors?.reason) msg = xhr.responseJSON.errors.reason.join('\n');
+            toast('error', 'Error', msg);
+            console.error(xhr?.responseText || xhr);
+        });
+    });
+
+    // ── Enviar retroalimentación ─────────────────────────────────────────────
+    $(document).on('click', '.js-do-feedback', function () {
+        const message = $('#feedbackMessageInput').val().trim();
+        if (message.length < 5) {
+            $('#feedbackMessageError').removeClass('d-none');
+            $('#feedbackMessageInput').trigger('focus');
+            return;
+        }
+        $('#feedbackMessageError').addClass('d-none');
+
+        const modal = $('#reviewModal');
+        const url   = modal.data('feedback-url');
+        const type  = modal.data('type');
+        const docId = modal.data('doc') || '';
+        const $btn  = $(this).prop('disabled', true).text('Enviando…');
+
+        $.post(url, { feedback: message, doc_id: docId, type }).done(() => {
+            showPanel('reviewViewer', 'reviewFooterDefault');
+            toast('success', 'Enviado', 'La retroalimentación fue enviada al proveedor.');
+        }).fail(xhr => {
+            $btn.prop('disabled', false).html('<i class="ti ti-send me-1"></i> Enviar retroalimentación');
+            let msg = 'No se pudo enviar.';
+            if (xhr.status === 422 && xhr.responseJSON?.errors?.message) msg = xhr.responseJSON.errors.message.join('\n');
+            toast('error', 'Error', msg);
+            console.error(xhr?.responseText || xhr);
+        });
     });
 });
-
 </script>
 @endpush

@@ -36,26 +36,6 @@ class RequisitionWorkflowController extends Controller
     }
 
     /**
-     * Bandeja: requisiciones rechazadas.
-     * Nota: No tienes campo 'rejection_reason' ni 'rejected_by' en la migración
-     */
-    public function rejectedInbox(Request $request)
-    {
-        $rows = Requisition::with([
-            'company:id,name',
-            'costCenter:id,code,name',
-            'department:id,name',
-            'requester:id,name'
-            // No hay 'rejecter' porque no tienes el campo en la migración
-        ])
-            ->where('status', RequisitionStatus::REJECTED->value)
-            ->orderByDesc('id')
-            ->paginate(20);
-
-        return view('requisitions.inbox.rejected', compact('rows'));
-    }
-
-    /**
      * Mostrar página de validación y cotización de requisición.
      */
     public function showValidationPage(Requisition $requisition)
