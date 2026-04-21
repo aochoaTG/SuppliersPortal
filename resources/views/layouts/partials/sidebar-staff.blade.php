@@ -14,14 +14,13 @@
 
     HOW TO ADD A NEW SECTION:
       1. Add a new section block wrapped with @hasanyrole('role1|role2|...')
-      2. Add a comment above the block listing the allowed roles:
-         {{-- SECTION NAME — visible to: role1, role2 --}}
+      2. Add a plain comment above the block listing the allowed roles.
       3. Update the ROLES HANDLED list above if a new role is introduced.
 
     HOW TO ADD AN ITEM INSIDE AN EXISTING SECTION:
       1. Add the <li> block in the correct section.
       2. If it has different role restrictions than the parent section,
-         wrap it with its own @hasanyrole and add an inline comment.
+         wrap it with its own @hasanyrole directive and add an inline comment.
 
     SECTIONS:
       - INICIO          → all roles

@@ -313,7 +313,6 @@ Route::middleware(['auth', 'lock'])->group(function () {
     Route::prefix('requisitions')->name('requisitions.')->group(function () {
         // Bandejas de workflow
         Route::get('/inbox/validation', [RequisitionWorkflowController::class, 'validationInbox'])->name('inbox.validation');
-        Route::get('/inbox/rejected', [RequisitionWorkflowController::class, 'rejectedInbox'])->name('inbox.rejected');
 
         // Vista de revisión/validación
         Route::get('/{requisition}/validate', [RequisitionWorkflowController::class, 'showValidationPage'])->name('validate.show');
