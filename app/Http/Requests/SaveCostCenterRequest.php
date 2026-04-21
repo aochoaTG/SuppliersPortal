@@ -16,7 +16,7 @@ class SaveCostCenterRequest extends FormRequest
     {
         $costCenter = $this->route('cost_center');
 
-        $uniqueCode = Rule::unique('cost_centers', 'code')->whereNull('deleted_at');
+        $uniqueCode = Rule::unique('cost_centers', 'code');
         if ($costCenter !== null) {
             $uniqueCode->ignore($costCenter);
         }

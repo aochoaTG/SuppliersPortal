@@ -43,6 +43,7 @@ use App\Http\Controllers\{
     ReceptionController,
     LogViewerController,
     SupplierDeliveryController,
+    CostCenterImportController,
 };
 
 // ============================================================================
@@ -221,6 +222,12 @@ Route::middleware(['auth', 'lock'])->group(function () {
 
     Route::get('cost-centers/datatable', [CostCenterController::class, 'datatable'])->name('cost-centers.datatable');
     Route::get('cost-centers/api/companies/{company}/cost-centers', [CostCenterController::class, 'byCompany'])->name('cost-centers.api.by-company');
+    Route::prefix('cost-centers/import')->name('cost-centers.import.')->group(function () {
+        Route::get('/template', [CostCenterImportController::class, 'downloadTemplate'])->name('template');
+        Route::post('/preview', [CostCenterImportController::class, 'preview'])->name('preview');
+        Route::get('/preview', [CostCenterImportController::class, 'showPreview'])->name('preview.show');
+        Route::post('/confirm', [CostCenterImportController::class, 'confirm'])->name('confirm');
+    });
     Route::resource('cost-centers', CostCenterController::class)->except(['show'])->parameters(['cost-centers' => 'cost_center']);
 
     Route::get('departments/datatable', [DepartmentController::class, 'datatable'])->name('departments.datatable');
