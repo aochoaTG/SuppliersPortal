@@ -78,8 +78,7 @@ class ReceptionService
                 // Si el ítem es NO_CONFORME, queda pendiente para que el proveedor
                 // lo reponga — la orden no avanzará a RECEIVED hasta que esas unidades
                 // sean recibidas conformes en una recepción posterior.
-                $isConforming = ($lineData['conformity'] ?? ReceptionItem::CONFORMITY_OK) === ReceptionItem::CONFORMITY_OK;
-                if ($quantityReceived > 0 && $isConforming) {
+                if ($quantityReceived > 0) {
                     $item->increment('quantity_received', $quantityReceived);
                 }
             }
@@ -98,9 +97,6 @@ class ReceptionService
             $this->updateOrderStatus($order, $newOrderStatus, $receiver);
 
             // 6. Si la orden quedó totalmente recibida, marcar el compromiso presupuestal
-            if ($newOrderStatus === 'RECEIVED') {
-                $this->markBudgetAsReceived($order);
-            }
 
             Log::info("Recepción {$reception->folio} registrada para la orden {$order->folio}.");
 
@@ -243,14 +239,6 @@ class ReceptionService
                 'Tipo de orden no soportado para recepción: ' . get_class($order)
             ),
         };
-    }
-
-    /**
-     * Marca el compromiso presupuestal como recibido si la orden tiene uno asociado.
-     */
-    private function markBudgetAsReceived(Model $order): void
-    {
-        $order->budgetCommitment?->markAsReceived();
     }
 
     /**

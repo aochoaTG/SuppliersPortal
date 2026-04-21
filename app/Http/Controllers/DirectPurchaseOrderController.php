@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Notifications\NewDirectPurchaseOrderNotification;
 use App\Http\Requests\SaveDirectPurchaseOrderRequest;
 use App\Services\ApprovalService;
+use App\Services\BudgetAllocationService;
 use App\Services\PricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,8 @@ class DirectPurchaseOrderController extends Controller
 {
     public function __construct(
         private ApprovalService $approvalService,
-        private PricingService $pricingService
+        private PricingService $pricingService,
+        private BudgetAllocationService $budgetAllocationService
     ) {
     }
 

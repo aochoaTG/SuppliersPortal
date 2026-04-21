@@ -73,6 +73,30 @@ class DirectPurchaseOrder extends Model
         'reception_deadline_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::updated(function (DirectPurchaseOrder $order) {
+            $originalStatus = $order->getOriginal('status');
+            $newStatus = $order->status;
+
+            if ($originalStatus === $newStatus) {
+                return;
+            }
+
+            if ($newStatus === 'ISSUED') {
+                app(\App\Services\BudgetAllocationService::class)->syncCommitmentTrace($order);
+            }
+
+            if ($newStatus === 'RETURNED' && $originalStatus === 'ISSUED') {
+                app(\App\Services\BudgetAllocationService::class)->releaseTrace($order);
+            }
+
+            if ($newStatus === 'DELIVERED_PENDING_RECEPTION') {
+                app(\App\Services\BudgetAllocationService::class)->consumeOrder($order);
+            }
+        });
+    }
+
     /**
      * =========================================
      * RELACIONES
@@ -137,6 +161,11 @@ class DirectPurchaseOrder extends Model
     public function budgetCommitment(): HasOne
     {
         return $this->hasOne(BudgetCommitment::class);
+    }
+
+    public function budgetCommitments(): HasMany
+    {
+        return $this->hasMany(BudgetCommitment::class);
     }
 
     // Historial de recepciones registradas contra esta OCD

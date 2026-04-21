@@ -10,9 +10,15 @@ use Illuminate\Support\Facades\Log;
 use App\Models\RfqResponse;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Services\BudgetAllocationService;
 
 class QuotationApprovalController extends Controller
 {
+    public function __construct(
+        private BudgetAllocationService $budgetAllocationService
+    ) {
+    }
+
     public function index()
     {
         $pendingApprovals = QuotationSummary::with([
@@ -130,6 +136,7 @@ class QuotationApprovalController extends Controller
         }
 
         // 3. Finalizar la Requisición
+        $this->budgetAllocationService->commitOrder($po);
         $summary->requisition->update(['status' => 'COMPLETED']);
     }
 }

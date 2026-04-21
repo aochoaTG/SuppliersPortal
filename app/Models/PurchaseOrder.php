@@ -53,6 +53,22 @@ class PurchaseOrder extends Model
         'reception_deadline_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::updated(function (PurchaseOrder $order) {
+            $originalStatus = $order->getOriginal('status');
+            $newStatus = $order->status;
+
+            if ($originalStatus === $newStatus) {
+                return;
+            }
+
+            if ($newStatus === 'DELIVERED_PENDING_RECEPTION') {
+                app(\App\Services\BudgetAllocationService::class)->consumeOrder($order);
+            }
+        });
+    }
+
     // Relación con el creador (el Superadmin que autorizó)
     public function creator()
     {
@@ -92,6 +108,11 @@ class PurchaseOrder extends Model
     public function budgetCommitment(): HasOne
     {
         return $this->hasOne(BudgetCommitment::class);
+    }
+
+    public function budgetCommitments(): HasMany
+    {
+        return $this->hasMany(BudgetCommitment::class);
     }
 
     public function receivingLocation()

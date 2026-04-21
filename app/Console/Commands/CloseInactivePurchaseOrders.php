@@ -248,7 +248,7 @@ class CloseInactivePurchaseOrders extends Command
             ]);
 
             // Liberar presupuesto comprometido mediante los items y su distribución presupuestal
-            $this->releaseBudgetForStandardPO($po);
+            app(\App\Services\BudgetAllocationService::class)->releaseOrder($po);
 
             DB::commit();
 
