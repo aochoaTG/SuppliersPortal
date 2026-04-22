@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ExchangeRate extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'currency_from',
         'currency_to',
@@ -22,6 +25,7 @@ class ExchangeRate extends Model
     {
         return static::where('currency_from', $from)
             ->where('currency_to', $to)
+            ->latest('fetched_at')
             ->first();
     }
 }

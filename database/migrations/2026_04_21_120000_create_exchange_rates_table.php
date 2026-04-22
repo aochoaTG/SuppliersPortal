@@ -13,7 +13,7 @@ return new class extends Migration
             $table->char('currency_from', 3);
             $table->char('currency_to', 3);
             $table->decimal('rate', 10, 4);
-            $table->timestamp('fetched_at');
+            $table->timestamp('fetched_at')->useCurrent();
             $table->timestamps();
 
             $table->unique(['currency_from', 'currency_to']);

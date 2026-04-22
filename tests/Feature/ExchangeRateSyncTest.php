@@ -29,7 +29,7 @@ class ExchangeRateSyncTest extends TestCase
         $result = ExchangeRate::current('USD', 'MXN');
 
         $this->assertNotNull($result);
-        $this->assertEquals('17.4320', $result->rate);
+        $this->assertSame('17.4320', $result->rate);
     }
 
     public function test_current_returns_null_for_different_pair(): void
