@@ -35,6 +35,17 @@
                     </a>
                 </div> <!-- .dropdown-->
             </div> <!-- end topbar-item -->
+
+            <!-- Tipo de cambio USD/MXN -->
+            @if($exchangeRate)
+            <div class="topbar-item d-none d-md-flex">
+                <span class="badge bg-light text-dark border fs-12 fw-semibold px-2 py-1">
+                    <i class="ti ti-currency-dollar me-1 text-success"></i>USD
+                    ${{ number_format($exchangeRate->rate, 2) }}
+                    <span class="text-muted fw-normal">· act. {{ $exchangeRate->fetched_at->format('H:i') }}</span>
+                </span>
+            </div>
+            @endif
         </div>
 
         <div class="d-flex align-items-center gap-2">

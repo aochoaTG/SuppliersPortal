@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Gate; // 👈 AGREGAR ESTA LÍNEA
+use App\Models\ExchangeRate;
 use App\Models\SupplierDocument;
 use App\Models\ReceivingLocation; // 👈 AGREGAR ESTA LÍNEA
 use App\Policies\ReceivingLocationPolicy; // 👈 AGREGAR ESTA LÍNEA
@@ -38,5 +39,8 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('pendingReviewCount', $pendingCount);
         });
+
+        // Tipo de cambio USD/MXN para el navbar
+        View::share('exchangeRate', rescue(fn () => ExchangeRate::current('USD', 'MXN'), null));
     }
 }
