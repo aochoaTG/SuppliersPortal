@@ -15,3 +15,10 @@ Schedule::command('purchase-orders:close-inactive')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/close-inactive-purchase-orders.log'));
 
+// Sincronización del tipo de cambio USD/MXN — cada hora, L-V, 8-18h
+Schedule::command('exchange-rates:sync')
+    ->hourly()
+    ->weekdays()
+    ->between('8:00', '18:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/exchange-rates.log'));
