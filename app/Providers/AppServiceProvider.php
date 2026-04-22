@@ -40,7 +40,9 @@ class AppServiceProvider extends ServiceProvider
             $view->with('pendingReviewCount', $pendingCount);
         });
 
-        // Tipo de cambio USD/MXN para el navbar
-        View::share('exchangeRate', rescue(fn () => ExchangeRate::current('USD', 'MXN'), null));
+        // Tipo de cambio USD/MXN para el navbar (solo en contexto web)
+        if (! $this->app->runningInConsole()) {
+            View::share('exchangeRate', rescue(fn () => ExchangeRate::current('USD', 'MXN'), null));
+        }
     }
 }
