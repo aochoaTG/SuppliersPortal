@@ -44,7 +44,20 @@ use App\Http\Controllers\{
     LogViewerController,
     SupplierDeliveryController,
     CostCenterImportController,
+    SatRetencionController,
 };
+
+// ============================================================================
+//  Serve storage files via PHP when symlink to network path won't work (local dev)
+// ============================================================================
+Route::get('/storage/{path}', function (string $path) {
+    if (! \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+        abort(404);
+    }
+    $mime = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($path) ?: 'application/octet-stream';
+    return response(\Illuminate\Support\Facades\Storage::disk('public')->get($path), 200)
+        ->header('Content-Type', $mime);
+})->where('path', '.*');
 
 // ============================================================================
 //  Default redirect
@@ -493,6 +506,13 @@ Route::middleware(['auth', 'lock', 'role:superadmin'])->group(function () {
 
     Route::get('/approvals/quotations', [QuotationApprovalController::class, 'index'])->name('approvals.quotations.index');
     Route::post('/approvals/quotations/{summary}/handle', [QuotationApprovalController::class, 'handle'])->name('approvals.quotations.handle');
+
+    // SAT Retenciones
+    Route::get('sat-retenciones/datatable', [SatRetencionController::class, 'datatable'])
+        ->name('sat-retenciones.datatable');
+    Route::resource('sat-retenciones', SatRetencionController::class)
+        ->except(['show'])
+        ->parameters(['sat-retenciones' => 'sat_retencion']);
 });
 
 // ============================================================================
