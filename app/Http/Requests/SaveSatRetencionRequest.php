@@ -22,7 +22,7 @@ class SaveSatRetencionRequest extends FormRequest
         }
 
         return [
-            'clave'                   => ['required', 'string', 'max:20', $uniqueClave],
+            'clave'                   => ['required', 'string', 'max:20', 'regex:/^[A-Z0-9\-]{1,20}$/', $uniqueClave],
             'nombre'                  => ['required', 'string', 'max:100'],
             'impuesto'                => ['required', Rule::in(['ISR', 'IVA'])],
             'porcentaje'              => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -42,8 +42,10 @@ class SaveSatRetencionRequest extends FormRequest
         return [
             'clave.required'              => 'La clave es obligatoria.',
             'clave.max'                   => 'La clave no puede superar 20 caracteres.',
+            'clave.regex'                 => 'La clave solo puede contener letras mayúsculas, números y guiones.',
             'clave.unique'                => 'Ya existe una retención con esa clave.',
             'nombre.required'             => 'El nombre es obligatorio.',
+            'nombre.max'                  => 'El nombre no puede superar 100 caracteres.',
             'impuesto.required'           => 'Selecciona el tipo de impuesto.',
             'impuesto.in'                 => 'El impuesto debe ser ISR o IVA.',
             'porcentaje.numeric'          => 'El porcentaje debe ser un número.',
