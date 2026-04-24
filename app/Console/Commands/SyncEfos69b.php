@@ -98,6 +98,7 @@ class SyncEfos69b extends Command
             }
         }
 
+        
         // Último lote
         if ($rows) {
             $this->upsertChunk($rows);
