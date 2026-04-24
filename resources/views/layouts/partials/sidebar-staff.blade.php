@@ -388,7 +388,8 @@ $openConfiguration =
     request()->routeIs('departments.*') ||
     request()->routeIs('receiving-locations.*') ||
     request()->routeIs('taxes.*') ||
-    request()->routeIs('approval-levels.*');
+    request()->routeIs('approval-levels.*') ||
+    request()->routeIs('sat-retenciones.*');
 @endphp
 <li class="side-nav-item">
     <a class="side-nav-link {{ $openConfiguration ? '' : 'collapsed' }}" data-bs-toggle="collapse"
@@ -435,7 +436,12 @@ $openConfiguration =
                 <a href="{{ route('approval-levels.index') }}"
                     class="side-nav-link {{ request()->routeIs('approval-levels.*') ? 'active' : '' }}">
                     <span class="menu-text">Niveles de Autorización</span>
-                    <span class="badge bg-soft-danger text-danger ms-auto">🛡️</span>
+                </a>
+            </li>
+            <li class="side-nav-item">
+                <a href="{{ route('sat-retenciones.index') }}"
+                    class="side-nav-link {{ request()->routeIs('sat-retenciones.*') ? 'active' : '' }}">
+                    <span class="menu-text">Retenciones SAT</span>
                 </a>
             </li>
         </ul>
