@@ -20,6 +20,8 @@
             @include('cost_centers.partials.form', [
                 'costCenter' => $costCenter,
                 'categories' => $categories,
+                'companies' => $companies,
+                'users' => $users,
             ])
         </div>
 

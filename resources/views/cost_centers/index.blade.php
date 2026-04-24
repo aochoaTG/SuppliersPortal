@@ -58,6 +58,7 @@
                         <th>Categoría</th>
                         <th>Código</th>
                         <th>Nombre</th>
+                        <th>Tipo de Compra</th>
                         <th>Responsable</th>
                         <th class="text-center">Presupuesto</th>
                         <th class="text-center">Estado</th>
@@ -210,6 +211,11 @@
                 {
                     data: 'name',
                     name: 'name'
+                },
+                {
+                    data: 'purchase_type_label',
+                    name: 'purchase_type',
+                    defaultContent: 'â€”'
                 },
                 {
                     data: 'responsible_name',
