@@ -197,7 +197,7 @@
                                                 </div>
                                             @endif
 
-                                            {{-- 🛠️ ESPECIFICACIONES TÉCNICAS (NUEVO) --}}
+                                            {{-- ESPECIFICACIONES TÉCNICAS (NUEVO) --}}
                                             @if($resp->specifications)
                                                 <div class="mb-1 p-1 bg-light rounded border-start border-primary border-2">
                                                     <small class="d-block text-dark fw-semibold" style="font-size: 10px;">ESPECIFICACIONES:</small>
@@ -205,7 +205,7 @@
                                                 </div>
                                             @endif
 
-                                            {{-- 🛡️ GARANTÍA Y ADJUNTO (NUEVO) --}}
+                                            {{-- GARANTÍA Y ADJUNTO (NUEVO) --}}
                                             <div class="d-flex gap-1 mb-1">
                                                 @if($resp->warranty_terms)
                                                     <span class="badge bg-soft-dark text-dark border border-dark border-opacity-10 fs-9" title="Garantía ofrecida">

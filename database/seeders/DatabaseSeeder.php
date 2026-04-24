@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             ReceivingLocationSeeder::class,
             QuotationPlannerTestSeeder::class,
             ApprovalLevelSeeder::class,
+            SatRetencionSeeder::class,
         ]);
     }
 }

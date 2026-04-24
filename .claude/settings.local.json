@@ -24,7 +24,8 @@
       "Bash(C:\\\\Users\\\\alfo.ochoa\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\skills\\\\brainstorming\\\\scripts\\\\start-server.sh *)",
       "Bash(bash *)",
       "Bash(php *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(grep -n \"xss\\\\|sanitize\\\\|e\\(\\\\$\\\\|htmlspecialchars\" resources/views/sat_retenciones/ -r)"
     ]
   }
 }

@@ -436,7 +436,6 @@ $openConfiguration =
                 <a href="{{ route('approval-levels.index') }}"
                     class="side-nav-link {{ request()->routeIs('approval-levels.*') ? 'active' : '' }}">
                     <span class="menu-text">Niveles de Autorización</span>
-                    <span class="badge bg-soft-danger text-danger ms-auto">🛡️</span>
                 </a>
             </li>
             <li class="side-nav-item">
