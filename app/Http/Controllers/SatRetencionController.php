@@ -57,7 +57,7 @@ class SatRetencionController extends Controller
             ->with('success', 'Retención eliminada correctamente.');
     }
 
-    public function datatable()
+    public function datatable(): \Illuminate\Http\JsonResponse
     {
         $query = SatRetencion::query();
 
@@ -78,8 +78,8 @@ class SatRetencionController extends Controller
                     : '<span class="badge bg-secondary">Inactivo</span>';
             })
             ->addColumn('actions', function ($row) {
-                $editUrl   = route('sat-retenciones.edit', $row->id);
-                $deleteUrl = route('sat-retenciones.destroy', $row->id);
+                $editUrl   = route('sat-retenciones.edit',    ['sat_retencion' => $row->id]);
+                $deleteUrl = route('sat-retenciones.destroy', ['sat_retencion' => $row->id]);
                 $entity    = e($row->clave . ' — ' . $row->nombre);
 
                 return '<div class="d-flex justify-content-end gap-1">'
