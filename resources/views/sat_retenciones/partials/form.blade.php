@@ -1,8 +1,8 @@
 {{-- Formulario parcial reutilizable para create y edit --}}
 @php
-    $activoChecked           = old('activo', $sat_retencion->activo ?? true) ? true : false;
-    $cfdiChecked             = old('requiere_cfdi_retencion', $sat_retencion->requiere_cfdi_retencion ?? true) ? true : false;
-    $impuestoSeleccionado    = old('impuesto', $sat_retencion->impuesto ?? '');
+    $activoChecked        = filter_var(old('activo', $sat_retencion->activo ?? true), FILTER_VALIDATE_BOOLEAN);
+    $cfdiChecked          = filter_var(old('requiere_cfdi_retencion', $sat_retencion->requiere_cfdi_retencion ?? true), FILTER_VALIDATE_BOOLEAN);
+    $impuestoSeleccionado = old('impuesto', $sat_retencion->impuesto ?? '');
 @endphp
 
 <div class="row g-3">
