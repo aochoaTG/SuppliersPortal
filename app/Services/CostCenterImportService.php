@@ -306,16 +306,11 @@ class CostCenterImportService
             $errors[] = $this->errorEntry(0, 'archivo', 'El archivo no contiene filas de datos.');
         }
 
-        $duplicateCodes = $this->duplicateCodesInFile($rawRows);
-        $existingCodes = $this->existingCodesInDatabase($rawRows);
-
         foreach ($rawRows as $row) {
             $rowResult = $this->validateSingleRow(
                 $row['row_number'],
                 $row['values'],
-                $catalogs,
-                $duplicateCodes,
-                $existingCodes
+                $catalogs
             );
 
             if (!empty($rowResult['errors'])) {
@@ -378,9 +373,7 @@ class CostCenterImportService
     private function validateSingleRow(
         int $rowNumber,
         array $values,
-        array $catalogs,
-        array $duplicateCodes,
-        array $existingCodes
+        array $catalogs
     ): array {
         $errors = [];
 
@@ -402,10 +395,6 @@ class CostCenterImportService
             $errors[] = $this->errorEntry($rowNumber, 'codigo', 'El código es obligatorio.');
         } elseif (mb_strlen($code) > 50) {
             $errors[] = $this->errorEntry($rowNumber, 'codigo', 'El código no debe exceder 50 caracteres.');
-        } elseif (isset($duplicateCodes[mb_strtolower($code)])) {
-            $errors[] = $this->errorEntry($rowNumber, 'codigo', 'El código está repetido dentro del archivo.');
-        } elseif (isset($existingCodes[mb_strtolower($code)])) {
-            $errors[] = $this->errorEntry($rowNumber, 'codigo', 'El código ya existe en el catálogo actual.');
         }
 
         if ($name === '') {
@@ -506,42 +495,6 @@ class CostCenterImportService
                 'status' => $status,
             ],
         ];
-    }
-
-    private function duplicateCodesInFile(array $rawRows): array
-    {
-        $counts = [];
-
-        foreach ($rawRows as $row) {
-            $code = $this->sanitizeText($row['values']['codigo'] ?? null);
-            if ($code === '') {
-                continue;
-            }
-
-            $key = mb_strtolower($code);
-            $counts[$key] = ($counts[$key] ?? 0) + 1;
-        }
-
-        return array_filter($counts, fn($count) => $count > 1);
-    }
-
-    private function existingCodesInDatabase(array $rawRows): array
-    {
-        $codes = collect($rawRows)
-            ->map(fn(array $row) => $this->sanitizeText($row['values']['codigo'] ?? null))
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($codes->isEmpty()) {
-            return [];
-        }
-
-        return CostCenter::query()
-            ->whereIn('code', $codes->all())
-            ->pluck('code')
-            ->mapWithKeys(fn(string $code) => [mb_strtolower($code) => true])
-            ->all();
     }
 
     private function catalogMaps(): array

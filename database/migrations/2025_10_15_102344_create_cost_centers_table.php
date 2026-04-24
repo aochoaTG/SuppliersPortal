@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->id();
 
             // ===== DATOS BASE DEL CENTRO =====
-            $table->string('code', 50)->unique();
+            $table->string('code', 50);
             $table->string('name', 200);
             $table->text('description')->nullable();
             $table->enum('purchase_type', ['Gasto Operativo', 'Gasto Staff', 'Gasto Corporativo']);

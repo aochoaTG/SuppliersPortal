@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use App\Enum\PurchaseType;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class SaveCostCenterRequest extends FormRequest
@@ -16,29 +15,15 @@ class SaveCostCenterRequest extends FormRequest
 
     public function rules(): array
     {
-        $costCenter = $this->route('cost_center');
-
-        $uniqueCode = Rule::unique('cost_centers', 'code');
-        if ($costCenter !== null) {
-            $uniqueCode->ignore($costCenter);
-        }
-
         return [
-            // ===== DATOS BASE =====
-            'code' => ['required', 'string', 'max:50', $uniqueCode],
+            'code' => ['required', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:500'],
             'purchase_type' => ['required', new Enum(PurchaseType::class)],
-
-            // ===== RELACIONES ORGANIZACIONALES =====
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'company_id' => ['required', 'integer', 'exists:companies,id'],
             'responsible_user_id' => ['required', 'integer', 'exists:users,id'],
-
-            // ===== TIPO DE PRESUPUESTO =====
             'budget_type' => ['required', 'string', 'in:ANNUAL,FREE_CONSUMPTION'],
-
-            // ===== CAMPOS PARA CONSUMO LIBRE =====
             'global_amount' => [
                 'nullable',
                 'required_if:budget_type,FREE_CONSUMPTION',
@@ -59,8 +44,6 @@ class SaveCostCenterRequest extends FormRequest
                 'min:10',
                 'max:1000',
             ],
-
-            // ===== ESTADO =====
             'status' => ['required', 'string', 'in:ACTIVO,INACTIVO'],
         ];
     }
@@ -87,25 +70,18 @@ class SaveCostCenterRequest extends FormRequest
     {
         return [
             'code.required' => 'El codigo es requerido.',
-            'code.unique' => 'El codigo ya existe en el sistema.',
             'code.max' => 'El codigo no debe exceder 50 caracteres.',
-
             'name.required' => 'El nombre del centro de costo es requerido.',
             'name.max' => 'El nombre no debe exceder 200 caracteres.',
-
             'purchase_type.required' => 'El tipo de compra es obligatorio.',
-
             'global_amount.required_if' => 'El monto global es requerido para centros de consumo libre.',
             'global_amount.min' => 'El monto global debe ser mayor a 0.',
             'global_amount.max' => 'El monto global no puede ser mayor a 999,999,999.99.',
-
             'free_consumption_justification.required_if' => 'La justificacion es requerida para centros de consumo libre.',
             'free_consumption_justification.min' => 'La justificacion debe tener al menos 10 caracteres.',
-
             'validity_date.required_if' => 'La fecha de vigencia es obligatoria para centros de consumo libre.',
             'validity_date.after_or_equal' => 'La fecha de vigencia debe ser igual o posterior a la fecha actual.',
             'validity_date.date' => 'La fecha de vigencia debe ser una fecha valida.',
-
             'budget_type.required' => 'El tipo de presupuesto es obligatorio.',
             'budget_type.in' => 'El tipo de presupuesto debe ser ANNUAL o FREE_CONSUMPTION.',
             'status.required' => 'El estado es obligatorio.',

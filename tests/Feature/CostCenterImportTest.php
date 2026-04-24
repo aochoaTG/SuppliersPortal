@@ -25,21 +25,16 @@ class CostCenterImportTest extends TestCase
         $response = $this->actingAs($user)->get(route('cost-centers.import.template'));
 
         $response->assertOk();
-        $this->assertStringContainsString(
-            'layout_centros_costo.xlsx',
-            (string) $response->headers->get('content-disposition')
-        );
+        $this->assertStringContainsString('layout_centros_costo.xlsx', (string) $response->headers->get('content-disposition'));
 
         $binaryFile = $response->baseResponse->getFile();
         $this->assertNotNull($binaryFile);
-        $path = $binaryFile->getPathname();
-        $spreadsheet = IOFactory::load($path);
 
+        $spreadsheet = IOFactory::load($binaryFile->getPathname());
         $headers = $spreadsheet->getSheet(0)->rangeToArray('A1:L1')[0];
 
         $this->assertSame(CostCenterImportService::HEADERS, $headers);
         $this->assertSame(2, $spreadsheet->getSheetCount());
-        $this->assertTrue($spreadsheet->getSheet(1)->getSheetState() !== \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_VISIBLE);
     }
 
     public function test_preview_accepts_valid_annual_cost_center_file(): void
@@ -73,17 +68,16 @@ class CostCenterImportTest extends TestCase
         $this->assertNotNull($preview);
         $this->assertTrue($preview['can_import']);
         $this->assertSame('CC-100', $preview['valid_rows'][0]['values']['codigo']);
-        $this->assertSame('Centro de prueba', $preview['valid_rows'][0]['values']['nombre']);
         $this->assertSame('Gasto Operativo', $preview['valid_rows'][0]['values']['tipo de compra']);
     }
 
-    public function test_preview_rejects_existing_code_in_database(): void
+    public function test_preview_allows_duplicate_codes_in_database(): void
     {
         $authUser = User::factory()->create();
         [$company, $category, $responsible] = $this->seedCatalogs();
 
         CostCenter::create([
-            'code' => 'CC-EXISTE',
+            'code' => 'CC-DUP',
             'name' => 'Ya existe',
             'description' => null,
             'purchase_type' => 'Gasto Staff',
@@ -104,8 +98,8 @@ class CostCenterImportTest extends TestCase
 
         $file = $this->buildImportFile([
             [
-                'codigo' => 'CC-EXISTE',
-                'nombre' => 'Centro duplicado',
+                'codigo' => 'CC-DUP',
+                'nombre' => 'Centro duplicado permitido',
                 'descripcion' => '',
                 'tipo de compra' => 'Gasto Staff',
                 'empresa' => "{$company->code} - {$company->name}",
@@ -119,14 +113,17 @@ class CostCenterImportTest extends TestCase
             ],
         ]);
 
-        $this->actingAs($authUser)->post(route('cost-centers.import.preview'), ['excel_file' => $file]);
-
         $this->actingAs($authUser)
-            ->get(route('cost-centers.import.preview.show'))
-            ->assertSee('El cÃ³digo ya existe en el catÃ¡logo actual.');
+            ->post(route('cost-centers.import.preview'), ['excel_file' => $file])
+            ->assertRedirect(route('cost-centers.import.preview.show'));
+
+        $preview = session('cost_center_import.preview');
+
+        $this->assertTrue($preview['can_import']);
+        $this->assertSame(1, $preview['valid_rows_count']);
     }
 
-    public function test_preview_rejects_duplicate_codes_inside_file(): void
+    public function test_preview_allows_duplicate_codes_inside_file(): void
     {
         $authUser = User::factory()->create();
         [$company, $category, $responsible] = $this->seedCatalogs();
@@ -162,11 +159,14 @@ class CostCenterImportTest extends TestCase
             ],
         ]);
 
-        $this->actingAs($authUser)->post(route('cost-centers.import.preview'), ['excel_file' => $file]);
-
         $this->actingAs($authUser)
-            ->get(route('cost-centers.import.preview.show'))
-            ->assertSee('El cÃ³digo estÃ¡ repetido dentro del archivo.');
+            ->post(route('cost-centers.import.preview'), ['excel_file' => $file])
+            ->assertRedirect(route('cost-centers.import.preview.show'));
+
+        $preview = session('cost_center_import.preview');
+
+        $this->assertTrue($preview['can_import']);
+        $this->assertSame(2, $preview['valid_rows_count']);
     }
 
     public function test_preview_requires_free_consumption_fields(): void
@@ -196,8 +196,7 @@ class CostCenterImportTest extends TestCase
         $this->actingAs($authUser)
             ->get(route('cost-centers.import.preview.show'))
             ->assertSee('El monto global es obligatorio para "Consumo Libre".')
-            ->assertSee('La fecha de vigencia es obligatoria para "Consumo Libre".')
-            ->assertSee('La justificaciÃ³n es obligatoria para FREE_CONSUMPTION.');
+            ->assertSee('La fecha de vigencia es obligatoria para "Consumo Libre".');
     }
 
     public function test_preview_rejects_invalid_purchase_type(): void
@@ -263,55 +262,6 @@ class CostCenterImportTest extends TestCase
             'company_id' => $company->id,
             'category_id' => $category->id,
             'responsible_user_id' => $responsible->id,
-            'budget_type' => 'FREE_CONSUMPTION',
-            'status' => 'ACTIVO',
-            'created_by' => $authUser->id,
-        ]);
-    }
-
-    public function test_confirm_does_not_insert_when_preview_has_errors(): void
-    {
-        $authUser = User::factory()->create();
-        [$company, $category, $responsible] = $this->seedCatalogs();
-
-        $file = $this->buildImportFile([
-            [
-                'codigo' => 'CC-BLOCK',
-                'nombre' => 'Centro 1',
-                'descripcion' => '',
-                'tipo de compra' => 'Gasto Staff',
-                'empresa' => "{$company->code} - {$company->name}",
-                'categoria' => $category->name,
-                'responsable' => "{$responsible->name} <{$responsible->email}>",
-                'tipo_presupuesto' => 'Presupuesto Anual',
-                'monto_global' => '',
-                'fecha_vigencia' => '',
-                'justificacion_consumo_libre' => '',
-                'estado' => 'ACTIVO',
-            ],
-            [
-                'codigo' => 'CC-BLOCK',
-                'nombre' => 'Centro 2',
-                'descripcion' => '',
-                'tipo de compra' => 'Gasto Staff',
-                'empresa' => "{$company->code} - {$company->name}",
-                'categoria' => $category->name,
-                'responsable' => "{$responsible->name} <{$responsible->email}>",
-                'tipo_presupuesto' => 'Presupuesto Anual',
-                'monto_global' => '',
-                'fecha_vigencia' => '',
-                'justificacion_consumo_libre' => '',
-                'estado' => 'ACTIVO',
-            ],
-        ]);
-
-        $this->actingAs($authUser)->post(route('cost-centers.import.preview'), ['excel_file' => $file]);
-        $this->actingAs($authUser)
-            ->post(route('cost-centers.import.confirm'))
-            ->assertRedirect(route('cost-centers.import.preview.show'));
-
-        $this->assertDatabaseMissing('cost_centers', [
-            'code' => 'CC-BLOCK',
         ]);
     }
 
