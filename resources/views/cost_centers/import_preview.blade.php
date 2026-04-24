@@ -1,17 +1,17 @@
 @extends('layouts.zircos')
 
-@section('title', 'Preview de importación')
-@section('page.title', 'Preview de importación de centros de costo')
+@section('title', 'Preview de importacion')
+@section('page.title', 'Preview de importacion de centros de costo')
 @section('page.breadcrumbs')
 <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
 <li class="breadcrumb-item"><a href="{{ route('cost-centers.index') }}">Centros de Costo</a></li>
-<li class="breadcrumb-item active">Preview de importación</li>
+<li class="breadcrumb-item active">Preview de importacion</li>
 @endsection
 
 @section('content')
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="ti ti-table-import me-1"></i> Preview de importación</h5>
+        <h5 class="mb-0"><i class="ti ti-table-import me-1"></i> Preview de importacion</h5>
         <span class="badge {{ $preview['can_import'] ? 'bg-success' : 'bg-danger' }}">
             {{ $preview['can_import'] ? 'Listo para importar' : 'Con errores' }}
         </span>
@@ -35,7 +35,7 @@
             <div class="col-md-3">
                 <div class="border rounded p-3 h-100">
                     <div class="text-muted small">Archivo</div>
-                    <div class="fw-semibold">{{ $preview['original_filename'] ?? '—' }}</div>
+                    <div class="fw-semibold">{{ $preview['original_filename'] ?? '-' }}</div>
                 </div>
             </div>
             <div class="col-md-3">
@@ -46,7 +46,7 @@
             </div>
             <div class="col-md-3">
                 <div class="border rounded p-3 h-100">
-                    <div class="text-muted small">Filas válidas</div>
+                    <div class="text-muted small">Filas validas</div>
                     <div class="fs-4 fw-semibold text-success">{{ $preview['valid_rows_count'] }}</div>
                 </div>
             </div>
@@ -95,16 +95,17 @@
 
         @if (!empty($preview['valid_rows']))
         <div>
-            <h6 class="mb-2">Filas válidas</h6>
+            <h6 class="mb-2">Filas validas</h6>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
                             <th>Fila</th>
-                            <th>Código</th>
+                            <th>Codigo</th>
                             <th>Nombre</th>
+                            <th>Tipo de Compra</th>
                             <th>Empresa</th>
-                            <th>Categoría</th>
+                            <th>Categoria</th>
                             <th>Responsable</th>
                             <th>Tipo</th>
                             <th>Estado</th>
@@ -116,6 +117,7 @@
                             <td>{{ $row['row_number'] }}</td>
                             <td>{{ $row['values']['codigo'] }}</td>
                             <td>{{ $row['values']['nombre'] }}</td>
+                            <td>{{ $row['values']['tipo de compra'] }}</td>
                             <td>{{ $row['values']['empresa'] }}</td>
                             <td>{{ $row['values']['categoria'] }}</td>
                             <td>{{ $row['values']['responsable'] }}</td>
@@ -136,7 +138,7 @@
         <form action="{{ route('cost-centers.import.confirm') }}" method="POST">
             @csrf
             <button type="submit" class="btn btn-primary" {{ $preview['can_import'] ? '' : 'disabled' }}>
-                <i class="ti ti-check me-1"></i> Confirmar importación
+                <i class="ti ti-check me-1"></i> Confirmar importacion
             </button>
         </form>
     </div>

@@ -73,6 +73,15 @@ class CostCenterSeeder extends Seeder
             'ESTACIONES' => 'EST',
         ];
 
+        $purchaseTypes = [
+            'ADMINISTRACION' => 'Gasto Staff',
+            'ENPROYECTO' => 'Gasto Operativo',
+            'STAFF' => 'Gasto Staff',
+            'CORPORATIVO' => 'Gasto Corporativo',
+            'OPERACIONES' => 'Gasto Operativo',
+            'ESTACIONES' => 'Gasto Operativo',
+        ];
+
         // ===== 5) LISTA DE CENTROS DE COSTO =====
         $rows = [
             // ADMINISTRACION
@@ -121,6 +130,7 @@ class CostCenterSeeder extends Seeder
             $catName = $row['category'];
             $name = $row['name'];
             $budgetType = $row['budget_type'] ?? 'ANNUAL';
+            $purchaseType = $row['purchase_type'] ?? ($purchaseTypes[$catName] ?? 'Gasto Operativo');
 
             // Resuelve category_id
             $categoryId = $catId[$catName] ?? null;
@@ -140,6 +150,7 @@ class CostCenterSeeder extends Seeder
                 [
                     'name' => $name,
                     'description' => null,
+                    'purchase_type' => $purchaseType,
                     'category_id' => $categoryId,
                     'company_id' => $company->id, // 🔴 USA EMPRESA EXISTENTE
                     'responsible_user_id' => $defaultUser->id,

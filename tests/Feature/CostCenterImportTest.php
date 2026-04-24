@@ -35,7 +35,7 @@ class CostCenterImportTest extends TestCase
         $path = $binaryFile->getPathname();
         $spreadsheet = IOFactory::load($path);
 
-        $headers = $spreadsheet->getSheet(0)->rangeToArray('A1:K1')[0];
+        $headers = $spreadsheet->getSheet(0)->rangeToArray('A1:L1')[0];
 
         $this->assertSame(CostCenterImportService::HEADERS, $headers);
         $this->assertSame(2, $spreadsheet->getSheetCount());
@@ -52,6 +52,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-100',
                 'nombre' => 'Centro de prueba',
                 'descripcion' => 'Carga masiva annual',
+                'tipo de compra' => 'Gasto Operativo',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",
@@ -67,12 +68,13 @@ class CostCenterImportTest extends TestCase
             ->post(route('cost-centers.import.preview'), ['excel_file' => $file])
             ->assertRedirect(route('cost-centers.import.preview.show'));
 
-        $this->actingAs($authUser)
-            ->get(route('cost-centers.import.preview.show'))
-            ->assertOk()
-            ->assertSee('Listo para importar')
-            ->assertSee('CC-100')
-            ->assertSee('Centro de prueba');
+        $preview = session('cost_center_import.preview');
+
+        $this->assertNotNull($preview);
+        $this->assertTrue($preview['can_import']);
+        $this->assertSame('CC-100', $preview['valid_rows'][0]['values']['codigo']);
+        $this->assertSame('Centro de prueba', $preview['valid_rows'][0]['values']['nombre']);
+        $this->assertSame('Gasto Operativo', $preview['valid_rows'][0]['values']['tipo de compra']);
     }
 
     public function test_preview_rejects_existing_code_in_database(): void
@@ -84,6 +86,7 @@ class CostCenterImportTest extends TestCase
             'code' => 'CC-EXISTE',
             'name' => 'Ya existe',
             'description' => null,
+            'purchase_type' => 'Gasto Staff',
             'company_id' => $company->id,
             'category_id' => $category->id,
             'responsible_user_id' => $responsible->id,
@@ -104,6 +107,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-EXISTE',
                 'nombre' => 'Centro duplicado',
                 'descripcion' => '',
+                'tipo de compra' => 'Gasto Staff',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",
@@ -119,7 +123,7 @@ class CostCenterImportTest extends TestCase
 
         $this->actingAs($authUser)
             ->get(route('cost-centers.import.preview.show'))
-            ->assertSee('El código ya existe en el catálogo actual.');
+            ->assertSee('El cÃ³digo ya existe en el catÃ¡logo actual.');
     }
 
     public function test_preview_rejects_duplicate_codes_inside_file(): void
@@ -132,6 +136,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-DUP',
                 'nombre' => 'Centro 1',
                 'descripcion' => '',
+                'tipo de compra' => 'Gasto Operativo',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",
@@ -145,6 +150,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-DUP',
                 'nombre' => 'Centro 2',
                 'descripcion' => '',
+                'tipo de compra' => 'Gasto Operativo',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",
@@ -160,7 +166,7 @@ class CostCenterImportTest extends TestCase
 
         $this->actingAs($authUser)
             ->get(route('cost-centers.import.preview.show'))
-            ->assertSee('El código está repetido dentro del archivo.');
+            ->assertSee('El cÃ³digo estÃ¡ repetido dentro del archivo.');
     }
 
     public function test_preview_requires_free_consumption_fields(): void
@@ -173,6 +179,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-FREE',
                 'nombre' => 'Centro libre',
                 'descripcion' => '',
+                'tipo de compra' => 'Gasto Corporativo',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",
@@ -190,7 +197,36 @@ class CostCenterImportTest extends TestCase
             ->get(route('cost-centers.import.preview.show'))
             ->assertSee('El monto global es obligatorio para "Consumo Libre".')
             ->assertSee('La fecha de vigencia es obligatoria para "Consumo Libre".')
-            ->assertSee('La justificación es obligatoria para FREE_CONSUMPTION.');
+            ->assertSee('La justificaciÃ³n es obligatoria para FREE_CONSUMPTION.');
+    }
+
+    public function test_preview_rejects_invalid_purchase_type(): void
+    {
+        $authUser = User::factory()->create();
+        [$company, $category, $responsible] = $this->seedCatalogs();
+
+        $file = $this->buildImportFile([
+            [
+                'codigo' => 'CC-TIPO',
+                'nombre' => 'Centro invalido',
+                'descripcion' => '',
+                'tipo de compra' => 'Otro',
+                'empresa' => "{$company->code} - {$company->name}",
+                'categoria' => $category->name,
+                'responsable' => "{$responsible->name} <{$responsible->email}>",
+                'tipo_presupuesto' => 'Presupuesto Anual',
+                'monto_global' => '',
+                'fecha_vigencia' => '',
+                'justificacion_consumo_libre' => '',
+                'estado' => 'ACTIVO',
+            ],
+        ]);
+
+        $this->actingAs($authUser)->post(route('cost-centers.import.preview'), ['excel_file' => $file]);
+
+        $this->actingAs($authUser)
+            ->get(route('cost-centers.import.preview.show'))
+            ->assertSee('El tipo de compra debe ser Gasto Operativo, Gasto Staff o Gasto Corporativo.');
     }
 
     public function test_confirm_import_inserts_valid_rows(): void
@@ -203,6 +239,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-INSERT',
                 'nombre' => 'Centro insertado',
                 'descripcion' => 'Desde Excel',
+                'tipo de compra' => 'Gasto Corporativo',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",
@@ -222,6 +259,7 @@ class CostCenterImportTest extends TestCase
         $this->assertDatabaseHas('cost_centers', [
             'code' => 'CC-INSERT',
             'name' => 'Centro insertado',
+            'purchase_type' => 'Gasto Corporativo',
             'company_id' => $company->id,
             'category_id' => $category->id,
             'responsible_user_id' => $responsible->id,
@@ -241,6 +279,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-BLOCK',
                 'nombre' => 'Centro 1',
                 'descripcion' => '',
+                'tipo de compra' => 'Gasto Staff',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",
@@ -254,6 +293,7 @@ class CostCenterImportTest extends TestCase
                 'codigo' => 'CC-BLOCK',
                 'nombre' => 'Centro 2',
                 'descripcion' => '',
+                'tipo de compra' => 'Gasto Staff',
                 'empresa' => "{$company->code} - {$company->name}",
                 'categoria' => $category->name,
                 'responsable' => "{$responsible->name} <{$responsible->email}>",

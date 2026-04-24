@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enum\PurchaseType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -21,6 +22,7 @@ class CostCenter extends Model
         'code',
         'name',
         'description',
+        'purchase_type',
         'category_id',
         'company_id',
         'responsible_user_id',
@@ -37,6 +39,7 @@ class CostCenter extends Model
     ];
 
     protected $casts = [
+        'purchase_type' => PurchaseType::class,
         'budget_type' => 'string',
         'status' => 'string',
         'global_amount' => 'decimal:2',

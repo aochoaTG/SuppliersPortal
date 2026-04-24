@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enum\PurchaseType;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\CostCenter;
@@ -33,6 +34,7 @@ class CostCenterImportService
         'codigo',
         'nombre',
         'descripcion',
+        'tipo de compra',
         'empresa',
         'categoria',
         'responsable',
@@ -95,6 +97,7 @@ class CostCenterImportService
                     'code' => $row['code'],
                     'name' => $row['name'],
                     'description' => $row['description'],
+                    'purchase_type' => $row['purchase_type'],
                     'company_id' => $row['company_id'],
                     'category_id' => $row['category_id'],
                     'responsible_user_id' => $row['responsible_user_id'],
@@ -135,9 +138,9 @@ class CostCenterImportService
         $captureSheet->setTitle('CentrosCosto');
         $captureSheet->fromArray(self::HEADERS, null, 'A1');
         $captureSheet->freezePane('A2');
-        $captureSheet->setAutoFilter('A1:K1');
+        $captureSheet->setAutoFilter('A1:L1');
 
-        $captureSheet->getStyle('A1:K1')->applyFromArray([
+        $captureSheet->getStyle('A1:L1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
@@ -149,21 +152,22 @@ class CostCenterImportService
             'A' => 18,
             'B' => 30,
             'C' => 40,
-            'D' => 28,
-            'E' => 24,
-            'F' => 34,
-            'G' => 22,
-            'H' => 18,
+            'D' => 18,
+            'E' => 28,
+            'F' => 24,
+            'G' => 34,
+            'H' => 22,
             'I' => 18,
-            'J' => 44,
-            'K' => 18,
+            'J' => 18,
+            'K' => 44,
+            'L' => 18,
         ];
 
         foreach ($columnWidths as $column => $width) {
             $captureSheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $captureSheet->getStyle('I2:I' . self::TEMPLATE_ROW_LIMIT)
+        $captureSheet->getStyle('J2:J' . self::TEMPLATE_ROW_LIMIT)
             ->getNumberFormat()
             ->setFormatCode('yyyy-mm-dd');
 
@@ -175,8 +179,9 @@ class CostCenterImportService
             'A' => $catalogs['companies']->values()->all(),
             'B' => $catalogs['categories']->values()->all(),
             'C' => $catalogs['responsibles']->values()->all(),
-            'D' => array_keys(self::BUDGET_TYPE_OPTIONS),
-            'E' => ['ACTIVO', 'INACTIVO'],
+            'D' => PurchaseType::values(),
+            'E' => array_keys(self::BUDGET_TYPE_OPTIONS),
+            'F' => ['ACTIVO', 'INACTIVO'],
         ];
 
         foreach ($lists as $column => $values) {
@@ -189,11 +194,12 @@ class CostCenterImportService
             }
         }
 
-        $this->applyListValidation($captureSheet, 'D', 'Catalogos!$A$1:$A$' . max(1, $catalogs['companies']->count()));
-        $this->applyListValidation($captureSheet, 'E', 'Catalogos!$B$1:$B$' . max(1, $catalogs['categories']->count()));
-        $this->applyListValidation($captureSheet, 'F', 'Catalogos!$C$1:$C$' . max(1, $catalogs['responsibles']->count()));
-        $this->applyListValidation($captureSheet, 'G', 'Catalogos!$D$1:$D$2');
-        $this->applyListValidation($captureSheet, 'K', 'Catalogos!$E$1:$E$2');
+        $this->applyListValidation($captureSheet, 'D', 'Catalogos!$D$1:$D$' . count(PurchaseType::cases()));
+        $this->applyListValidation($captureSheet, 'E', 'Catalogos!$A$1:$A$' . max(1, $catalogs['companies']->count()));
+        $this->applyListValidation($captureSheet, 'F', 'Catalogos!$B$1:$B$' . max(1, $catalogs['categories']->count()));
+        $this->applyListValidation($captureSheet, 'G', 'Catalogos!$C$1:$C$' . max(1, $catalogs['responsibles']->count()));
+        $this->applyListValidation($captureSheet, 'H', 'Catalogos!$E$1:$E$2');
+        $this->applyListValidation($captureSheet, 'L', 'Catalogos!$F$1:$F$2');
         $this->applyBudgetTypeGuidance($captureSheet);
 
         $captureSheet->setCellValue('A2', '');
@@ -219,7 +225,7 @@ class CostCenterImportService
     private function applyBudgetTypeGuidance(Worksheet $sheet): void
     {
         for ($row = 2; $row <= self::TEMPLATE_ROW_LIMIT; $row++) {
-            foreach (['H', 'I', 'J'] as $column) {
+            foreach (['I', 'J', 'K'] as $column) {
                 $validation = $sheet->getCell("{$column}{$row}")->getDataValidation();
                 $validation->setShowInputMessage(true);
                 $validation->setPromptTitle('Campo condicionado');
@@ -227,14 +233,14 @@ class CostCenterImportService
             }
         }
 
-        $sheet->getStyle('G2:G' . self::TEMPLATE_ROW_LIMIT)->applyFromArray([
+        $sheet->getStyle('H2:H' . self::TEMPLATE_ROW_LIMIT)->applyFromArray([
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FFF2CC'],
             ],
         ]);
 
-        $sheet->getStyle('H2:J' . self::TEMPLATE_ROW_LIMIT)->applyFromArray([
+        $sheet->getStyle('I2:K' . self::TEMPLATE_ROW_LIMIT)->applyFromArray([
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'F3F4F6'],
@@ -381,6 +387,7 @@ class CostCenterImportService
         $code = $this->sanitizeText($values['codigo']);
         $name = $this->sanitizeText($values['nombre']);
         $description = $this->sanitizeNullableText($values['descripcion']);
+        $purchaseType = $this->sanitizeText($values['tipo de compra']);
         $companyLabel = $this->sanitizeText($values['empresa']);
         $categoryLabel = $this->sanitizeText($values['categoria']);
         $responsibleLabel = $this->sanitizeText($values['responsable']);
@@ -409,6 +416,10 @@ class CostCenterImportService
 
         if ($description !== null && mb_strlen($description) > 500) {
             $errors[] = $this->errorEntry($rowNumber, 'descripcion', 'La descripción no debe exceder 500 caracteres.');
+        }
+
+        if (!in_array($purchaseType, PurchaseType::values(), true)) {
+            $errors[] = $this->errorEntry($rowNumber, 'tipo de compra', 'El tipo de compra debe ser Gasto Operativo, Gasto Staff o Gasto Corporativo.');
         }
 
         $company = $catalogs['companies'][$companyLabel] ?? null;
@@ -481,6 +492,7 @@ class CostCenterImportService
                 'code' => $code,
                 'name' => $name,
                 'description' => $description,
+                'purchase_type' => $purchaseType,
                 'company_id' => $company->id,
                 'company_label' => $companyLabel,
                 'category_id' => $category->id,

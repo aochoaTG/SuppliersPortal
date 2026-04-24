@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->string('code', 50)->unique();
             $table->string('name', 200);
             $table->text('description')->nullable();
+            $table->enum('purchase_type', ['Gasto Operativo', 'Gasto Staff', 'Gasto Corporativo']);
 
             // ===== RELACIONES ORGANIZACIONALES =====
             $table->foreignId('company_id')

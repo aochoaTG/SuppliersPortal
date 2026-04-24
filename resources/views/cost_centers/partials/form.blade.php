@@ -1,37 +1,53 @@
 <div class="row g-3">
-    {{-- ===== SECCIÓN 1: DATOS BASE ===== --}}
+    {{-- ===== SECCION 1: DATOS BASE ===== --}}
     <div class="col-md-4">
-        <label for="code" class="form-label">Código <span class="text-danger">*</span></label>
+        <label for="code" class="form-label">Codigo <span class="text-danger">*</span></label>
         <input type="text" class="form-control @error('code') is-invalid @enderror" id="code" name="code"
             value="{{ old('code', $costCenter->code ?? '') }}" placeholder="Ej.: E04188, CORP01, PROY-MIGUEL">
         @error('code')
         <div class="invalid-feedback">{{ $message }}</div>
         @enderror
-        <div class="form-text">Identificador único para reportes/integraciones.</div>
+        <div class="form-text">Identificador unico para reportes/integraciones.</div>
     </div>
 
     <div class="col-md-8">
         <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
         <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name"
-            value="{{ old('name', $costCenter->name ?? '') }}" placeholder="Ej.: Estación 07 Gemela Grande">
+            value="{{ old('name', $costCenter->name ?? '') }}" placeholder="Ej.: Estacion 07 Gemela Grande">
         @error('name')
         <div class="invalid-feedback">{{ $message }}</div>
         @enderror
     </div>
 
-    <div class="col-md-12">
-        <label for="description" class="form-label">Descripción</label>
+    <div class="col-md-8">
+        <label for="description" class="form-label">Descripcion</label>
         <textarea class="form-control @error('description') is-invalid @enderror" id="description" name="description"
-            rows="3" placeholder="Descripción detallada del centro de costo (opcional)">{{ old('description', $costCenter->description ?? '') }}</textarea>
+            rows="3" placeholder="Descripcion detallada del centro de costo (opcional)">{{ old('description', $costCenter->description ?? '') }}</textarea>
         @error('description')
         <div class="invalid-feedback">{{ $message }}</div>
         @enderror
     </div>
 
-    {{-- ===== SECCIÓN 2: RELACIONES ORGANIZACIONALES ===== --}}
+    <div class="col-md-4">
+        <label for="purchase_type" class="form-label">Tipo de Compra <span class="text-danger">*</span></label>
+        <select id="purchase_type" name="purchase_type" class="@error('purchase_type') is-invalid @enderror form-select" required>
+            <option value="">Seleccionar tipo de compra</option>
+            @foreach (['Gasto Operativo', 'Gasto Staff', 'Gasto Corporativo'] as $purchaseType)
+            <option value="{{ $purchaseType }}"
+                {{ old('purchase_type', $costCenter->purchase_type?->value ?? $costCenter->purchase_type ?? '') === $purchaseType ? 'selected' : '' }}>
+                {{ $purchaseType }}
+            </option>
+            @endforeach
+        </select>
+        @error('purchase_type')
+        <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
+    </div>
+
+    {{-- ===== SECCION 2: RELACIONES ORGANIZACIONALES ===== --}}
     <div class="col-12">
         <hr>
-        <h6 class="mb-3"><i class="ti ti-org"></i> Organización</h6>
+        <h6 class="mb-3"><i class="ti ti-org"></i> Organizacion</h6>
     </div>
 
     <div class="col-md-4">
@@ -51,9 +67,9 @@
     </div>
 
     <div class="col-md-4">
-        <label for="category_id" class="form-label">Categoría <span class="text-danger">*</span></label>
+        <label for="category_id" class="form-label">Categoria <span class="text-danger">*</span></label>
         <select id="category_id" name="category_id" class="@error('category_id') is-invalid @enderror form-select">
-            <option value="">-- Selecciona categoría --</option>
+            <option value="">-- Selecciona categoria --</option>
             @foreach ($categories as $cat)
             <option value="{{ $cat->id }}"
                 {{ (int) old('category_id', $costCenter->category_id ?? 0) === (int) $cat->id ? 'selected' : '' }}>
@@ -67,7 +83,7 @@
     </div>
 
     <div class="col-md-4">
-        <label for="responsible_user_id" class="form-label">Responsable (Jefe de Área) <span
+        <label for="responsible_user_id" class="form-label">Responsable (Jefe de Area) <span
                 class="text-danger">*</span></label>
         <select id="responsible_user_id" name="responsible_user_id"
             class="@error('responsible_user_id') is-invalid @enderror form-select">
@@ -82,10 +98,10 @@
         @error('responsible_user_id')
         <div class="invalid-feedback">{{ $message }}</div>
         @enderror
-        <div class="form-text">Jefe de Área responsable de este centro de costo.</div>
+        <div class="form-text">Jefe de Area responsable de este centro de costo.</div>
     </div>
 
-    {{-- ===== SECCIÓN 3: TIPO DE PRESUPUESTO ===== --}}
+    {{-- ===== SECCION 3: TIPO DE PRESUPUESTO ===== --}}
     <div class="col-12">
         <hr>
         <h6 class="mb-3"><i class="ti ti-coin"></i> Presupuesto</h6>
@@ -109,11 +125,10 @@
         @enderror
         <div class="form-text">
             <strong>Anual:</strong> Presupuesto dividido mensualmente.<br>
-            <strong>Consumo Libre:</strong> Monto global sin límites temporales.
+            <strong>Consumo Libre:</strong> Monto global sin limites temporales.
         </div>
     </div>
 
-    {{-- 🆕 MONTO GLOBAL (en la misma fila) --}}
     <div id="freeConsumptionFields" class="col-md-4" style="display: none;">
         <label for="global_amount" class="form-label">Monto Global Autorizado <span class="text-danger">*</span></label>
         <div class="input-group">
@@ -128,7 +143,6 @@
         <div class="form-text">Monto total autorizado para consumo libre.</div>
     </div>
 
-    {{-- 🆕 FECHA DE VIGENCIA (en la misma fila) --}}
     <div id="validityDateField" class="col-md-4" style="display: none;">
         <label for="validity_date" class="form-label">
             Fecha de Vigencia <span class="text-danger">*</span>
@@ -150,26 +164,25 @@
         @enderror
         <div class="form-text">
             @if (auth()->user()->hasRole('superadmin'))
-            Fecha límite de vigencia del centro de consumo libre.
+            Fecha limite de vigencia del centro de consumo libre.
             @else
             Campo bloqueado. Solo modificable por superadministradores.
             @endif
         </div>
     </div>
 
-    {{-- JUSTIFICACIÓN (fila completa abajo) --}}
     <div id="freeConsumptionJustification" class="col-md-12" style="display: none;">
-        <label for="free_consumption_justification" class="form-label">Justificación <span class="text-danger">*</span></label>
+        <label for="free_consumption_justification" class="form-label">Justificacion <span class="text-danger">*</span></label>
         <textarea class="form-control @error('free_consumption_justification') is-invalid @enderror"
             id="free_consumption_justification" name="free_consumption_justification" rows="3"
-            placeholder="Justificación del consumo libre (obra, proyecto, uso continuo, etc.)">{{ old('free_consumption_justification', $costCenter->free_consumption_justification ?? '') }}</textarea>
+            placeholder="Justificacion del consumo libre (obra, proyecto, uso continuo, etc.)">{{ old('free_consumption_justification', $costCenter->free_consumption_justification ?? '') }}</textarea>
         @error('free_consumption_justification')
         <div class="invalid-feedback">{{ $message }}</div>
         @enderror
-        <div class="form-text">Explica por qué este centro requiere consumo libre.</div>
+        <div class="form-text">Explica por que este centro requiere consumo libre.</div>
     </div>
 
-    {{-- ===== SECCIÓN 4: ESTADO ===== --}}
+    {{-- ===== SECCION 4: ESTADO ===== --}}
     <div class="col-12">
         <hr>
         <h6 class="mb-3"><i class="ti ti-status"></i> Estado</h6>
@@ -181,11 +194,11 @@
             <option value="">-- Selecciona estado --</option>
             <option value="ACTIVO"
                 {{ old('status', $costCenter->status ?? 'ACTIVO') === 'ACTIVO' ? 'selected' : '' }}>
-                ✓ Activo
+                Activo
             </option>
             <option value="INACTIVO"
                 {{ old('status', $costCenter->status ?? 'ACTIVO') === 'INACTIVO' ? 'selected' : '' }}>
-                ✗ Inactivo
+                Inactivo
             </option>
         </select>
         @error('status')
@@ -194,26 +207,26 @@
         <div class="form-text">Centros inactivos no pueden usarse en nuevas requisiciones.</div>
     </div>
 
-    {{-- ===== AUDITORÍA (solo lectura en edición) ===== --}}
+    {{-- ===== AUDITORIA (solo lectura en edicion) ===== --}}
     @if ($costCenter->id)
     <div class="col-12">
         <hr>
-        <h6 class="mb-3"><i class="ti ti-history"></i> Auditoría</h6>
+        <h6 class="mb-3"><i class="ti ti-history"></i> Auditoria</h6>
     </div>
 
     <div class="col-md-6">
         <label class="form-label">Creado por</label>
         <div class="form-control-plaintext">
-            {{ $costCenter->createdBy?->name ?? '—' }}
-            <small class="text-muted d-block">{{ $costCenter->created_at?->format('d/m/Y H:i') ?? '—' }}</small>
+            {{ $costCenter->createdBy?->name ?? '-' }}
+            <small class="text-muted d-block">{{ $costCenter->created_at?->format('d/m/Y H:i') ?? '-' }}</small>
         </div>
     </div>
 
     <div class="col-md-6">
-        <label class="form-label">Último cambio</label>
+        <label class="form-label">Ultimo cambio</label>
         <div class="form-control-plaintext">
-            {{ $costCenter->updatedBy?->name ?? '—' }}
-            <small class="text-muted d-block">{{ $costCenter->updated_at?->format('d/m/Y H:i') ?? '—' }}</small>
+            {{ $costCenter->updatedBy?->name ?? '-' }}
+            <small class="text-muted d-block">{{ $costCenter->updated_at?->format('d/m/Y H:i') ?? '-' }}</small>
         </div>
     </div>
 
@@ -221,9 +234,8 @@
     <div class="col-md-6">
         <label class="form-label">Eliminado por</label>
         <div class="form-control-plaintext text-danger">
-            {{ $costCenter->deletedBy?->name ?? '—' }}
-            <small
-                class="text-muted d-block">{{ $costCenter->deleted_at?->format('d/m/Y H:i') ?? '—' }}</small>
+            {{ $costCenter->deletedBy?->name ?? '-' }}
+            <small class="text-muted d-block">{{ $costCenter->deleted_at?->format('d/m/Y H:i') ?? '-' }}</small>
         </div>
     </div>
     @endif
@@ -235,20 +247,17 @@
     document.addEventListener('DOMContentLoaded', function() {
         const budgetTypeSelect = document.getElementById('budget_type');
         const freeConsumptionFields = document.getElementById('freeConsumptionFields');
-        const validityDateField = document.getElementById('validityDateField'); // 🆕
+        const validityDateField = document.getElementById('validityDateField');
         const freeConsumptionJustification = document.getElementById('freeConsumptionJustification');
 
         function toggleFreeConsumptionFields() {
             const isFreeConsumption = budgetTypeSelect.value === 'FREE_CONSUMPTION';
             freeConsumptionFields.style.display = isFreeConsumption ? 'block' : 'none';
-            validityDateField.style.display = isFreeConsumption ? 'block' : 'none'; // 🆕
+            validityDateField.style.display = isFreeConsumption ? 'block' : 'none';
             freeConsumptionJustification.style.display = isFreeConsumption ? 'block' : 'none';
         }
 
-        // Ejecutar al cargar (para edición)
         toggleFreeConsumptionFields();
-
-        // Ejecutar al cambiar
         budgetTypeSelect.addEventListener('change', toggleFreeConsumptionFields);
     });
 </script>
