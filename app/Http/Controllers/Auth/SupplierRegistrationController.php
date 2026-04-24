@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RegisterSupplierRequest;
-use App\Models\User;
 use App\Models\Supplier;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
+use App\Notifications\NewSupplierRegistrationForBuyerNotification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class SupplierRegistrationController extends Controller
 {
@@ -29,11 +29,10 @@ class SupplierRegistrationController extends Controller
                 'first_name' => $data['first_name'],
                 'last_name'  => $data['last_name'],
                 'email'      => $data['email'],
-                'password'   => $data['password'], // se hashea por cast "hashed"
+                'password'   => $data['password'], // Se hashea por cast "hashed".
                 'is_active'  => true,
             ]);
 
-            // (Opcional) asignar rol "supplier"
             if (method_exists($user, 'assignRole')) {
                 $user->assignRole('supplier');
             }
@@ -42,7 +41,7 @@ class SupplierRegistrationController extends Controller
             $repseData = $this->prepareRepseData($data);
 
             // 3) Crear supplier (incluyendo campos REPSE)
-            Supplier::create([
+            $supplier = Supplier::create([
                 'user_id'       => $user->id,
                 'company_name'  => $data['company_name'],
                 'rfc'           => strtoupper($data['rfc']),
@@ -64,11 +63,13 @@ class SupplierRegistrationController extends Controller
                 'default_payment_terms' => $data['default_payment_terms'],
 
                 // Bancarios: null hasta activación
-                'bank_name'     => null,
+                'bank_name'      => null,
                 'account_number' => null,
-                'clabe'         => null,
-                'currency'      => null,
+                'clabe'          => null,
+                'currency'       => null,
             ]);
+
+            $this->notifyBuyersAboutNewSupplier($supplier);
 
             // 4) Login + verificación de correo
             Auth::login($user);
@@ -80,6 +81,42 @@ class SupplierRegistrationController extends Controller
         });
     }
 
+    private function notifyBuyersAboutNewSupplier(Supplier $supplier): void
+    {
+        try {
+            $buyers = User::role('buyer')->get();
+
+            if ($buyers->isEmpty()) {
+                Log::warning('No se encontraron usuarios con rol buyer para notificar nueva alta de proveedor.', [
+                    'supplier_id' => $supplier->id,
+                    'supplier_rfc' => $supplier->rfc,
+                ]);
+
+                return;
+            }
+
+            foreach ($buyers as $buyer) {
+                try {
+                    $buyer->notify(new NewSupplierRegistrationForBuyerNotification($supplier));
+                } catch (\Exception $e) {
+                    Log::error('Error al enviar notificación de nueva alta de proveedor a buyer.', [
+                        'supplier_id' => $supplier->id,
+                        'supplier_rfc' => $supplier->rfc,
+                        'buyer_id' => $buyer->id,
+                        'buyer_email' => $buyer->email,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Error general al notificar a buyers sobre nueva alta de proveedor.', [
+                'supplier_id' => $supplier->id,
+                'supplier_rfc' => $supplier->rfc,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Preparar y limpiar datos REPSE
      */
@@ -87,7 +124,6 @@ class SupplierRegistrationController extends Controller
     {
         $providesSpecializedServices = ($data['provides_specialized_services'] ?? 0) == 1;
 
-        // Si no presta servicios especializados, limpiar todos los campos REPSE
         if (!$providesSpecializedServices) {
             return [
                 'provides_specialized_services' => false,
@@ -97,12 +133,9 @@ class SupplierRegistrationController extends Controller
             ];
         }
 
-        // Si presta servicios especializados, procesar los datos
         $specializedServices = $data['specialized_services_types'] ?? [];
 
-        // Si seleccionó "otros", agregar la descripción
         if (in_array('otros', $specializedServices) && !empty($data['otros_descripcion'])) {
-            // Reemplazar "otros" con la descripción personalizada
             $key = array_search('otros', $specializedServices);
             if ($key !== false) {
                 $specializedServices[$key] = 'otros: ' . trim($data['otros_descripcion']);
@@ -128,7 +161,6 @@ class SupplierRegistrationController extends Controller
 
         $number = strtoupper(trim($number));
 
-        // Si no empieza con "REPSE-", agregarlo
         if (!str_starts_with($number, 'REPSE-')) {
             $number = 'REPSE-' . $number;
         }
