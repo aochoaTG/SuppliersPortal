@@ -177,15 +177,14 @@ document.addEventListener('DOMContentLoaded', function() {
         templateResult: function(option) {
             if (!option.id) return option.text;
             const el = option.element;
-            return $(`<div>
-                <small class="text-muted">[${el.dataset.categoryCode}] ${el.dataset.categoryName}</small>
-                <div>${el.dataset.name}</div>
-            </div>`);
+            return $(`<span class="d-inline-block text-wrap">
+                [${el.dataset.categoryCode}] ${el.dataset.categoryName} - ${el.dataset.name}
+            </span>`);
         },
         templateSelection: function(option) {
             if (!option.id) return option.text;
             const el = option.element;
-            return $(`<span><small class="text-muted me-1">[${el.dataset.categoryCode}]</small>${el.dataset.name}</span>`);
+            return $(`<span>[${el.dataset.categoryCode}] ${el.dataset.categoryName} - ${el.dataset.name}</span>`);
         }
     });
 

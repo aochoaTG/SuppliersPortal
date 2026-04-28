@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" data-sidenav-size="compact">
+<html lang="es" data-sidenav-size="default">
 
     <head>
         <meta charset="utf-8" />
