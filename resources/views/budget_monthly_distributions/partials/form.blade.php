@@ -1,5 +1,6 @@
 @php
     $selectedCategoryIds = collect($selectedCategoryIds ?? [])->map(fn ($id) => (int) $id)->values();
+    $selectedCedulas = collect($selectedCedulas ?? []);
     $categories = $cedulasByCategory->map(function ($cedulas) {
         $category = $cedulas->first()->expenseCategory;
 
