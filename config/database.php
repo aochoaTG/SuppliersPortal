@@ -108,9 +108,8 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'encrypt' => 'false',
-            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'true'),
-            // Agregar estas opciones
+            'encrypt' => env('DB_ENCRYPT', 'no'),
+            'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'yes'),
             'options' => [
                 PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8,
             ],

@@ -237,29 +237,8 @@ class DirectPurchaseOrderController extends Controller
                 'approved_at' => now(),
             ]);
 
-            // 3. Comprometer presupuesto en cada categoría
-            $date = \Carbon\Carbon::parse($monthStr . '-01');
-            $budget = \App\Models\AnnualBudget::where('cost_center_id', $costCenterId)
-                ->where('fiscal_year', $date->year)
-                ->where('status', 'APROBADO')
-                ->with(['monthlyDistributions' => fn($q) => $q->where('month', $date->month)])
-                ->first();
-
-            foreach ($itemsByCategory as $categoryId => $items) {
-                $amountToCommit = (float) $items->sum('total');
-
-                if ($budget) {
-                    $distribution = $budget->monthlyDistributions
-                        ->where('expense_category_id', $categoryId)
-                        ->first();
-
-                    if ($distribution) {
-                        if (!$distribution->commitAmount($amountToCommit)) {
-                            throw new \Exception('No se pudo comprometer el presupuesto para la categoría: ' . ($items->first()->expenseCategory->name ?? $categoryId));
-                        }
-                    }
-                }
-            }
+            // 3. Comprometer presupuesto respetando la distribución por cédula.
+            $this->budgetAllocationService->commitOrder($directPurchaseOrder);
 
             // 4. Registrar en el historial
             $directPurchaseOrder->approvals()->create([
@@ -371,27 +350,7 @@ class DirectPurchaseOrderController extends Controller
 
             // Si viene de ISSUED, liberar el presupuesto comprometido
             if ($comingFromIssued) {
-                $itemsByCategory = $directPurchaseOrder->items->groupBy('expense_category_id');
-                $costCenterId    = $directPurchaseOrder->cost_center_id;
-                $date            = \Carbon\Carbon::parse($directPurchaseOrder->application_month . '-01');
-
-                $budget = \App\Models\AnnualBudget::where('cost_center_id', $costCenterId)
-                    ->where('fiscal_year', $date->year)
-                    ->where('status', 'APROBADO')
-                    ->with(['monthlyDistributions' => fn($q) => $q->where('month', $date->month)])
-                    ->first();
-
-                if ($budget) {
-                    foreach ($itemsByCategory as $categoryId => $items) {
-                        $distribution = $budget->monthlyDistributions
-                            ->where('expense_category_id', $categoryId)
-                            ->first();
-
-                        if ($distribution) {
-                            $distribution->releaseCommitment((float) $items->sum('total'));
-                        }
-                    }
-                }
+                $this->budgetAllocationService->releaseOrder($directPurchaseOrder);
             }
 
             $directPurchaseOrder->update([
@@ -623,38 +582,13 @@ class DirectPurchaseOrderController extends Controller
             $month = $date->month;
 
             // 2. Buscar el presupuesto anual para este CC y Año
-            $budget = \App\Models\AnnualBudget::where('cost_center_id', $costCenterId)
-                ->where('fiscal_year', $year)
-                ->where('status', 'APROBADO')
-                ->first();
-
-            if (!$budget) {
-                return [
-                    'available' => false,
-                    'message' => 'No existe un presupuesto aprobado para el centro de costo y año fiscal seleccionados.',
-                ];
-            }
-
-            // 3. Obtener disponible para el mes y categoría
-            $available = $budget->getAvailableForMonthAndCategory($month, $categoryId);
-
-            if ($available < $requiredAmount) {
-                return [
-                    'available' => false,
-                    'message' => sprintf(
-                        'Presupuesto insuficiente para la categoría seleccionada en el mes %d. Disponible: $%s, Requerido: $%s, Faltante: $%s',
-                        $month,
-                        number_format($available, 2),
-                        number_format($requiredAmount, 2),
-                        number_format($requiredAmount - $available, 2)
-                    ),
-                ];
-            }
-
-            return [
-                'available' => true,
-                'message' => 'Presupuesto disponible.',
-            ];
+            return $this->budgetAllocationService->checkAvailability(
+                (int) $costCenterId,
+                (int) $year,
+                (int) $month,
+                (int) $categoryId,
+                (float) $requiredAmount
+            );
         } catch (\Exception $e) {
             return [
                 'available' => false,

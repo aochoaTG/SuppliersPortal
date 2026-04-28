@@ -34,6 +34,11 @@ class BudgetCedula extends Model
         return $this->belongsTo(ExpenseCategory::class);
     }
 
+    public function monthlyDistributions()
+    {
+        return $this->hasMany(BudgetMonthlyDistribution::class, 'budget_cedula_id');
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');

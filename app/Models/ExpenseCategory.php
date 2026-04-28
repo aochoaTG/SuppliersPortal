@@ -51,6 +51,11 @@ class ExpenseCategory extends Model
         return $this->hasMany(BudgetMonthlyDistribution::class);
     }
 
+    public function cedulas()
+    {
+        return $this->hasMany(BudgetCedula::class, 'expense_category_id');
+    }
+
     /**
      * Distribuciones mensuales presupuestales que usan esta categoría
      * 

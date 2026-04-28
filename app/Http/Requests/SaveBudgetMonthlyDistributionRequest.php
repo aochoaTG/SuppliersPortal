@@ -3,8 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Models\AnnualBudget;
+use App\Models\BudgetCedula;
 use App\Models\BudgetMonthlyDistribution;
-use App\Models\ExpenseCategory;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SaveBudgetMonthlyDistributionRequest extends FormRequest
@@ -19,39 +19,16 @@ class SaveBudgetMonthlyDistributionRequest extends FormRequest
         $isUpdate = $this->route('annual_budget') !== null;
 
         $rules = [
-            'annual_budget_id' => [
-                'required',
-                'integer',
-                'exists:annual_budgets,id',
-            ],
-            'distributions' => [
-                'required',
-                'array',
-            ],
+            'annual_budget_id' => ['required', 'integer', 'exists:annual_budgets,id'],
+            'distributions' => ['required', 'array'],
         ];
 
         if ($isUpdate) {
-            $rules['distributions.*.id'] = [
-                'required',
-                'integer',
-                'exists:budget_monthly_distributions,id',
-            ];
-            $rules['distributions.*.assigned_amount'] = [
-                'required',
-                'numeric',
-                'min:0',
-            ];
+            $rules['distributions.*.id'] = ['required', 'integer', 'exists:budget_monthly_distributions,id'];
+            $rules['distributions.*.assigned_amount'] = ['required', 'numeric', 'min:0'];
         } else {
-            $rules['distributions.*'] = [
-                'required',
-                'array',
-                'size:12',
-            ];
-            $rules['distributions.*.*'] = [
-                'required',
-                'numeric',
-                'min:0',
-            ];
+            $rules['distributions.*'] = ['required', 'array', 'size:12'];
+            $rules['distributions.*.*'] = ['required', 'numeric', 'min:0'];
         }
 
         return $rules;
@@ -62,18 +39,13 @@ class SaveBudgetMonthlyDistributionRequest extends FormRequest
         return [
             'annual_budget_id.required' => 'El presupuesto anual es obligatorio.',
             'annual_budget_id.exists' => 'El presupuesto anual seleccionado no existe.',
-
             'distributions.required' => 'Debe proporcionar las distribuciones mensuales.',
             'distributions.array' => 'El formato de las distribuciones es inválido.',
-
-            // Store
-            'distributions.*.array' => 'Cada categoría debe tener 12 meses de distribución.',
-            'distributions.*.size' => 'Cada categoría debe tener exactamente 12 meses.',
+            'distributions.*.array' => 'Cada cédula debe tener 12 meses de distribución.',
+            'distributions.*.size' => 'Cada cédula debe tener exactamente 12 meses.',
             'distributions.*.*.required' => 'Todos los montos mensuales son obligatorios.',
             'distributions.*.*.numeric' => 'Los montos deben ser valores numéricos.',
             'distributions.*.*.min' => 'Los montos no pueden ser negativos.',
-
-            // Update
             'distributions.*.id.required' => 'El ID de la distribución es obligatorio.',
             'distributions.*.id.exists' => 'La distribución seleccionada no existe.',
             'distributions.*.assigned_amount.required' => 'El monto asignado es obligatorio.',
@@ -99,7 +71,7 @@ class SaveBudgetMonthlyDistributionRequest extends FormRequest
 
             $annualBudget = AnnualBudget::find($this->annual_budget_id);
 
-            if (!$annualBudget) {
+            if (! $annualBudget) {
                 $validator->errors()->add('annual_budget_id', 'El presupuesto anual no existe.');
                 return;
             }
@@ -115,32 +87,33 @@ class SaveBudgetMonthlyDistributionRequest extends FormRequest
 
             if ($this->route('annual_budget') !== null) {
                 $this->validateUpdate($validator, $annualBudget);
-            } else {
-                $this->validateStore($validator);
+                return;
             }
+
+            $this->validateStore($validator);
         });
     }
 
     protected function validateStore($validator): void
     {
-        $categoryIds = array_keys($this->distributions);
-        $existingCategories = ExpenseCategory::whereIn('id', $categoryIds)->pluck('id')->toArray();
+        $cedulaIds = array_keys($this->distributions);
+        $existingCedulas = BudgetCedula::whereIn('id', $cedulaIds)->pluck('id')->all();
 
-        foreach ($categoryIds as $categoryId) {
-            if (!in_array($categoryId, $existingCategories)) {
+        foreach ($cedulaIds as $cedulaId) {
+            if (! in_array($cedulaId, $existingCedulas)) {
                 $validator->errors()->add(
-                    "distributions.{$categoryId}",
-                    "La categoría de gasto con ID {$categoryId} no existe."
+                    "distributions.{$cedulaId}",
+                    "La cédula presupuestaria con ID {$cedulaId} no existe."
                 );
             }
         }
 
-        foreach ($this->distributions as $categoryId => $months) {
+        foreach ($this->distributions as $cedulaId => $months) {
             foreach ($months as $month => $amount) {
                 if ($month < 1 || $month > 12) {
                     $validator->errors()->add(
-                        "distributions.{$categoryId}.{$month}",
-                        "El mes debe estar entre 1 y 12."
+                        "distributions.{$cedulaId}.{$month}",
+                        'El mes debe estar entre 1 y 12.'
                     );
                 }
             }
@@ -156,7 +129,7 @@ class SaveBudgetMonthlyDistributionRequest extends FormRequest
             ->toArray();
 
         foreach ($distributionIds as $distId) {
-            if (!in_array($distId, $validDistributions)) {
+            if (! in_array($distId, $validDistributions)) {
                 $validator->errors()->add(
                     "distributions.{$distId}",
                     "La distribución con ID {$distId} no pertenece al presupuesto anual especificado."
@@ -167,43 +140,43 @@ class SaveBudgetMonthlyDistributionRequest extends FormRequest
         foreach ($this->distributions as $index => $distData) {
             $distribution = BudgetMonthlyDistribution::find($distData['id']);
 
-            if ($distribution) {
-                $minimumRequired = (float) $distribution->consumed_amount
-                    + (float) $distribution->committed_amount;
+            if (! $distribution) {
+                continue;
+            }
 
-                $newAmount = (float) $distData['assigned_amount'];
+            $minimumRequired = (float) $distribution->consumed_amount + (float) $distribution->committed_amount;
+            $newAmount = (float) $distData['assigned_amount'];
 
-                if ($newAmount < $minimumRequired) {
-                    $validator->errors()->add(
-                        "distributions.{$index}.assigned_amount",
-                        "El monto asignado no puede ser menor a la suma de consumido (" .
-                            number_format($distribution->consumed_amount, 2) .
-                            ") + comprometido (" .
-                            number_format($distribution->committed_amount, 2) .
-                            "). Mínimo requerido: $" . number_format($minimumRequired, 2)
-                    );
-                }
+            if ($newAmount < $minimumRequired) {
+                $validator->errors()->add(
+                    "distributions.{$index}.assigned_amount",
+                    'El monto asignado no puede ser menor a la suma de consumido ('
+                    . number_format($distribution->consumed_amount, 2)
+                    . ') + comprometido ('
+                    . number_format($distribution->committed_amount, 2)
+                    . '). Mínimo requerido: $'
+                    . number_format($minimumRequired, 2)
+                );
             }
         }
     }
 
     protected function prepareForValidation(): void
     {
-        // Solo aplica para store (matriz category => months)
-        if ($this->route('annual_budget') === null && $this->has('distributions')) {
-            $distributions = [];
-
-            foreach ($this->distributions as $categoryId => $months) {
-                $distributions[(int) $categoryId] = [];
-
-                foreach ($months as $month => $amount) {
-                    $distributions[(int) $categoryId][(int) $month] = $amount;
-                }
-            }
-
-            $this->merge([
-                'distributions' => $distributions,
-            ]);
+        if ($this->route('annual_budget') !== null || ! $this->has('distributions')) {
+            return;
         }
+
+        $distributions = [];
+
+        foreach ($this->distributions as $cedulaId => $months) {
+            $distributions[(int) $cedulaId] = [];
+
+            foreach ($months as $month => $amount) {
+                $distributions[(int) $cedulaId][(int) $month] = $amount;
+            }
+        }
+
+        $this->merge(['distributions' => $distributions]);
     }
 }

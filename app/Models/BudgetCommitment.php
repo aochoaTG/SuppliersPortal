@@ -18,6 +18,7 @@ class BudgetCommitment extends Model
         'cost_center_id',
         'application_month',
         'expense_category_id',
+        'budget_cedula_id',
         'committed_amount',
         'status',
         'committed_at',
@@ -56,6 +57,11 @@ class BudgetCommitment extends Model
     public function expenseCategory(): BelongsTo
     {
         return $this->belongsTo(ExpenseCategory::class);
+    }
+
+    public function budgetCedula(): BelongsTo
+    {
+        return $this->belongsTo(BudgetCedula::class, 'budget_cedula_id');
     }
 
     /**

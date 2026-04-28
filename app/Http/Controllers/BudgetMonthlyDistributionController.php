@@ -2,187 +2,134 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SaveBudgetMonthlyDistributionRequest;
 use App\Models\AnnualBudget;
 use App\Models\BudgetCedula;
 use App\Models\BudgetMonthlyDistribution;
-use App\Models\ExpenseCategory;
-use App\Http\Requests\SaveBudgetMonthlyDistributionRequest;
+use App\Services\BudgetCategorySummaryService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Yajra\DataTables\Facades\DataTables;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Log;
 
 class BudgetMonthlyDistributionController extends Controller
 {
-    /**
-     * Listar distribuciones mensuales de un presupuesto anual.
-     */
+    public function __construct(
+        private readonly BudgetCategorySummaryService $categorySummaryService
+    ) {
+    }
+
     public function index(Request $request): View
     {
         $budgetId = $request->query('annual_budget_id');
 
         $budget = null;
         if ($budgetId) {
-            $budget = AnnualBudget::with('costCenter.company')
+            $budget = AnnualBudget::with(['costCenter.company', 'monthlyDistributions'])
                 ->findOrFail($budgetId);
         }
 
-        // Cargar todos los presupuestos anuales para el filtro usando el scope withDetails
         $budgets = AnnualBudget::withDetails()->get();
 
         return view('budget_monthly_distributions.index', compact('budget', 'budgets'));
     }
 
-    /**
-     * Endpoint DataTable: distribuciones mensuales.
-     */
     public function datatable(Request $request)
     {
         $budgetId = $request->query('annual_budget_id');
 
-        if (!$budgetId) {
+        if (! $budgetId) {
             return response()->json(['error' => 'Budget ID requerido'], 400);
         }
 
-        $query = BudgetMonthlyDistribution::query()
-            ->with([
-                'annualBudget:id,cost_center_id,fiscal_year',
-                'expenseCategory:id,code,name',
-                'createdBy:id,name',
-            ])
-            ->where('annual_budget_id', $budgetId)
-            ->notDeleted();
-        // 🔴 QUITAR LOS orderBy() de aquí
-        // ->orderBy('month')
-        // ->orderBy('expense_category_id');
+        $budget = $this->loadBudgetWithDistributions((int) $budgetId);
+        $rows = $this->buildMonthlyCategoryRows($budget);
 
-        return DataTables::of($query)
-            // ===== COLUMNA: MES =====
-            ->addColumn('month_label', fn(BudgetMonthlyDistribution $row) => $row->month_label)
+        return DataTables::of($rows)
+            ->addColumn('month_label', fn (array $row) => $row['month_label'])
+            ->addColumn('category_code', fn (array $row) => e("[{$row['category_code']}] {$row['category_name']}"))
+            ->addColumn('assigned_amount', fn (array $row) => '$' . number_format($row['assigned_amount'], 2))
+            ->addColumn('consumed_amount', fn (array $row) => '$' . number_format($row['consumed_amount'], 2))
+            ->addColumn('committed_amount', fn (array $row) => '$' . number_format($row['committed_amount'], 2))
+            ->addColumn('available_amount', function (array $row) {
+                $value = number_format($row['available_amount'], 2);
+                $class = $row['available_amount'] > 0
+                    ? 'badge bg-success'
+                    : 'badge bg-warning text-dark';
 
-            // ===== COLUMNA: CATEGORÍA =====
-            ->addColumn('category_code', function (BudgetMonthlyDistribution $row) {
-                $code = $row->expenseCategory?->code ?? '—';
-                $name = $row->expenseCategory?->name ?? '—';
-                return e("[$code] $name");
+                return '<span class="' . $class . '">$' . $value . '</span>';
             })
-
-            // ===== COLUMNA: ASIGNADO =====
-            ->editColumn('assigned_amount', function (BudgetMonthlyDistribution $row) {
-                return '$' . number_format((float) $row->assigned_amount, 2);
-            })
-
-            // ===== COLUMNA: CONSUMIDO =====
-            ->editColumn('consumed_amount', function (BudgetMonthlyDistribution $row) {
-                return '$' . number_format((float) $row->consumed_amount, 2);
-            })
-
-            // ===== COLUMNA: COMPROMETIDO =====
-            ->editColumn('committed_amount', function (BudgetMonthlyDistribution $row) {
-                return '$' . number_format((float) $row->committed_amount, 2);
-            })
-
-            // ===== COLUMNA: DISPONIBLE =====
-            ->addColumn('available_amount', function (BudgetMonthlyDistribution $row) {
-                $available = $row->getAvailableAmount();
-                $val = number_format($available, 2);
-
-                $class = 'badge bg-secondary';
-                if ($available > 0)
-                    $class = 'badge bg-success';
-                if ($available == 0.0)
-                    $class = 'badge bg-warning text-dark';
-                if ($available < 0)
-                    $class = 'badge bg-danger';
-
-                return '<span class="' . $class . '">$' . $val . '</span>';
-            })
-
-            // ===== COLUMNA: % UTILIZACIÓN =====
-            ->addColumn('usage_percentage', function (BudgetMonthlyDistribution $row) {
-                $pct = number_format($row->getUsagePercentage(), 1);
+            ->addColumn('usage_percentage', function (array $row) {
+                $pct = number_format($row['usage_percentage'], 1);
                 $class = match (true) {
-                    $row->getUsagePercentage() > 90 => 'badge bg-danger',
-                    $row->getUsagePercentage() > 70 => 'badge bg-warning text-dark',
+                    $row['usage_percentage'] > 90 => 'badge bg-danger',
+                    $row['usage_percentage'] > 70 => 'badge bg-warning text-dark',
                     default => 'badge bg-success',
                 };
+
                 return '<span class="' . $class . '">' . $pct . '%</span>';
             })
-
-            // ===== COLUMNA: ESTADO =====
-            ->addColumn('status_label', fn(BudgetMonthlyDistribution $row) => $row->status_label)
-
-            // 🔴 AGREGAR EL ORDER BY AQUÍ (después de procesar columnas)
-            ->orderColumn('month', function ($query, $direction) {
-                $query->orderBy('month', $direction);
-            })
-            ->orderColumn('expense_category_id', function ($query, $direction) {
-                $query->orderBy('expense_category_id', $direction);
-            })
-
+            ->addColumn('status_label', fn (array $row) => $this->statusBadge($row['status']))
             ->rawColumns(['available_amount', 'usage_percentage', 'status_label'])
             ->make(true);
     }
 
-    /**
-     * Mostrar formulario para crear distribuciones mensuales.
-     */
     public function create(AnnualBudget $annualBudget): View|RedirectResponse
     {
-        // Cargar la relación si no está cargada
         $annualBudget->loadMissing(['costCenter.company']);
 
-        // Verificar que el presupuesto esté en PLANIFICACION
         if ($annualBudget->status !== 'PLANIFICACION') {
             return redirect()
                 ->route('annual_budgets.show', $annualBudget->id)
                 ->with('error', 'Solo se pueden crear distribuciones para presupuestos en estado PLANIFICACION.');
         }
 
-        // Verificar si ya existen distribuciones
-        $existingCount = $annualBudget->monthlyDistributions()->count();
-        if ($existingCount > 0) {
+        if ($annualBudget->monthlyDistributions()->exists()) {
             return redirect()
                 ->route('budget_monthly_distributions.edit', $annualBudget->id)
                 ->with('info', 'Este presupuesto ya tiene distribuciones. Redirigiendo a edición.');
         }
 
-        $allCedulas = BudgetCedula::with('expenseCategory')
-            ->active()
-            ->notDeleted()
-            ->orderBy('expense_category_id')
-            ->orderBy('name')
-            ->get();
+        [$allCedulas, $cedulasByCategory] = $this->getCedulaCatalog();
 
-        $selectedCedulas = collect();
-        $distributions   = [];
-
-        return view('budget_monthly_distributions.create', compact('annualBudget', 'allCedulas', 'selectedCedulas', 'distributions'));
+        return view('budget_monthly_distributions.create', [
+            'annualBudget' => $annualBudget,
+            'allCedulas' => $allCedulas,
+            'cedulasByCategory' => $cedulasByCategory,
+            'selectedCategoryIds' => [],
+            'distributions' => [],
+            'isEdit' => false,
+        ]);
     }
 
-    /**
-     * Guardar distribuciones mensuales masivamente.
-     */
     public function store(SaveBudgetMonthlyDistributionRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-
         $budget = AnnualBudget::findOrFail($validated['annual_budget_id']);
+        $cedulas = BudgetCedula::with('expenseCategory')
+            ->whereIn('id', array_keys($validated['distributions']))
+            ->get()
+            ->keyBy('id');
 
         try {
             DB::beginTransaction();
 
-            // Crear distribuciones masivamente
-            $distributionsData = [];
-            foreach ($validated['distributions'] as $categoryId => $months) {
+            $rows = [];
+            foreach ($validated['distributions'] as $cedulaId => $months) {
+                $cedula = $cedulas->get((int) $cedulaId);
+                if (! $cedula) {
+                    continue;
+                }
+
                 foreach ($months as $month => $amount) {
-                    $distributionsData[] = [
+                    $rows[] = [
                         'annual_budget_id' => $budget->id,
-                        'expense_category_id' => $categoryId,
-                        'month' => $month,
+                        'budget_cedula_id' => (int) $cedulaId,
+                        'expense_category_id' => $cedula->expense_category_id,
+                        'month' => (int) $month,
                         'assigned_amount' => $amount,
                         'consumed_amount' => 0,
                         'committed_amount' => 0,
@@ -193,90 +140,61 @@ class BudgetMonthlyDistributionController extends Controller
                 }
             }
 
-            // Insertar todas las distribuciones de una vez
-            BudgetMonthlyDistribution::insert($distributionsData);
+            BudgetMonthlyDistribution::insert($rows);
 
             DB::commit();
 
             return redirect()
                 ->route('annual_budgets.show', $budget->id)
-                ->with('success', 'Distribuciones mensuales creadas exitosamente.');
-        } catch (\Exception $e) {
+                ->with('success', 'Distribuciones mensuales por cédula creadas exitosamente.');
+        } catch (\Throwable $e) {
             DB::rollBack();
 
-            return redirect()
-                ->back()
+            return back()
                 ->withInput()
                 ->with('error', 'Error al guardar las distribuciones: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Muestra el formulario para editar las distribuciones mensuales de un presupuesto anual.
-     *
-     * @param AnnualBudget $annual_budget Instancia del presupuesto anual a editar
-     * @return View Vista con el formulario de edición
-     */
     public function edit(AnnualBudget $annual_budget): View
     {
-        // Cargar relaciones necesarias para la vista
-        // - Centro de costo con su compañía asociada
-        // - Distribuciones mensuales con sus categorías de gasto
-        $annualBudget = $annual_budget->load([
-            'costCenter.company',
-            'monthlyDistributions.expenseCategory'
-        ]);
+        $annualBudget = $this->loadBudgetWithDistributions($annual_budget->id);
+        [$allCedulas, $cedulasByCategory] = $this->getCedulaCatalog();
 
-        $allCedulas = BudgetCedula::with('expenseCategory')
-            ->active()
-            ->notDeleted()
-            ->orderBy('expense_category_id')
-            ->orderBy('name')
-            ->get();
-
-        $selectedCedulas = collect();
-
-        // Inicializar array para organizar las distribuciones existentes
-        // La estructura será: [category_id][month] = datos_distribución
         $distributions = [];
-
-        // Procesar cada distribución mensual existente
         foreach ($annualBudget->monthlyDistributions as $dist) {
-            $distributions[$dist->expense_category_id][$dist->month] = [
+            $distributions[$dist->budget_cedula_id][$dist->month] = [
                 'id' => $dist->id,
-                'assigned_amount' => (float)$dist->assigned_amount,    // Monto asignado
-                'consumed_amount' => (float)$dist->consumed_amount,    // Monto consumido
-                'committed_amount' => (float)$dist->committed_amount,  // Monto comprometido
-                'available_amount' => $dist->getAvailableAmount(),     // Monto disponible (calculado)
+                'assigned_amount' => (float) $dist->assigned_amount,
+                'consumed_amount' => (float) $dist->consumed_amount,
+                'committed_amount' => (float) $dist->committed_amount,
+                'available_amount' => $dist->getAvailableAmount(),
             ];
         }
 
-        // 🔴 NO pre-llenamos todas las categorías, solo las que tienen distribuciones
-        // La matriz se generará dinámicamente en JavaScript según categorías seleccionadas
-
         return view('budget_monthly_distributions.edit', [
-            'annualBudget'    => $annualBudget,
-            'allCedulas'      => $allCedulas,
-            'selectedCedulas' => $selectedCedulas,
-            'distributions'   => $distributions,
-            'isEdit'          => true,
+            'annualBudget' => $annualBudget,
+            'allCedulas' => $allCedulas,
+            'cedulasByCategory' => $cedulasByCategory,
+            'selectedCategoryIds' => $annualBudget->monthlyDistributions
+                ->pluck('expense_category_id')
+                ->unique()
+                ->values()
+                ->all(),
+            'distributions' => $distributions,
+            'isEdit' => true,
         ]);
     }
 
-    /**
-     * Actualizar distribuciones mensuales masivamente.
-     */
-    public function update(SaveBudgetMonthlyDistributionRequest $request, AnnualBudget $annual_budget)
+    public function update(SaveBudgetMonthlyDistributionRequest $request, AnnualBudget $annual_budget): RedirectResponse
     {
         $validated = $request->validated();
 
         try {
             DB::beginTransaction();
 
-            // Actualizar cada distribución
             foreach ($validated['distributions'] as $distData) {
                 $distribution = BudgetMonthlyDistribution::findOrFail($distData['id']);
-
                 $distribution->update([
                     'assigned_amount' => $distData['assigned_amount'],
                     'updated_by' => Auth::id(),
@@ -288,24 +206,20 @@ class BudgetMonthlyDistributionController extends Controller
             return redirect()
                 ->route('annual_budgets.show', $annual_budget->id)
                 ->with('success', 'Distribuciones mensuales actualizadas exitosamente.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
 
-            return redirect()
-                ->back()
+            return back()
                 ->withInput()
                 ->with('error', 'Error al actualizar las distribuciones: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Ver detalle de una distribución mensual.
-     */
     public function show(BudgetMonthlyDistribution $budget_monthly_distribution): View
     {
         $distribution = $budget_monthly_distribution->load([
             'annualBudget.costCenter.company',
-            'expenseCategory',
+            'budgetCedula.expenseCategory',
             'createdBy',
             'updatedBy',
         ]);
@@ -313,48 +227,19 @@ class BudgetMonthlyDistributionController extends Controller
         return view('budget_monthly_distributions.show', compact('distribution'));
     }
 
-    /**
-     * Obtener distribuciones de un presupuesto (JSON API).
-     * Útil para AJAX y selectores dinámicos.
-     */
     public function getByBudget(AnnualBudget $annual_budget)
     {
-        $distributions = $annual_budget->monthlyDistributions()
-            ->with('expenseCategory:id,code,name')
-            ->notDeleted()
-            ->orderBy('month')
-            ->get()
-            ->map(function ($dist) {
-                return [
-                    'id' => $dist->id,
-                    'month' => $dist->month,
-                    'month_label' => $dist->month_label,
-                    'category_code' => $dist->expenseCategory->code,
-                    'category_name' => $dist->expenseCategory->name,
-                    'assigned_amount' => (float) $dist->assigned_amount,
-                    'consumed_amount' => (float) $dist->consumed_amount,
-                    'committed_amount' => (float) $dist->committed_amount,
-                    'available_amount' => $dist->getAvailableAmount(),
-                    'usage_percentage' => $dist->getUsagePercentage(),
-                    'status' => $dist->status,
-                ];
-            });
+        $budget = $this->loadBudgetWithDistributions($annual_budget->id);
 
-        return response()->json($distributions);
+        return response()->json($this->buildMonthlyCategoryRows($budget)->values());
     }
 
-    /**
-     * Obtener distribución por mes y categoría (JSON API).
-     * Útil para validación presupuestal en requisiciones.
-     */
     public function checkAvailability(AnnualBudget $annual_budget, int $month, int $categoryId)
     {
-        $distribution = $annual_budget->monthlyDistributions()
-            ->where('month', $month)
-            ->where('expense_category_id', $categoryId)
-            ->first();
+        $budget = $this->loadBudgetWithDistributions($annual_budget->id);
+        $summary = $this->categorySummaryService->forBudgetMonthAndCategory($budget, $month, $categoryId);
 
-        if (!$distribution) {
+        if (! $summary) {
             return response()->json([
                 'available' => false,
                 'message' => 'No existe distribución para este mes y categoría.',
@@ -363,46 +248,98 @@ class BudgetMonthlyDistributionController extends Controller
 
         return response()->json([
             'available' => true,
-            'assigned_amount' => (float) $distribution->assigned_amount,
-            'consumed_amount' => (float) $distribution->consumed_amount,
-            'committed_amount' => (float) $distribution->committed_amount,
-            'available_amount' => $distribution->getAvailableAmount(),
-            'can_commit' => fn($amount) => $distribution->canCommit($amount),
+            'assigned_amount' => $summary['assigned_amount'],
+            'consumed_amount' => $summary['consumed_amount'],
+            'committed_amount' => $summary['committed_amount'],
+            'available_amount' => $summary['available_amount'],
         ]);
     }
 
-    /**
-     * Matriz mensual (mes x categoría) para un presupuesto.
-     * Vista tabular para análisis rápido.
-     */
     public function matrix(AnnualBudget $annual_budget): View
     {
-        $annual_budget->load('costCenter.company', 'monthlyDistributions.expenseCategory');
-
-        // Obtener todas las categorías
-        $categories = $annual_budget->monthlyDistributions()
-            ->distinct()
+        $budget = $this->loadBudgetWithDistributions($annual_budget->id);
+        $categories = $budget->monthlyDistributions
             ->pluck('expenseCategory')
-            ->sortBy('code');
+            ->filter()
+            ->unique('id')
+            ->sortBy('code')
+            ->values();
 
-        // Organizar en matriz: meses x categorías
         $matrix = [];
         for ($month = 1; $month <= 12; $month++) {
-            $matrix[$month] = [];
+            $monthSummary = $this->categorySummaryService->forBudgetMonth($budget, $month)->keyBy('category_id');
             foreach ($categories as $category) {
-                $distribution = $annual_budget->monthlyDistributions()
-                    ->where('month', $month)
-                    ->where('expense_category_id', $category->id)
-                    ->first();
-
-                $matrix[$month][$category->id] = $distribution ?? null;
+                $matrix[$month][$category->id] = $monthSummary->get($category->id);
             }
         }
 
         return view('budget_monthly_distributions.matrix', [
-            'budget' => $annual_budget,
+            'budget' => $budget,
             'matrix' => $matrix,
             'categories' => $categories,
         ]);
+    }
+
+    private function loadBudgetWithDistributions(int $budgetId): AnnualBudget
+    {
+        return AnnualBudget::with([
+            'costCenter.company',
+            'monthlyDistributions' => fn ($query) => $query
+                ->with(['budgetCedula.expenseCategory', 'expenseCategory'])
+                ->orderBy('month')
+                ->orderBy('expense_category_id')
+                ->orderBy('budget_cedula_id'),
+        ])->findOrFail($budgetId);
+    }
+
+    private function getCedulaCatalog(): array
+    {
+        $allCedulas = BudgetCedula::with('expenseCategory')
+            ->active()
+            ->notDeleted()
+            ->orderBy('expense_category_id')
+            ->orderBy('name')
+            ->get();
+
+        return [$allCedulas, $allCedulas->groupBy('expense_category_id')];
+    }
+
+    private function buildMonthlyCategoryRows(AnnualBudget $budget): Collection
+    {
+        return $budget->monthlyDistributions
+            ->groupBy(fn (BudgetMonthlyDistribution $distribution) => $distribution->month . ':' . $distribution->expense_category_id)
+            ->map(function (Collection $items) {
+                $first = $items->first();
+                $assigned = (float) $items->sum('assigned_amount');
+                $consumed = (float) $items->sum('consumed_amount');
+                $committed = (float) $items->sum('committed_amount');
+                $available = $assigned - $consumed - $committed;
+
+                return [
+                    'month' => $first->month,
+                    'month_label' => $first->month_label,
+                    'category_id' => $first->expense_category_id,
+                    'category_code' => $first->expenseCategory?->code ?? '—',
+                    'category_name' => $first->expenseCategory?->name ?? '—',
+                    'assigned_amount' => $assigned,
+                    'consumed_amount' => $consumed,
+                    'committed_amount' => $committed,
+                    'available_amount' => $available,
+                    'usage_percentage' => $assigned > 0 ? (($consumed + $committed) / $assigned) * 100 : 0,
+                    'status' => $available <= 0 ? 'AGOTADO' : ($assigned > 0 && (($consumed + $committed) / $assigned) > 0.7 ? 'CRITICO' : 'NORMAL'),
+                ];
+            })
+            ->sortBy(fn (array $row) => sprintf('%02d-%s', $row['month'], $row['category_code']))
+            ->values();
+    }
+
+    private function statusBadge(string $status): string
+    {
+        return match ($status) {
+            'NORMAL' => '<span class="badge bg-success">Normal</span>',
+            'CRITICO' => '<span class="badge bg-danger">Crítico</span>',
+            'AGOTADO' => '<span class="badge bg-dark">Agotado</span>',
+            default => '<span class="badge bg-warning text-dark">Alerta</span>',
+        };
     }
 }

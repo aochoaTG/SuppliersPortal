@@ -28,25 +28,34 @@ class SaveAnnualBudgetRequest extends FormRequest
                         if ($budget->cost_center_id != $value) {
                             $fail('No se puede cambiar el centro de costo de un presupuesto existente.');
                         }
+
                         return;
                     }
 
                     $costCenter = CostCenter::find($value);
+
                     if ($costCenter && $costCenter->budget_type !== 'ANNUAL') {
                         $fail('El centro de costo debe ser de tipo ANNUAL.');
                     }
+
                     if ($costCenter && $costCenter->status !== 'ACTIVO') {
                         $fail('El centro de costo debe estar ACTIVO.');
                     }
 
                     if ($costCenter && $this->fiscal_year) {
-                        $exists = AnnualBudget::where('cost_center_id', $value)
+                        $existingBudget = AnnualBudget::withTrashed()
+                            ->where('cost_center_id', $value)
                             ->where('fiscal_year', $this->fiscal_year)
-                            ->whereNull('deleted_at')
-                            ->exists();
+                            ->first();
 
-                        if ($exists) {
-                            $fail('Ya existe un presupuesto para este centro de costo en el año ' . $this->fiscal_year);
+                        if ($existingBudget) {
+                            $message = 'Ya existe un presupuesto para este centro de costo en el año ' . $this->fiscal_year . '.';
+
+                            if ($existingBudget->trashed()) {
+                                $message = 'Ya existe un presupuesto eliminado para este centro de costo en el año ' . $this->fiscal_year . '. Restaura o reutiliza ese registro en lugar de crear otro.';
+                            }
+
+                            $fail($message);
                         }
                     }
                 },
