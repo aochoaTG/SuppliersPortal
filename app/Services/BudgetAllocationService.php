@@ -9,6 +9,7 @@ use App\Models\CostCenter;
 use App\Models\DirectPurchaseOrder;
 use App\Models\PurchaseOrder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -31,25 +32,8 @@ class BudgetAllocationService
             return ['available' => true, 'message' => 'Centro de costo de consumo libre.'];
         }
 
-        $budget = AnnualBudget::where('cost_center_id', $costCenterId)
-            ->where('fiscal_year', $year)
-            ->where('status', 'APROBADO')
-            ->first();
-
-        if (! $budget) {
-            return ['available' => false, 'message' => 'No existe presupuesto aprobado para el centro de costo y año fiscal seleccionados.'];
-        }
-
-        $distribution = BudgetMonthlyDistribution::where('annual_budget_id', $budget->id)
-            ->where('month', $month)
-            ->where('expense_category_id', $categoryId)
-            ->first();
-
-        if (! $distribution) {
-            return ['available' => false, 'message' => 'No existe distribución mensual para la categoría y mes seleccionados.'];
-        }
-
-        $available = $distribution->getAvailableAmount();
+        $distributions = $this->resolveDistributionsForCategory($costCenterId, $year, $month, $categoryId);
+        $available = (float) $distributions->sum(fn (BudgetMonthlyDistribution $distribution) => $distribution->getAvailableAmount());
 
         return [
             'available' => $available + 0.000001 >= $requiredAmount,
@@ -61,9 +45,9 @@ class BudgetAllocationService
                     number_format($requiredAmount, 2)
                 ),
             'available_amount' => $available,
-            'assigned_amount' => (float) $distribution->assigned_amount,
-            'consumed_amount' => (float) $distribution->consumed_amount,
-            'committed_amount' => (float) $distribution->committed_amount,
+            'assigned_amount' => (float) $distributions->sum('assigned_amount'),
+            'consumed_amount' => (float) $distributions->sum('consumed_amount'),
+            'committed_amount' => (float) $distributions->sum('committed_amount'),
         ];
     }
 
@@ -80,17 +64,19 @@ class BudgetAllocationService
     {
         DB::transaction(function () use ($order) {
             foreach ($this->getOrderBudgetLines($order) as $line) {
-                $commitment = $this->findCommitment($order, $line['expense_category_id']) ?? new BudgetCommitment();
+                $commitments = $this->findCommitments($order, $line['expense_category_id']);
 
-                if ($commitment->exists && $commitment->status === 'RECEIVED') {
-                    continue;
+                foreach ($commitments as $commitment) {
+                    if ($commitment->status === 'RECEIVED') {
+                        continue;
+                    }
+
+                    $commitment->status = 'COMMITTED';
+                    $commitment->committed_at = $commitment->committed_at ?? now();
+                    $commitment->released_at = null;
+                    $commitment->received_at = null;
+                    $commitment->save();
                 }
-
-                $this->fillCommitment($commitment, $order, $line, 'COMMITTED');
-                $commitment->committed_at = $commitment->committed_at ?? now();
-                $commitment->released_at = null;
-                $commitment->received_at = null;
-                $commitment->save();
             }
         });
     }
@@ -108,16 +94,15 @@ class BudgetAllocationService
     {
         DB::transaction(function () use ($order) {
             foreach ($this->getOrderBudgetLines($order) as $line) {
-                $commitment = $this->findCommitment($order, $line['expense_category_id']);
+                $commitments = $this->findCommitments($order, $line['expense_category_id'])
+                    ->where('status', 'COMMITTED');
 
-                if (! $commitment || $commitment->status !== 'COMMITTED') {
-                    continue;
+                foreach ($commitments as $commitment) {
+                    $commitment->update([
+                        'status' => 'RELEASED',
+                        'released_at' => now(),
+                    ]);
                 }
-
-                $commitment->update([
-                    'status' => 'RELEASED',
-                    'released_at' => now(),
-                ]);
             }
         });
     }
@@ -133,98 +118,145 @@ class BudgetAllocationService
 
     private function commitLine(Model $order, array $line): void
     {
-        $commitment = $this->findCommitment($order, $line['expense_category_id']);
+        $existing = $this->findCommitments($order, $line['expense_category_id'])
+            ->where('status', '!=', 'RELEASED');
 
-        if ($commitment && $commitment->status !== 'RELEASED') {
+        if ($existing->isNotEmpty()) {
             return;
         }
 
-        if ($line['budget_type'] === 'ANNUAL') {
-            $distribution = $this->resolveDistribution(
-                $line['cost_center_id'],
-                $line['year'],
-                $line['month'],
-                $line['expense_category_id']
-            );
-
-            if (! $distribution->commitAmount($line['amount'])) {
-                throw new RuntimeException(
-                    "No se pudo comprometer presupuesto para la categoría {$line['expense_category_id']}."
-                );
-            }
+        if ($line['budget_type'] !== 'ANNUAL') {
+            $commitment = new BudgetCommitment();
+            $this->fillCommitment($commitment, $order, $line, 'COMMITTED', null, $line['amount']);
+            $commitment->committed_at = now();
+            $commitment->save();
+            return;
         }
 
-        $commitment = $commitment ?? new BudgetCommitment();
-        $this->fillCommitment($commitment, $order, $line, 'COMMITTED');
-        $commitment->committed_at = now();
-        $commitment->released_at = null;
-        $commitment->received_at = null;
-        $commitment->save();
+        $distributions = $this->resolveDistributionsForCategory(
+            $line['cost_center_id'],
+            $line['year'],
+            $line['month'],
+            $line['expense_category_id']
+        );
+
+        $allocations = $this->allocateAmountAcrossDistributions($distributions, (float) $line['amount']);
+
+        foreach ($allocations as $allocation) {
+            /** @var BudgetMonthlyDistribution $distribution */
+            $distribution = $allocation['distribution'];
+            $amount = $allocation['amount'];
+
+            if (! $distribution->commitAmount($amount)) {
+                throw new RuntimeException(
+                    "No se pudo comprometer presupuesto para la cédula {$distribution->budget_cedula_id}."
+                );
+            }
+
+            $commitment = new BudgetCommitment();
+            $this->fillCommitment(
+                $commitment,
+                $order,
+                $line,
+                'COMMITTED',
+                $distribution->budget_cedula_id,
+                $amount
+            );
+            $commitment->committed_at = now();
+            $commitment->save();
+        }
     }
 
     private function releaseLine(Model $order, array $line): void
     {
-        $commitment = $this->findCommitment($order, $line['expense_category_id']);
+        $commitments = $this->findCommitments($order, $line['expense_category_id'])
+            ->where('status', 'COMMITTED');
 
-        if (! $commitment || $commitment->status !== 'COMMITTED') {
-            return;
-        }
-
-        if ($line['budget_type'] === 'ANNUAL') {
-            $distribution = $this->resolveDistribution(
-                $line['cost_center_id'],
-                $line['year'],
-                $line['month'],
-                $line['expense_category_id']
-            );
-
-            if (! $distribution->releaseCommitment((float) $commitment->committed_amount)) {
-                throw new RuntimeException(
-                    "No se pudo liberar presupuesto para la categoría {$line['expense_category_id']}."
+        foreach ($commitments as $commitment) {
+            if ($line['budget_type'] === 'ANNUAL' && $commitment->budget_cedula_id) {
+                $distribution = $this->resolveDistributionByCedula(
+                    $line['cost_center_id'],
+                    $line['year'],
+                    $line['month'],
+                    (int) $commitment->budget_cedula_id
                 );
-            }
-        }
 
-        $commitment->update([
-            'status' => 'RELEASED',
-            'released_at' => now(),
-        ]);
+                if (! $distribution->releaseCommitment((float) $commitment->committed_amount)) {
+                    throw new RuntimeException(
+                        "No se pudo liberar presupuesto para la cédula {$commitment->budget_cedula_id}."
+                    );
+                }
+            }
+
+            $commitment->update([
+                'status' => 'RELEASED',
+                'released_at' => now(),
+            ]);
+        }
     }
 
     private function consumeLine(Model $order, array $line): void
     {
-        $commitment = $this->findCommitment($order, $line['expense_category_id']);
+        $commitments = $this->findCommitments($order, $line['expense_category_id'])
+            ->where('status', 'COMMITTED');
 
-        if (! $commitment || $commitment->status === 'RECEIVED') {
-            return;
-        }
-
-        if ($line['budget_type'] === 'ANNUAL') {
-            $distribution = $this->resolveDistribution(
-                $line['cost_center_id'],
-                $line['year'],
-                $line['month'],
-                $line['expense_category_id']
-            );
-
-            if (! $distribution->commitToConsume((float) $commitment->committed_amount)) {
-                throw new RuntimeException(
-                    "No se pudo consumir presupuesto para la categoría {$line['expense_category_id']}."
+        foreach ($commitments as $commitment) {
+            if ($line['budget_type'] === 'ANNUAL' && $commitment->budget_cedula_id) {
+                $distribution = $this->resolveDistributionByCedula(
+                    $line['cost_center_id'],
+                    $line['year'],
+                    $line['month'],
+                    (int) $commitment->budget_cedula_id
                 );
-            }
-        }
 
-        $commitment->update([
-            'status' => 'RECEIVED',
-            'received_at' => now(),
-        ]);
+                if (! $distribution->commitToConsume((float) $commitment->committed_amount)) {
+                    throw new RuntimeException(
+                        "No se pudo consumir presupuesto para la cédula {$commitment->budget_cedula_id}."
+                    );
+                }
+            }
+
+            $commitment->update([
+                'status' => 'RECEIVED',
+                'received_at' => now(),
+            ]);
+        }
     }
 
-    private function resolveDistribution(
+    private function resolveDistributionsForCategory(
         int $costCenterId,
         int $year,
         int $month,
         int $categoryId
+    ): Collection {
+        $budget = AnnualBudget::where('cost_center_id', $costCenterId)
+            ->where('fiscal_year', $year)
+            ->where('status', 'APROBADO')
+            ->first();
+
+        if (! $budget) {
+            throw new RuntimeException("No existe presupuesto aprobado para el centro de costo {$costCenterId} en {$year}.");
+        }
+
+        $distributions = BudgetMonthlyDistribution::where('annual_budget_id', $budget->id)
+            ->where('month', $month)
+            ->where('expense_category_id', $categoryId)
+            ->whereNotNull('budget_cedula_id')
+            ->orderBy('budget_cedula_id')
+            ->get();
+
+        if ($distributions->isEmpty()) {
+            throw new RuntimeException("No existe distribución mensual para la categoría {$categoryId} en {$month}/{$year}.");
+        }
+
+        return $distributions;
+    }
+
+    private function resolveDistributionByCedula(
+        int $costCenterId,
+        int $year,
+        int $month,
+        int $cedulaId
     ): BudgetMonthlyDistribution {
         $budget = AnnualBudget::where('cost_center_id', $costCenterId)
             ->where('fiscal_year', $year)
@@ -237,14 +269,46 @@ class BudgetAllocationService
 
         $distribution = BudgetMonthlyDistribution::where('annual_budget_id', $budget->id)
             ->where('month', $month)
-            ->where('expense_category_id', $categoryId)
+            ->where('budget_cedula_id', $cedulaId)
             ->first();
 
         if (! $distribution) {
-            throw new RuntimeException("No existe distribución mensual para la categoría {$categoryId} en {$month}/{$year}.");
+            throw new RuntimeException("No existe distribución mensual para la cédula {$cedulaId} en {$month}/{$year}.");
         }
 
         return $distribution;
+    }
+
+    private function allocateAmountAcrossDistributions(Collection $distributions, float $amount): array
+    {
+        $remaining = $amount;
+        $allocations = [];
+
+        foreach ($distributions->sortByDesc(fn (BudgetMonthlyDistribution $distribution) => $distribution->getAvailableAmount()) as $distribution) {
+            if ($remaining <= 0.000001) {
+                break;
+            }
+
+            $available = $distribution->getAvailableAmount();
+            if ($available <= 0) {
+                continue;
+            }
+
+            $portion = min($available, $remaining);
+            $allocations[] = [
+                'distribution' => $distribution,
+                'amount' => $portion,
+            ];
+            $remaining -= $portion;
+        }
+
+        if ($remaining > 0.000001) {
+            throw new RuntimeException(
+                sprintf('Presupuesto insuficiente. Faltó asignar $%s a nivel cédula.', number_format($remaining, 2))
+            );
+        }
+
+        return $allocations;
     }
 
     private function getOrderBudgetLines(Model $order): array
@@ -274,8 +338,8 @@ class BudgetAllocationService
             $applicationMonth = $order->created_at->format('Y-m');
 
             return $order->items
-                ->groupBy(fn($item) => $item->requisitionItem?->expense_category_id)
-                ->filter(fn($items, $categoryId) => ! empty($categoryId))
+                ->groupBy(fn ($item) => $item->requisitionItem?->expense_category_id)
+                ->filter(fn ($items, $categoryId) => ! empty($categoryId))
                 ->map(function ($items, $categoryId) use ($order, $applicationMonth) {
                     return [
                         'cost_center_id' => (int) $order->requisition->cost_center_id,
@@ -294,10 +358,9 @@ class BudgetAllocationService
         throw new RuntimeException('Tipo de orden no soportado para asignación presupuestal.');
     }
 
-    private function findCommitment(Model $order, int $expenseCategoryId): ?BudgetCommitment
+    private function findCommitments(Model $order, int $expenseCategoryId): Collection
     {
-        $query = BudgetCommitment::query()
-            ->where('expense_category_id', $expenseCategoryId);
+        $query = BudgetCommitment::query()->where('expense_category_id', $expenseCategoryId);
 
         if ($order instanceof DirectPurchaseOrder) {
             $query->where('direct_purchase_order_id', $order->id);
@@ -307,17 +370,24 @@ class BudgetAllocationService
             throw new RuntimeException('Tipo de orden no soportado para compromisos.');
         }
 
-        return $query->latest('id')->first();
+        return $query->orderBy('id')->get();
     }
 
-    private function fillCommitment(BudgetCommitment $commitment, Model $order, array $line, string $status): void
-    {
+    private function fillCommitment(
+        BudgetCommitment $commitment,
+        Model $order,
+        array $line,
+        string $status,
+        ?int $budgetCedulaId,
+        float $amount
+    ): void {
         $commitment->direct_purchase_order_id = $order instanceof DirectPurchaseOrder ? $order->id : null;
         $commitment->purchase_order_id = $order instanceof PurchaseOrder ? $order->id : null;
         $commitment->cost_center_id = $line['cost_center_id'];
         $commitment->application_month = $line['application_month'];
         $commitment->expense_category_id = $line['expense_category_id'];
-        $commitment->committed_amount = $line['amount'];
+        $commitment->budget_cedula_id = $budgetCedulaId;
+        $commitment->committed_amount = $amount;
         $commitment->status = $status;
     }
 }

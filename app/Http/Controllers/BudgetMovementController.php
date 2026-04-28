@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\SaveBudgetMovementRequest;
+use App\Models\AnnualBudget;
+use App\Models\BudgetCedula;
 use App\Models\BudgetMovement;
 use App\Models\BudgetMovementDetail;
+use App\Models\BudgetMonthlyDistribution;
 use App\Models\CostCenter;
 use App\Models\ExpenseCategory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Yajra\DataTables\Facades\DataTables;
@@ -389,6 +393,8 @@ class BudgetMovementController extends Controller
             ], 403);
         }
 
+        return $this->approveUsingCedulaDistribution($budgetMovement);
+
         DB::beginTransaction();
         try {
             // Cargar los detalles del movimiento
@@ -581,6 +587,8 @@ class BudgetMovementController extends Controller
             'expense_category_id' => 'required|exists:expense_categories,id',
         ]);
 
+        return $this->checkBudgetAvailabilityUsingCedulas($request);
+
         try {
             // Buscar el presupuesto anual del centro de costo
             $annualBudget = \App\Models\AnnualBudget::where('cost_center_id', $request->cost_center_id)
@@ -716,5 +724,255 @@ class BudgetMovementController extends Controller
             'recentApproved',
             'recentRejected'
         ));
+    }
+
+    private function approveUsingCedulaDistribution(BudgetMovement $budgetMovement)
+    {
+        DB::beginTransaction();
+
+        try {
+            $budgetMovement->load('details.costCenter', 'details.expenseCategory');
+
+            foreach ($budgetMovement->details as $detail) {
+                if ((float) $detail->amount >= 0) {
+                    continue;
+                }
+
+                $annualBudget = $this->resolveAnnualBudgetForDetail($detail, (int) $budgetMovement->fiscal_year);
+                $distributions = $this->resolveCategoryDistributions($annualBudget, $detail);
+
+                if ($distributions->isEmpty()) {
+                    throw new \Exception(
+                        "No existe presupuesto asignado para el centro de costo '{$detail->costCenter->name}' " .
+                            "en el mes {$detail->month_name} para la categoría '{$detail->expenseCategory->name}'."
+                    );
+                }
+
+                $availableAmount = (float) $distributions->sum(
+                    fn (BudgetMonthlyDistribution $distribution) => $distribution->getAvailableAmount()
+                );
+                $requiredAmount = abs((float) $detail->amount);
+
+                if ($availableAmount + 0.000001 < $requiredAmount) {
+                    throw new \Exception(
+                        "El centro de costo '{$detail->costCenter->name}' no tiene suficiente presupuesto disponible. " .
+                            "Mes: {$detail->month_name}, " .
+                            "Categoría: '{$detail->expenseCategory->name}'. " .
+                            "Disponible: $" . number_format($availableAmount, 2) . ", " .
+                            "Requerido: $" . number_format($requiredAmount, 2)
+                    );
+                }
+            }
+
+            foreach ($budgetMovement->details as $detail) {
+                $annualBudget = $this->resolveAnnualBudgetForDetail($detail, (int) $budgetMovement->fiscal_year);
+                $this->applyDetailToBudget($annualBudget, $detail);
+            }
+
+            $budgetMovement->update([
+                'status' => BudgetMovement::STATUS_APPROVED,
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Movimiento aprobado exitosamente. Los cambios se han aplicado al presupuesto.'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al aprobar el movimiento: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function checkBudgetAvailabilityUsingCedulas(Request $request)
+    {
+        try {
+            $annualBudget = AnnualBudget::where('cost_center_id', $request->cost_center_id)
+                ->where('fiscal_year', $request->fiscal_year)
+                ->first();
+
+            if (! $annualBudget) {
+                return response()->json([
+                    'success' => false,
+                    'has_budget' => false,
+                    'message' => 'No existe presupuesto anual para este centro de costo en el año fiscal seleccionado.',
+                    'available_amount' => 0,
+                    'assigned_amount' => 0,
+                    'consumed_amount' => 0,
+                    'committed_amount' => 0,
+                ]);
+            }
+
+            $distributions = BudgetMonthlyDistribution::where('annual_budget_id', $annualBudget->id)
+                ->where('month', $request->month)
+                ->where('expense_category_id', $request->expense_category_id)
+                ->get();
+
+            if ($distributions->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'has_budget' => false,
+                    'message' => 'No hay presupuesto asignado para este mes y categoría.',
+                    'available_amount' => 0,
+                    'assigned_amount' => 0,
+                    'consumed_amount' => 0,
+                    'committed_amount' => 0,
+                ]);
+            }
+
+            $availableAmount = (float) $distributions->sum(
+                fn (BudgetMonthlyDistribution $distribution) => $distribution->getAvailableAmount()
+            );
+            $assignedAmount = (float) $distributions->sum('assigned_amount');
+            $consumedAmount = (float) $distributions->sum('consumed_amount');
+            $committedAmount = (float) $distributions->sum('committed_amount');
+            $usage = $assignedAmount > 0 ? (($consumedAmount + $committedAmount) / $assignedAmount) * 100 : 0;
+            $status = $availableAmount <= 0
+                ? 'AGOTADO'
+                : ($usage > 70 ? 'CRITICO' : 'NORMAL');
+
+            return response()->json([
+                'success' => true,
+                'has_budget' => $availableAmount > 0,
+                'message' => $availableAmount > 0 ? 'Presupuesto disponible' : 'No hay presupuesto disponible',
+                'available_amount' => $availableAmount,
+                'assigned_amount' => $assignedAmount,
+                'consumed_amount' => $consumedAmount,
+                'committed_amount' => $committedAmount,
+                'status' => $status,
+                'status_label' => match ($status) {
+                    'NORMAL' => 'Normal',
+                    'CRITICO' => 'Crítico',
+                    'AGOTADO' => 'Agotado',
+                    default => 'Alerta',
+                },
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al verificar presupuesto: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function resolveAnnualBudgetForDetail(BudgetMovementDetail $detail, int $fiscalYear): AnnualBudget
+    {
+        $annualBudget = AnnualBudget::where('cost_center_id', $detail->cost_center_id)
+            ->where('fiscal_year', $fiscalYear)
+            ->first();
+
+        if (! $annualBudget) {
+            throw new \Exception(
+                "No existe presupuesto anual para el centro de costo '{$detail->costCenter->name}' " .
+                    "en el año {$fiscalYear}. Debe crear el presupuesto anual antes de aprobar este movimiento."
+            );
+        }
+
+        return $annualBudget;
+    }
+
+    private function resolveCategoryDistributions(AnnualBudget $annualBudget, BudgetMovementDetail $detail): Collection
+    {
+        return BudgetMonthlyDistribution::where('annual_budget_id', $annualBudget->id)
+            ->where('month', $detail->month)
+            ->where('expense_category_id', $detail->expense_category_id)
+            ->orderBy('budget_cedula_id')
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function applyDetailToBudget(AnnualBudget $annualBudget, BudgetMovementDetail $detail): void
+    {
+        $distributions = $this->resolveCategoryDistributions($annualBudget, $detail);
+
+        if ((float) $detail->amount > 0) {
+            $this->applyIncreaseToCategory($annualBudget, $detail, $distributions);
+            return;
+        }
+
+        if ($distributions->isEmpty()) {
+            throw new \Exception(
+                "No existe presupuesto asignado para el centro de costo '{$detail->costCenter->name}' " .
+                    "en el mes {$detail->month_name} para la categoría '{$detail->expenseCategory->name}'."
+            );
+        }
+
+        $remaining = abs((float) $detail->amount);
+
+        foreach ($distributions->sortByDesc(fn (BudgetMonthlyDistribution $distribution) => $distribution->getAvailableAmount()) as $distribution) {
+            if ($remaining <= 0.000001) {
+                break;
+            }
+
+            $available = $distribution->getAvailableAmount();
+            if ($available <= 0) {
+                continue;
+            }
+
+            $reduction = min($available, $remaining);
+            $distribution->update([
+                'assigned_amount' => (float) $distribution->assigned_amount - $reduction,
+                'updated_by' => Auth::id(),
+            ]);
+            $remaining -= $reduction;
+        }
+
+        if ($remaining > 0.000001) {
+            throw new \Exception(
+                "No fue posible aplicar la reducción completa a la categoría '{$detail->expenseCategory->name}'. " .
+                    "Monto pendiente: $" . number_format($remaining, 2)
+            );
+        }
+    }
+
+    private function applyIncreaseToCategory(
+        AnnualBudget $annualBudget,
+        BudgetMovementDetail $detail,
+        Collection $distributions
+    ): void {
+        $amount = (float) $detail->amount;
+
+        if ($distributions->isNotEmpty()) {
+            /** @var BudgetMonthlyDistribution $distribution */
+            $distribution = $distributions->sortBy('budget_cedula_id')->first();
+            $distribution->update([
+                'assigned_amount' => (float) $distribution->assigned_amount + $amount,
+                'updated_by' => Auth::id(),
+            ]);
+            return;
+        }
+
+        $cedula = BudgetCedula::query()
+            ->active()
+            ->notDeleted()
+            ->where('expense_category_id', $detail->expense_category_id)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->first();
+
+        if (! $cedula) {
+            throw new \Exception(
+                "No hay cédulas activas configuradas para la categoría '{$detail->expenseCategory->name}'."
+            );
+        }
+
+        BudgetMonthlyDistribution::create([
+            'annual_budget_id' => $annualBudget->id,
+            'budget_cedula_id' => $cedula->id,
+            'expense_category_id' => $detail->expense_category_id,
+            'month' => $detail->month,
+            'assigned_amount' => $amount,
+            'consumed_amount' => 0,
+            'committed_amount' => 0,
+            'created_by' => Auth::id(),
+            'updated_by' => Auth::id(),
+        ]);
     }
 }

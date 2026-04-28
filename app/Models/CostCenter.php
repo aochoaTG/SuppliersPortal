@@ -262,17 +262,18 @@ class CostCenter extends Model
         }
 
         // Obtener distribución mensual
-        $distribution = $annualBudget->monthlyDistributions()
+        $distributions = $annualBudget->monthlyDistributions()
             ->where('month', $month)
             ->where('expense_category_id', $categoryId)
-            ->first();
+            ->get();
 
-        if (!$distribution) {
+        if ($distributions->isEmpty()) {
             return null;
         }
 
-        // Calcular disponible
-        return $distribution->getAvailableAmount();
+        return (float) $distributions->sum('assigned_amount')
+            - (float) $distributions->sum('consumed_amount')
+            - (float) $distributions->sum('committed_amount');
     }
 
     /**

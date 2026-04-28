@@ -142,18 +142,18 @@ class AnnualBudget extends Model
      */
     public function getAvailableForMonthAndCategory($month, $categoryId)
     {
-        $distribution = $this->monthlyDistributions()
+        $distributions = $this->monthlyDistributions()
             ->where('month', $month)
             ->where('expense_category_id', $categoryId)
-            ->first();
+            ->get();
 
-        if (!$distribution) {
+        if ($distributions->isEmpty()) {
             return 0;
         }
 
-        return $distribution->assigned_amount
-            - $distribution->consumed_amount
-            - $distribution->committed_amount;
+        return (float) $distributions->sum('assigned_amount')
+            - (float) $distributions->sum('consumed_amount')
+            - (float) $distributions->sum('committed_amount');
     }
 
     /**

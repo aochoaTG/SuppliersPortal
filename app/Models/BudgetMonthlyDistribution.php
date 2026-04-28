@@ -26,6 +26,7 @@ class BudgetMonthlyDistribution extends Model
 
     protected $fillable = [
         'annual_budget_id',
+        'budget_cedula_id',
         'expense_category_id',
         'month',
         'assigned_amount',
@@ -56,12 +57,22 @@ class BudgetMonthlyDistribution extends Model
         return $this->belongsTo(AnnualBudget::class);
     }
 
+    public function budgetCedula()
+    {
+        return $this->belongsTo(BudgetCedula::class, 'budget_cedula_id');
+    }
+
     /**
      * Categoría de gasto
      */
     public function expenseCategory()
     {
         return $this->belongsTo(ExpenseCategory::class);
+    }
+
+    public function getCedulaNameAttribute(): ?string
+    {
+        return $this->budgetCedula?->name;
     }
 
     /**
