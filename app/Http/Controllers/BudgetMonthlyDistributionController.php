@@ -100,6 +100,7 @@ class BudgetMonthlyDistributionController extends Controller
             'allCedulas' => $allCedulas,
             'cedulasByCategory' => $cedulasByCategory,
             'selectedCategoryIds' => [],
+            'selectedCedulas' => collect([]),
             'distributions' => [],
             'isEdit' => false,
         ]);
@@ -181,6 +182,11 @@ class BudgetMonthlyDistributionController extends Controller
                 ->unique()
                 ->values()
                 ->all(),
+            'selectedCedulas' => $annualBudget->monthlyDistributions
+                ->pluck('budgetCedula')
+                ->filter()
+                ->unique('id')
+                ->values(),
             'distributions' => $distributions,
             'isEdit' => true,
         ]);
