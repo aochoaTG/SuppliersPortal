@@ -1,24 +1,28 @@
-{{--
-    FORM PARCIAL: Matriz de Distribuciones Mensuales
-    Usado tanto en create como en edit
+@php
+    $selectedCategoryIds = collect($selectedCategoryIds ?? [])->map(fn ($id) => (int) $id)->values();
+    $categories = $cedulasByCategory->map(function ($cedulas) {
+        $category = $cedulas->first()->expenseCategory;
 
-    Variables requeridas:
-    - $annualBudget: AnnualBudget
-    - $allCedulas: Collection de TODAS las BudgetCedula disponibles (con expenseCategory cargado)
-    - $selectedCedulas: Collection de cédulas YA seleccionadas (solo en EDIT)
-    - $distributions: Array [cedula_id][month] => amount o data
-    - $isEdit: boolean (true para edit, false para create)
---}}
+        return [
+            'id' => $category->id,
+            'code' => $category->code,
+            'name' => $category->name,
+            'cedulas' => $cedulas->map(fn ($cedula) => [
+                'id' => $cedula->id,
+                'name' => $cedula->name,
+            ])->values(),
+        ];
+    })->sortBy(fn ($category) => $category['code'])->values();
+@endphp
 
 <div class="card mb-4">
     <div class="card-header">
         <h5 class="mb-0">
             <i class="ti ti-table me-2"></i>
-            Matriz de Distribución Mensual por Categoría
+            Distribución Mensual por Categoría y Cédula
         </h5>
     </div>
     <div class="card-body">
-        {{-- Información del Presupuesto --}}
         <div class="alert alert-info mb-4">
             <div class="row">
                 <div class="col-md-6">
@@ -32,735 +36,273 @@
             </div>
         </div>
 
-        {{-- Selector de Categorías --}}
         <div class="card mb-4 border-primary">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <h6 class="mb-0">
                     <i class="ti ti-category me-2"></i>
-                    Paso 1: Seleccione las Categorías de Gasto
+                    Paso 1: Seleccione las categorías a presupuestar
                 </h6>
-                <button type="button" class="btn btn-primary btn-sm" id="btnAddCategory" title="Agregar nueva categoría">
-                    <i class="ti ti-plus me-1"></i> Nueva Categoría
-                </button>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <label for="categorySelector" class="form-label">
-                        Cédulas Presupuestarias <span class="text-danger">*</span>
-                    </label>
-                    <select
-                        id="categorySelector"
-                        class="form-select"
-                        multiple="multiple"
-                        style="width: 100%;">
-                        @foreach ($allCedulas as $cedula)
-                            <option
-                                value="{{ $cedula->id }}"
-                                data-category-code="{{ $cedula->expenseCategory->code }}"
-                                data-category-name="{{ $cedula->expenseCategory->name }}"
-                                data-name="{{ $cedula->name }}"
-                                @if($isEdit && $selectedCedulas->contains('id', $cedula->id)) selected @endif>[{{ $cedula->expenseCategory->code }}] {{ $cedula->expenseCategory->name }} - {{ $cedula->name }}</option>
-                        @endforeach
-                    </select>
-                    <small class="text-muted">Seleccione una o más cédulas presupuestarias</small>
-                </div>
-            </div>
-        </div>
-        
-        {{-- Botones de Acción --}}
-        <div class="d-none gap-2 mb-4" id="distributionButtons">
-            <button type="button" class="btn btn-outline-primary" id="btnDistributeUniform">
-                <i class="ti ti-equal me-1"></i> Distribución Uniforme
-            </button>
-            <button type="button" class="btn btn-outline-secondary" id="btnClearAll">
-                <i class="ti ti-eraser me-1"></i> Limpiar Todo
-            </button>
-            <button type="button" class="btn btn-outline-info" id="btnCalculateTotals">
-                <i class="ti ti-calculator me-1"></i> Recalcular Totales
-            </button>
-        </div>
-
-        {{-- Tabla Matriz (se genera dinámicamente) --}}
-        <div id="matrixContainer" style="display: none;">
-            <div class="table-responsive">
-                <table class="table table-bordered table-hover table-sm" id="distributionMatrix">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="sticky-column" style="min-width: 200px;">Categoría</th>
-                            @for ($month = 1; $month <= 12; $month++)
-                                <th class="text-center text-nowrap">{{ \App\Models\BudgetMonthlyDistribution::make(['month' => $month])->month_label }}</th>
-                            @endfor
-                            <th class="text-center bg-secondary text-white">TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody id="matrixBody">
-                        {{-- Se genera con JavaScript --}}
-                    </tbody>
-                    <tfoot class="table-secondary">
-                        <tr>
-                            <th>TOTAL POR MES</th>
-                            @for ($month = 1; $month <= 12; $month++)
-                                <th class="text-center">
-                                    <strong class="month-total" data-month="{{ $month }}">$0.00</strong>
-                                </th>
-                            @endfor
-                            <th class="text-center bg-dark text-white">
-                                <strong id="grandTotal">$0.00</strong>
-                            </th>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-
-            {{-- Alerta de Validación --}}
-            <div id="validationAlert" class="alert alert-warning mt-3 d-none">
-                <i class="ti ti-alert-triangle me-2"></i>
-                <strong>Advertencia:</strong> La suma de las distribuciones mensuales debe coincidir con el monto total anual.
-                <div class="mt-2">
-                    <strong>Monto Total Anual:</strong> ${{ number_format($annualBudget->total_annual_amount, 2) }}<br>
-                    <strong>Suma de Distribuciones:</strong> <span id="sumDistributions">$0.00</span><br>
-                    <strong>Diferencia:</strong> <span id="difference" class="text-danger">$0.00</span>
-                </div>
+                <label for="categorySelector" class="form-label">
+                    Categorías de gasto <span class="text-danger">*</span>
+                </label>
+                <select id="categorySelector" class="form-select" multiple="multiple" style="width: 100%;">
+                    @foreach ($categories as $category)
+                        <option
+                            value="{{ $category['id'] }}"
+                            data-code="{{ $category['code'] }}"
+                            data-name="{{ $category['name'] }}"
+                            @if ($selectedCategoryIds->contains($category['id'])) selected @endif>
+                            [{{ $category['code'] }}] {{ $category['name'] }}
+                        </option>
+                    @endforeach
+                </select>
+                <small class="text-muted">Cada categoría agrupa sus cédulas hijas. Los montos se capturan en las cédulas y la categoría solo resume.</small>
             </div>
         </div>
 
-        {{-- Mensaje cuando no hay categorías seleccionadas --}}
-        <div id="noCategoriesMessage" class="alert alert-secondary text-center">
-            <i class="ti ti-info-circle me-2"></i>
-            Seleccione al menos una categoría para comenzar a distribuir el presupuesto.
+        <div id="categoryPanels"></div>
+
+        <div id="validationAlert" class="alert alert-warning mt-3 d-none">
+            <i class="ti ti-alert-triangle me-2"></i>
+            <strong>Advertencia:</strong> La suma de las distribuciones mensuales debe coincidir con el monto total anual.
+            <div class="mt-2">
+                <strong>Monto Total Anual:</strong> ${{ number_format($annualBudget->total_annual_amount, 2) }}<br>
+                <strong>Suma de Distribuciones:</strong> <span id="sumDistributions">$0.00</span><br>
+                <strong>Diferencia:</strong> <span id="difference" class="text-danger">$0.00</span>
+            </div>
         </div>
     </div>
 </div>
-{{-- Scripts --}}
+
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== Script de Distribución Mensual Cargado ===');
-    
-    // ========================================
-    // VARIABLES GLOBALES
-    // ========================================
-    const budgetTotalAmount = {{ $annualBudget->total_annual_amount }};
+    const budgetTotalAmount = {{ (float) $annualBudget->total_annual_amount }};
     const isEdit = {{ $isEdit ? 'true' : 'false' }};
+    const categories = @json($categories->values());
     const existingDistributions = @json($distributions);
+    const monthLabels = @json(array_map(fn ($month) => \App\Models\BudgetMonthlyDistribution::make(['month' => $month])->month_label, range(1, 12)));
 
-    // Nombres de meses
-    const monthLabels = @json(array_map(function($m) {
-        return App\Models\BudgetMonthlyDistribution::make(['month' => $m])->month_label;
-    }, range(1, 12)));
-
+    const categorySelector = $('#categorySelector');
+    const categoryPanels = document.getElementById('categoryPanels');
     let globalIndex = 0;
 
-    // Elementos del DOM
-    const matrixBody = document.getElementById('matrixBody');
-    const matrixContainer = document.getElementById('matrixContainer');
-    const noCategoriesMessage = document.getElementById('noCategoriesMessage');
-    const distributionButtons = document.getElementById('distributionButtons');
-
-    // ========================================
-    // INICIALIZAR SELECT2
-    // ========================================
-    console.log('Inicializando Select2...');
-    
-    const $categorySelector = $('#categorySelector');
-    
-    if ($categorySelector.length === 0) {
-        console.error('ERROR: No se encontró el elemento #categorySelector');
-        return;
-    }
-    
-    $categorySelector.select2({
+    categorySelector.select2({
         theme: 'bootstrap-5',
-        placeholder: 'Seleccione cédulas...',
+        placeholder: 'Seleccione categorías...',
         allowClear: true,
         closeOnSelect: false,
-        templateResult: function(option) {
-            if (!option.id) return option.text;
-            const el = option.element;
-            return $(`<span class="d-inline-block text-wrap">
-                [${el.dataset.categoryCode}] ${el.dataset.categoryName} - ${el.dataset.name}
-            </span>`);
-        },
-        templateSelection: function(option) {
-            if (!option.id) return option.text;
-            const el = option.element;
-            return $(`<span>[${el.dataset.categoryCode}] ${el.dataset.categoryName} - ${el.dataset.name}</span>`);
-        }
     });
 
-    console.log('Select2 inicializado correctamente');
+    function formatMoney(value) {
+        return '$' + Number(value || 0).toLocaleString('es-MX', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }
 
-    // ========================================
-    // FUNCIONES PRINCIPALES
-    // ========================================
+    function selectedCategories() {
+        const selectedIds = new Set((categorySelector.val() || []).map(Number));
+        return categories.filter(category => selectedIds.has(category.id));
+    }
 
-    /**
-     * Generar fila de categoría en la matriz
-     */
-    function generateCategoryRow(cedulaId, categoryCode, categoryName, cedulaName) {
-        let html = `<tr data-category-id="${cedulaId}">`;
+    function getCedulaMonthData(cedulaId, month) {
+        return existingDistributions?.[cedulaId]?.[month] ?? null;
+    }
 
-        // Columna: Categoría (pequeño) + Cédula (grande)
-        html += `
-            <td class="sticky-column bg-light">
-                <small class="text-muted d-block">[${categoryCode}] ${categoryName}</small>
-                <strong>${cedulaName}</strong>
-            </td>
-        `;
+    function renderCedulaRow(category, cedula) {
+        let row = `<tr data-cedula-id="${cedula.id}" data-category-id="${category.id}">`;
+        row += `<td class="sticky-column bg-light"><small class="text-muted d-block">[${category.code}] ${category.name}</small><strong>${cedula.name}</strong></td>`;
 
-        // Columnas: 12 Meses
         for (let month = 1; month <= 12; month++) {
-            let distData = null;
-            let distributionId = null;
-            let assignedAmount = 0;
-            let consumedAmount = 0;
-            let committedAmount = 0;
-            let isLocked = false;
+            const data = getCedulaMonthData(cedula.id, month);
+            const distributionId = data?.id ?? null;
+            const assignedAmount = data?.assigned_amount ?? 0;
+            const consumedAmount = data?.consumed_amount ?? 0;
+            const committedAmount = data?.committed_amount ?? 0;
+            const minimumRequired = consumedAmount + committedAmount;
 
-            // Buscar datos existentes
-            if (isEdit && existingDistributions[categoryId] && existingDistributions[categoryId][month]) {
-                distData = existingDistributions[categoryId][month];
-                distributionId = distData.id;
-                assignedAmount = distData.assigned_amount;
-                consumedAmount = distData.consumed_amount;
-                committedAmount = distData.committed_amount;
-                isLocked = (consumedAmount > 0 || committedAmount > 0);
-            }
-
-            html += `<td class="text-center p-1">`;
-
+            row += '<td class="text-center p-1">';
             if (isEdit && distributionId) {
-                // Modo EDIT: enviar ID de distribución
-                html += `
-                    <input type="hidden" name="distributions[${globalIndex}][id]" value="${distributionId}">
-                    <input
-                        type="number"
-                        name="distributions[${globalIndex}][assigned_amount]"
-                        class="form-control form-control-sm text-end distribution-input"
-                        data-category="${categoryId}"
-                        data-month="${month}"
-                        value="${assignedAmount.toFixed(2)}"
-                        step="0.01"
-                        min="${(consumedAmount + committedAmount).toFixed(2)}"
-                        ${isLocked ? `title="Este mes tiene consumo o compromisos. Mínimo: $${(consumedAmount + committedAmount).toFixed(2)}"` : ''}
-                        required>
-                `;
-
-                if (isLocked) {
-                    html += `
-                        <small class="text-warning d-block">
-                            <i class="ti ti-lock"></i>
-                            Min: $${(consumedAmount + committedAmount).toFixed(2)}
-                        </small>
-                    `;
+                row += `<input type="hidden" name="distributions[${globalIndex}][id]" value="${distributionId}">`;
+                row += `<input type="number" name="distributions[${globalIndex}][assigned_amount]" class="form-control form-control-sm text-end distribution-input" data-category="${category.id}" data-cedula="${cedula.id}" data-month="${month}" value="${Number(assignedAmount).toFixed(2)}" step="0.01" min="${minimumRequired.toFixed(2)}" required>`;
+                if (minimumRequired > 0) {
+                    row += `<small class="text-warning d-block"><i class="ti ti-lock"></i> Min: ${formatMoney(minimumRequired)}</small>`;
                 }
-
                 globalIndex++;
             } else {
-                // Modo CREATE: solo monto
-                html += `
-                    <input
-                        type="number"
-                        name="distributions[${categoryId}][${month}]"
-                        class="form-control form-control-sm text-end distribution-input"
-                        data-category="${categoryId}"
-                        data-month="${month}"
-                        value="0.00"
-                        step="0.01"
-                        min="0"
-                        required>
-                `;
+                row += `<input type="number" name="distributions[${cedula.id}][${month}]" class="form-control form-control-sm text-end distribution-input" data-category="${category.id}" data-cedula="${cedula.id}" data-month="${month}" value="${Number(assignedAmount).toFixed(2)}" step="0.01" min="0" required>`;
             }
-
-            html += `</td>`;
+            row += '</td>';
         }
 
-        // Columna: TOTAL por Categoría
-        html += `
-            <td class="text-center bg-light">
-                <strong class="category-total" data-category="${categoryId}">$0.00</strong>
-            </td>
+        row += `<td class="text-center bg-light"><strong class="cedula-total" data-cedula="${cedula.id}">$0.00</strong></td>`;
+        row += '</tr>';
+        return row;
+    }
+
+    function renderCategoryPanel(category, index) {
+        const collapseId = `category-collapse-${category.id}`;
+        let html = `
+            <div class="card mb-3 category-card" data-category-id="${category.id}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <button class="btn btn-link text-decoration-none p-0 fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${index === 0 ? 'true' : 'false'}">
+                        [${category.code}] ${category.name}
+                    </button>
+                    <div class="text-end">
+                        <small class="text-muted d-block">Total categoría</small>
+                        <strong class="category-total" data-category="${category.id}">$0.00</strong>
+                    </div>
+                </div>
+                <div id="${collapseId}" class="collapse ${index === 0 ? 'show' : ''}">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="sticky-column" style="min-width: 250px;">Cédula</th>
+                                        ${monthLabels.map(label => `<th class="text-center text-nowrap">${label}</th>`).join('')}
+                                        <th class="text-center bg-secondary text-white">TOTAL</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${category.cedulas.map(cedula => renderCedulaRow(category, cedula)).join('')}
+                                </tbody>
+                                <tfoot class="table-secondary">
+                                    <tr>
+                                        <th class="sticky-column">Total categoría por mes</th>
+                                        ${monthLabels.map((_, idx) => `<th class="text-center"><strong class="category-month-total" data-category="${category.id}" data-month="${idx + 1}">$0.00</strong></th>`).join('')}
+                                        <th class="text-center bg-dark text-white"><strong class="category-total" data-category="${category.id}">$0.00</strong></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
 
-        html += `</tr>`;
         return html;
     }
 
-    /**
-     * Actualizar matriz según categorías seleccionadas
-     */
-    function updateMatrix() {
-        console.log('updateMatrix() ejecutándose...');
-        
-        const selectedCategories = $categorySelector.select2('data');
-        console.log('Categorías seleccionadas:', selectedCategories.length);
-
-        // Limpiar
-        matrixBody.innerHTML = '';
+    function renderPanels() {
         globalIndex = 0;
+        const selected = selectedCategories();
+        categoryPanels.innerHTML = selected.length === 0
+            ? '<div class="alert alert-secondary text-center"><i class="ti ti-info-circle me-2"></i>Seleccione al menos una categoría para capturar el presupuesto.</div>'
+            : selected.map((category, index) => renderCategoryPanel(category, index)).join('');
 
-        if (selectedCategories.length === 0) {
-            matrixContainer.style.display = 'none';
-            noCategoriesMessage.style.display = 'block';
-            distributionButtons.classList.add('d-none');
-            distributionButtons.classList.remove('d-flex');
-            return;
-        }
-
-        // Mostrar matriz
-        matrixContainer.style.display = 'block';
-        noCategoriesMessage.style.display = 'none';
-        distributionButtons.classList.remove('d-none');
-        distributionButtons.classList.add('d-flex');
-
-        // Generar filas
-        selectedCategories.forEach(cat => {
-            const row = generateCategoryRow(
-                cat.id,
-                cat.element.dataset.categoryCode,
-                cat.element.dataset.categoryName,
-                cat.element.dataset.name
-            );
-            matrixBody.insertAdjacentHTML('beforeend', row);
-        });
-
-        // Re-asignar eventos
         attachInputEvents();
         calculateTotals();
-        
-        console.log('Matriz actualizada con', selectedCategories.length, 'categorías');
     }
 
-    /**
-     * Asignar eventos a inputs de distribución
-     */
     function attachInputEvents() {
         document.querySelectorAll('.distribution-input').forEach(input => {
-            input.removeEventListener('input', calculateTotals);
-            input.removeEventListener('change', calculateTotals);
             input.addEventListener('input', calculateTotals);
             input.addEventListener('change', calculateTotals);
         });
     }
 
-    /**
-     * Calcular todos los totales (categorías, meses, gran total)
-     */
     function calculateTotals() {
         let grandTotal = 0;
 
-        // Totales por categoría
-        document.querySelectorAll('[data-category-id]').forEach(row => {
-            const categoryId = row.dataset.categoryId;
-            let categorySum = 0;
+        selectedCategories().forEach(category => {
+            let categoryTotal = 0;
 
-            row.querySelectorAll('.distribution-input').forEach(input => {
-                const value = parseFloat(input.value) || 0;
-                categorySum += value;
+            category.cedulas.forEach(cedula => {
+                let cedulaTotal = 0;
+
+                for (let month = 1; month <= 12; month++) {
+                    const input = document.querySelector(`.distribution-input[data-cedula="${cedula.id}"][data-month="${month}"]`);
+                    const value = Number(input?.value || 0);
+                    cedulaTotal += value;
+
+                    const monthTotalEl = document.querySelector(`.category-month-total[data-category="${category.id}"][data-month="${month}"]`);
+                    if (monthTotalEl) {
+                        const current = Number(monthTotalEl.dataset.raw || 0) + value;
+                        monthTotalEl.dataset.raw = current;
+                    }
+                }
+
+                const cedulaTotalEl = document.querySelector(`.cedula-total[data-cedula="${cedula.id}"]`);
+                if (cedulaTotalEl) {
+                    cedulaTotalEl.textContent = formatMoney(cedulaTotal);
+                }
+
+                categoryTotal += cedulaTotal;
             });
 
-            const totalCell = row.querySelector(`.category-total[data-category="${categoryId}"]`);
-            if (totalCell) {
-                totalCell.textContent = '$' + categorySum.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            for (let month = 1; month <= 12; month++) {
+                const monthTotalEl = document.querySelector(`.category-month-total[data-category="${category.id}"][data-month="${month}"]`);
+                if (monthTotalEl) {
+                    monthTotalEl.textContent = formatMoney(monthTotalEl.dataset.raw || 0);
+                    monthTotalEl.dataset.raw = 0;
+                }
             }
 
-            grandTotal += categorySum;
+            document.querySelectorAll(`.category-total[data-category="${category.id}"]`).forEach(el => {
+                el.textContent = formatMoney(categoryTotal);
+            });
+
+            grandTotal += categoryTotal;
         });
 
-        // Totales por mes
-        for (let month = 1; month <= 12; month++) {
-            let monthSum = 0;
-
-            document.querySelectorAll(`.distribution-input[data-month="${month}"]`).forEach(input => {
-                const value = parseFloat(input.value) || 0;
-                monthSum += value;
-            });
-
-            const monthTotalCell = document.querySelector(`.month-total[data-month="${month}"]`);
-            if (monthTotalCell) {
-                monthTotalCell.textContent = '$' + monthSum.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            }
-        }
-
-        // Gran Total
-        const grandTotalElement = document.getElementById('grandTotal');
-        if (grandTotalElement) {
-            grandTotalElement.textContent = '$' + grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
-
-        // Validación
         const difference = Math.abs(grandTotal - budgetTotalAmount);
-        const validationAlert = document.getElementById('validationAlert');
-
-        const sumDistributionsElement = document.getElementById('sumDistributions');
-        const differenceElement = document.getElementById('difference');
-
-        if (sumDistributionsElement) {
-            sumDistributionsElement.textContent = '$' + grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
-
-        if (differenceElement) {
-            differenceElement.textContent = '$' + difference.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
-
-        if (validationAlert) {
-            if (difference > 0.01) {
-                validationAlert.classList.remove('d-none');
-            } else {
-                validationAlert.classList.add('d-none');
-            }
-        }
+        document.getElementById('sumDistributions').textContent = formatMoney(grandTotal);
+        document.getElementById('difference').textContent = formatMoney(difference);
+        document.getElementById('validationAlert').classList.toggle('d-none', difference <= 0.01);
     }
 
-    // ========================================
-    // EVENTOS SELECT2
-    // ========================================
-    $categorySelector.on('change', function() {
-        console.log('Select2: categorías cambiadas');
-        updateMatrix();
+    categorySelector.on('change', renderPanels);
+
+    document.getElementById('formDistributions')?.addEventListener('submit', function(e) {
+        if ((categorySelector.val() || []).length === 0) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Sin categorías',
+                text: 'Debe seleccionar al menos una categoría para el presupuesto.',
+                icon: 'error',
+                confirmButtonText: 'Entendido'
+            });
+            return;
+        }
+
+        const sumText = document.getElementById('sumDistributions').textContent.replace(/[$,]/g, '');
+        const total = Number(sumText);
+        const difference = Math.abs(total - budgetTotalAmount);
+
+        if (difference > 0.01) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Distribución incompleta',
+                html: `La suma capturada es <strong>${formatMoney(total)}</strong> y debe coincidir con <strong>${formatMoney(budgetTotalAmount)}</strong>.`,
+                icon: 'error',
+                confirmButtonText: 'Entendido'
+            });
+        }
     });
 
-    // ========================================
-    // BOTONES DE DISTRIBUCIÓN
-    // ========================================
-
-    /**
-     * Distribución Uniforme
-     */
-    const btnDistributeUniform = document.getElementById('btnDistributeUniform');
-    if (btnDistributeUniform) {
-        btnDistributeUniform.addEventListener('click', function() {
-            const selectedCategories = $categorySelector.select2('data');
-            const totalCategories = selectedCategories.length;
-
-            if (totalCategories === 0) {
-                Swal.fire({
-                    title: 'Sin Categorías',
-                    text: 'Debe seleccionar al menos una categoría primero',
-                    icon: 'warning',
-                    confirmButtonText: 'Entendido'
-                });
-                return;
-            }
-
-            const amountPerCategory = budgetTotalAmount / totalCategories;
-            const amountPerMonth = amountPerCategory / 12;
-
-            Swal.fire({
-                title: '¿Distribución Uniforme?',
-                html: `¿Desea distribuir uniformemente <strong>$${budgetTotalAmount.toFixed(2)}</strong> entre ${totalCategories} categorías y 12 meses?<br><br>Cada mes por categoría recibirá: <strong>$${amountPerMonth.toFixed(2)}</strong>`,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Sí, distribuir',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    document.querySelectorAll('.distribution-input').forEach(input => {
-                        const minValue = parseFloat(input.getAttribute('min')) || 0;
-                        if (minValue === 0) {
-                            input.value = amountPerMonth.toFixed(2);
-                        }
-                    });
-
-                    calculateTotals();
-
-                    Swal.fire({
-                        title: '¡Distribuido!',
-                        text: 'Los montos se han distribuido uniformemente',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                }
-            });
-        });
-    }
-
-    /**
-     * Limpiar Todo
-     */
-    const btnClearAll = document.getElementById('btnClearAll');
-    if (btnClearAll) {
-        btnClearAll.addEventListener('click', function() {
-            Swal.fire({
-                title: '¿Limpiar Distribuciones?',
-                text: '¿Está seguro de limpiar todas las distribuciones?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Sí, limpiar',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    document.querySelectorAll('.distribution-input').forEach(input => {
-                        const minValue = parseFloat(input.getAttribute('min')) || 0;
-                        if (minValue === 0) {
-                            input.value = '0.00';
-                        }
-                    });
-
-                    calculateTotals();
-
-                    Swal.fire({
-                        title: '¡Limpiado!',
-                        text: 'Todas las distribuciones han sido limpiadas',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                }
-            });
-        });
-    }
-
-    /**
-     * Recalcular Totales
-     */
-    const btnCalculateTotals = document.getElementById('btnCalculateTotals');
-    if (btnCalculateTotals) {
-        btnCalculateTotals.addEventListener('click', function() {
-            calculateTotals();
-            Swal.fire({
-                title: '¡Recalculado!',
-                text: 'Los totales han sido actualizados',
-                icon: 'info',
-                timer: 1500,
-                showConfirmButton: false
-            });
-        });
-    }
-
-    // ========================================
-    // VALIDACIÓN ANTES DE SUBMIT
-    // ========================================
-    const form = document.querySelector('form');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const selectedCategories = $categorySelector.select2('data');
-
-            if (selectedCategories.length === 0) {
-                e.preventDefault();
-                Swal.fire({
-                    title: 'Sin Categorías',
-                    text: 'Debe seleccionar al menos una categoría para el presupuesto',
-                    icon: 'error',
-                    confirmButtonText: 'Entendido'
-                });
-                return false;
-            }
-
-            const grandTotalElement = document.getElementById('grandTotal');
-            if (!grandTotalElement) {
-                return true;
-            }
-
-            const grandTotal = parseFloat(grandTotalElement.textContent.replace(/[$,]/g, ''));
-            const difference = Math.abs(grandTotal - budgetTotalAmount);
-
-            if (difference > 0.01) {
-                e.preventDefault();
-
-                Swal.fire({
-                    title: '¡Error en la Distribución!',
-                    html: `
-                        <div class="text-start">
-                            <p>La suma de las distribuciones <strong>no coincide</strong> con el monto total anual.</p>
-                            <hr>
-                            <p><strong>Monto Total Anual:</strong> $${budgetTotalAmount.toFixed(2)}</p>
-                            <p><strong>Suma de Distribuciones:</strong> $${grandTotal.toFixed(2)}</p>
-                            <p class="text-danger"><strong>Diferencia:</strong> $${difference.toFixed(2)}</p>
-                            <hr>
-                            <p class="mb-0">Por favor, ajuste las distribuciones antes de guardar.</p>
-                        </div>
-                    `,
-                    icon: 'error',
-                    confirmButtonColor: '#d33',
-                    confirmButtonText: 'Entendido',
-                    width: '600px'
-                });
-
-                return false;
-            }
-        });
-    }
-
-    // ========================================
-    // MODAL: NUEVA CATEGORÍA
-    // ========================================
-    const newCategoryModalElement = document.getElementById('newCategoryModal');
-    if (!newCategoryModalElement) {
-        console.error('ERROR: No se encontró el modal #newCategoryModal');
-    } else {
-        const newCategoryModal = new bootstrap.Modal(newCategoryModalElement);
-        const categoryForm = document.getElementById('newCategoryForm');
-
-        /**
-         * Abrir modal
-         */
-        const btnAddCategory = document.getElementById('btnAddCategory');
-        if (btnAddCategory) {
-            btnAddCategory.addEventListener('click', function() {
-                if (categoryForm) {
-                    categoryForm.reset();
-                }
-                const errorsDiv = document.getElementById('categoryFormErrors');
-                if (errorsDiv) {
-                    errorsDiv.classList.add('d-none');
-                }
-                newCategoryModal.show();
-            });
-        }
-
-        /**
-         * Convertir código a mayúsculas automáticamente
-         */
-        const codeInput = document.getElementById('newCategoryCode');
-        if (codeInput) {
-            codeInput.addEventListener('input', function() {
-                this.value = this.value.toUpperCase();
-            });
-        }
-
-        /**
-         * Enviar formulario de nueva categoría
-         */
-        if (categoryForm) {
-            categoryForm.addEventListener('submit', async function(e) {
-                e.preventDefault();
-
-                const formData = new FormData(this);
-                const errorsDiv = document.getElementById('categoryFormErrors');
-                const submitBtn = this.querySelector('button[type="submit"]');
-                const originalBtnText = submitBtn.innerHTML;
-
-                // Mostrar estado de carga
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Guardando...';
-
-                try {
-                    const response = await fetch('{{ route("expense-categories.store") }}', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: formData
-                    });
-
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        throw data;
-                    }
-
-                    // Cerrar el modal
-                    newCategoryModal.hide();
-
-                    // Agregar la nueva opción al select
-                    const option = new Option(
-                        `[${data.code}] ${data.name}`,
-                        data.id,
-                        false,
-                        true
-                    );
-                    option.dataset.code = data.code;
-                    option.dataset.name = data.name;
-
-                    // Agregar la opción al select2
-                    $categorySelector.append(option);
-                    $categorySelector.trigger('change');
-
-                    // Mostrar mensaje de éxito
-                    if (typeof toastOk === 'function') {
-                        toastOk('Categoría creada exitosamente');
-                    } else {
-                        Swal.fire({
-                            title: '¡Éxito!',
-                            text: 'Categoría creada exitosamente',
-                            icon: 'success',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                    }
-                } catch (error) {
-                    // Manejar errores de validación
-                    if (error.errors) {
-                        let errorHtml = '<ul class="mb-0">';
-                        Object.values(error.errors).forEach(err => {
-                            errorHtml += `<li>${err[0]}</li>`;
-                        });
-                        errorHtml += '</ul>';
-
-                        if (errorsDiv) {
-                            errorsDiv.innerHTML = errorHtml;
-                            errorsDiv.classList.remove('d-none');
-
-                            // Desplazarse al mensaje de error
-                            errorsDiv.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'center'
-                            });
-                        }
-                    } else {
-                        console.error('Error:', error);
-                        Swal.fire({
-                            title: 'Error',
-                            text: 'Ocurrió un error al guardar la categoría: ' + (error.message || 'Error desconocido'),
-                            icon: 'error',
-                            confirmButtonText: 'Entendido'
-                        });
-                    }
-                } finally {
-                    // Restaurar el botón
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalBtnText;
-                }
-            });
-        }
-
-        /**
-         * Limpiar errores al abrir el modal
-         */
-        newCategoryModalElement.addEventListener('show.bs.modal', function() {
-            const errorsDiv = document.getElementById('categoryFormErrors');
-            if (errorsDiv) {
-                errorsDiv.classList.add('d-none');
-                errorsDiv.innerHTML = '';
-            }
-        });
-    }
-
-    // ========================================
-    // INICIALIZACIÓN
-    // ========================================
-    console.log('Ejecutando inicialización...');
-    updateMatrix();
-    console.log('=== Script de Distribución Mensual Completado ===');
+    renderPanels();
 });
 </script>
 
 <style>
-    /* Columna fija izquierda */
-    .sticky-column {
-        position: sticky;
-        left: 0;
-        background: #f8f9fa;
-        z-index: 10;
-    }
+.sticky-column {
+    position: sticky;
+    left: 0;
+    background: #f8f9fa;
+    z-index: 2;
+}
 
-    /* Inputs más pequeños */
-    #distributionMatrix input[type="number"] {
-        font-size: 0.875rem;
-        padding: 0.25rem;
-    }
+.category-card .table td,
+.category-card .table th {
+    vertical-align: middle;
+}
 
-    /* Resaltar errores */
-    #distributionMatrix input[type="number"]:invalid {
-        border-color: #dc3545;
-    }
+.distribution-input {
+    min-width: 88px;
+}
 </style>
 @endpush
