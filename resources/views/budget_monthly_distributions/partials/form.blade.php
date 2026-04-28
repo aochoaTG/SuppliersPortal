@@ -1,12 +1,12 @@
 {{--
     FORM PARCIAL: Matriz de Distribuciones Mensuales
     Usado tanto en create como en edit
-    
+
     Variables requeridas:
     - $annualBudget: AnnualBudget
-    - $allCategories: Collection de TODAS las ExpenseCategory disponibles
-    - $selectedCategories: Collection de categorías YA seleccionadas (solo en EDIT)
-    - $distributions: Array [category_id][month] => amount o data
+    - $allCedulas: Collection de TODAS las BudgetCedula disponibles (con expenseCategory cargado)
+    - $selectedCedulas: Collection de cédulas YA seleccionadas (solo en EDIT)
+    - $distributions: Array [cedula_id][month] => amount o data
     - $isEdit: boolean (true para edit, false para create)
 --}}
 
@@ -46,26 +46,23 @@
             <div class="card-body">
                 <div class="mb-3">
                     <label for="categorySelector" class="form-label">
-                        Categorías de Gasto <span class="text-danger">*</span>
+                        Cédulas Presupuestarias <span class="text-danger">*</span>
                     </label>
-                    <select 
-                        id="categorySelector" 
-                        class="form-select" 
-                        multiple="multiple" 
+                    <select
+                        id="categorySelector"
+                        class="form-select"
+                        multiple="multiple"
                         style="width: 100%;">
-                        @foreach ($allCategories as $category)
-                            <option 
-                                value="{{ $category->id }}" 
-                                data-code="{{ $category->code }}"
-                                data-name="{{ $category->name }}"
-                                @if($isEdit && $selectedCategories->contains('id', $category->id))
-                                    selected
-                                @endif>
-                                [{{ $category->code }}] {{ $category->name }}
-                            </option>
+                        @foreach ($allCedulas as $cedula)
+                            <option
+                                value="{{ $cedula->id }}"
+                                data-category-code="{{ $cedula->expenseCategory->code }}"
+                                data-category-name="{{ $cedula->expenseCategory->name }}"
+                                data-name="{{ $cedula->name }}"
+                                @if($isEdit && $selectedCedulas->contains('id', $cedula->id)) selected @endif>[{{ $cedula->expenseCategory->code }}] {{ $cedula->expenseCategory->name }} - {{ $cedula->name }}</option>
                         @endforeach
                     </select>
-                    <small class="text-muted">Seleccione una o más categorías para este presupuesto</small>
+                    <small class="text-muted">Seleccione una o más cédulas presupuestarias</small>
                 </div>
             </div>
         </div>
@@ -174,9 +171,22 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $categorySelector.select2({
         theme: 'bootstrap-5',
-        placeholder: 'Seleccione categorías...',
+        placeholder: 'Seleccione cédulas...',
         allowClear: true,
-        closeOnSelect: false
+        closeOnSelect: false,
+        templateResult: function(option) {
+            if (!option.id) return option.text;
+            const el = option.element;
+            return $(`<div>
+                <small class="text-muted">[${el.dataset.categoryCode}] ${el.dataset.categoryName}</small>
+                <div>${el.dataset.name}</div>
+            </div>`);
+        },
+        templateSelection: function(option) {
+            if (!option.id) return option.text;
+            const el = option.element;
+            return $(`<span><small class="text-muted me-1">[${el.dataset.categoryCode}]</small>${el.dataset.name}</span>`);
+        }
     });
 
     console.log('Select2 inicializado correctamente');
@@ -188,14 +198,14 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * Generar fila de categoría en la matriz
      */
-    function generateCategoryRow(categoryId, categoryCode, categoryName) {
-        let html = `<tr data-category-id="${categoryId}">`;
+    function generateCategoryRow(cedulaId, categoryCode, categoryName, cedulaName) {
+        let html = `<tr data-category-id="${cedulaId}">`;
 
-        // Columna: Nombre de Categoría
+        // Columna: Categoría (pequeño) + Cédula (grande)
         html += `
             <td class="sticky-column bg-light">
-                <strong>[${categoryCode}]</strong><br>
-                <small class="text-muted">${categoryName}</small>
+                <small class="text-muted d-block">[${categoryCode}] ${categoryName}</small>
+                <strong>${cedulaName}</strong>
             </td>
         `;
 
@@ -308,7 +318,8 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedCategories.forEach(cat => {
             const row = generateCategoryRow(
                 cat.id,
-                cat.element.dataset.code,
+                cat.element.dataset.categoryCode,
+                cat.element.dataset.categoryName,
                 cat.element.dataset.name
             );
             matrixBody.insertAdjacentHTML('beforeend', row);

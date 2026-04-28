@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnnualBudget;
+use App\Models\BudgetCedula;
 use App\Models\BudgetMonthlyDistribution;
 use App\Models\ExpenseCategory;
 use App\Http\Requests\SaveBudgetMonthlyDistributionRequest;
@@ -149,23 +150,17 @@ class BudgetMonthlyDistributionController extends Controller
                 ->with('info', 'Este presupuesto ya tiene distribuciones. Redirigiendo a edición.');
         }
 
-        // Obtener todas las categorías de gasto activas
-        $categories = ExpenseCategory::where('status', 'ACTIVO')
-            ->orderBy('code')
+        $allCedulas = BudgetCedula::with('expenseCategory')
+            ->active()
+            ->notDeleted()
+            ->orderBy('expense_category_id')
+            ->orderBy('name')
             ->get();
 
-        // Pasar TODAS las categorías disponibles
-        $allCategories = ExpenseCategory::orderBy('code')->get();
+        $selectedCedulas = collect();
+        $distributions   = [];
 
-        // Preparar datos para el formulario
-        $distributions = [];
-        foreach ($categories as $category) {
-            for ($month = 1; $month <= 12; $month++) {
-                $distributions[$category->id][$month] = 0; // Inicializar en 0
-            }
-        }
-
-        return view('budget_monthly_distributions.create', compact('annualBudget', 'categories', 'distributions', 'allCategories'));
+        return view('budget_monthly_distributions.create', compact('annualBudget', 'allCedulas', 'selectedCedulas', 'distributions'));
     }
 
     /**
@@ -232,18 +227,14 @@ class BudgetMonthlyDistributionController extends Controller
             'monthlyDistributions.expenseCategory'
         ]);
 
-        // 🔴 TODAS las categorías activas disponibles (para el selector)
-        $allCategories = ExpenseCategory::where('status', 'ACTIVO')
-            ->orderBy('code')
+        $allCedulas = BudgetCedula::with('expenseCategory')
+            ->active()
+            ->notDeleted()
+            ->orderBy('expense_category_id')
+            ->orderBy('name')
             ->get();
 
-        // 🔴 Categorías YA seleccionadas (que tienen distribuciones)
-        $selectedCategories = ExpenseCategory::where('status', 'ACTIVO')
-            ->whereHas('budgetMonthlyDistributions', function ($query) use ($annualBudget) {
-                $query->where('annual_budget_id', $annualBudget->id);
-            })
-            ->orderBy('code')
-            ->get();
+        $selectedCedulas = collect();
 
         // Inicializar array para organizar las distribuciones existentes
         // La estructura será: [category_id][month] = datos_distribución
@@ -263,13 +254,12 @@ class BudgetMonthlyDistributionController extends Controller
         // 🔴 NO pre-llenamos todas las categorías, solo las que tienen distribuciones
         // La matriz se generará dinámicamente en JavaScript según categorías seleccionadas
 
-        // Retornar la vista con los datos preparados
         return view('budget_monthly_distributions.edit', [
-            'annualBudget' => $annualBudget,              // Datos del presupuesto anual
-            'allCategories' => $allCategories,            // 🔴 Todas las categorías disponibles
-            'selectedCategories' => $selectedCategories,  // 🔴 Categorías ya en uso
-            'distributions' => $distributions,            // Matriz de distribuciones existentes
-            'isEdit' => true                              // 🔴 Flag para modo edición
+            'annualBudget'    => $annualBudget,
+            'allCedulas'      => $allCedulas,
+            'selectedCedulas' => $selectedCedulas,
+            'distributions'   => $distributions,
+            'isEdit'          => true,
         ]);
     }
 

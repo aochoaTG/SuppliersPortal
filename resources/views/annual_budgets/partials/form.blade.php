@@ -94,10 +94,12 @@
         </label>
         <div class="input-group">
             <span class="input-group-text">$</span>
-            <input type="number" name="total_annual_amount" id="total_annual_amount"
+            <input type="text" id="total_annual_amount_display"
                 class="form-control @error('total_annual_amount') is-invalid @enderror"
-                value="{{ old('total_annual_amount', $annual_budget->total_annual_amount ?? '') }}" placeholder="0.00"
-                step="0.01" min="0" required>
+                value="{{ old('total_annual_amount', $annual_budget->total_annual_amount ?? '') }}"
+                placeholder="0.00" inputmode="decimal" autocomplete="off">
+            <input type="hidden" name="total_annual_amount" id="total_annual_amount"
+                value="{{ old('total_annual_amount', $annual_budget->total_annual_amount ?? '') }}">
         </div>
         @error('total_annual_amount')
         <div class="invalid-feedback d-block">
@@ -156,39 +158,74 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const inputMonto = document.getElementById('total_annual_amount');
-        const montoMensual = document.getElementById('montoMensual');
+        const displayInput = document.getElementById('total_annual_amount_display');
+        const hiddenInput  = document.getElementById('total_annual_amount');
+        const montoMensual   = document.getElementById('montoMensual');
         const montoCategoria = document.getElementById('montoCategoria');
-        const montoTotal = document.getElementById('montoTotal');
+        const montoTotal     = document.getElementById('montoTotal');
 
-        const formatCurrency = (value) => {
-            return new Intl.NumberFormat('es-MX', {
+        const formatCurrency = (value) =>
+            new Intl.NumberFormat('es-MX', {
                 style: 'currency',
                 currency: 'MXN',
                 minimumFractionDigits: 2
             }).format(value);
+
+        // Formatea el número con separador de miles pero sin símbolo de moneda
+        const formatDisplay = (value) =>
+            new Intl.NumberFormat('es-MX', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            }).format(value);
+
+        // Limpia el string del display para obtener un float
+        const parseDisplay = (str) => {
+            // Elimina todo excepto dígitos, punto y coma (separadores de es-MX)
+            // En es-MX el separador de miles es ',' y el decimal es '.'
+            const clean = str.replace(/[^0-9.]/g, '');
+            return parseFloat(clean) || 0;
         };
 
-        const updateDistribution = () => {
-            // Con input number, el valor ya es numérico
-            let value = parseFloat(inputMonto.value) || 0;
-
-            const monthly = value / 12;
+        const updateDistribution = (value) => {
+            const monthly    = value / 12;
             const byCategory = monthly / 7;
-
-            montoMensual.textContent = formatCurrency(monthly);
+            montoMensual.textContent   = formatCurrency(monthly);
             montoCategoria.textContent = formatCurrency(byCategory);
-            montoTotal.textContent = formatCurrency(value);
+            montoTotal.textContent     = formatCurrency(value);
         };
 
-        // Evento para actualizar en tiempo real
-        inputMonto.addEventListener('input', updateDistribution);
+        // Mientras el usuario escribe: formatear y sincronizar al hidden
+        displayInput.addEventListener('input', function() {
+            const raw = parseDisplay(this.value);
+            hiddenInput.value = raw || '';
+            updateDistribution(raw);
+        });
 
-        // También actualizar cuando cambia con las flechas
-        inputMonto.addEventListener('change', updateDistribution);
+        // Al perder el foco: re-formatear con separador de miles
+        displayInput.addEventListener('blur', function() {
+            const raw = parseDisplay(this.value);
+            if (raw) {
+                this.value = formatDisplay(raw);
+            }
+        });
 
-        // Inicializar
-        updateDistribution();
+        // Al obtener el foco: mostrar el número limpio para facilitar edición
+        displayInput.addEventListener('focus', function() {
+            const raw = parseDisplay(this.value);
+            this.value = raw ? raw.toString() : '';
+        });
+
+        // Antes del submit: asegurarse que el hidden tiene el valor correcto
+        displayInput.closest('form')?.addEventListener('submit', function() {
+            hiddenInput.value = parseDisplay(displayInput.value) || '';
+        });
+
+        // Inicializar: formatear el valor que venga del servidor
+        const initial = parseFloat(hiddenInput.value) || 0;
+        if (initial) {
+            displayInput.value = formatDisplay(initial);
+        }
+        updateDistribution(initial);
     });
 
     $(document).ready(function() {
