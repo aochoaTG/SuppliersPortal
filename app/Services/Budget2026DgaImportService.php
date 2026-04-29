@@ -31,10 +31,20 @@ class Budget2026DgaImportService
         'AJ' => 12,
     ];
 
+    protected function configKey(): string
+    {
+        return 'budget_2026_dga';
+    }
+
+    protected function configValue(string $path, mixed $default = null): mixed
+    {
+        return config($this->configKey() . '.' . $path, $default);
+    }
+
     public function analyze(string $filePath, int $year = 2026): array
     {
-        $sheetMap = collect(config('budget_2026_dga.sheet_to_cost_center', []));
-        $ignored = collect(config('budget_2026_dga.ignored_sheets', []));
+        $sheetMap = collect($this->configValue('sheet_to_cost_center', []));
+        $ignored = collect($this->configValue('ignored_sheets', []));
         $availableSheets = collect(IOFactory::createReader('Xlsx')->listWorksheetNames($filePath));
 
         $costCenters = CostCenter::query()
@@ -72,7 +82,7 @@ class Budget2026DgaImportService
             }
 
             $targetCostCenterName = $sheetMap->get($sheetName);
-            $targetCompanyName = config("budget_2026_dga.sheet_to_company.{$sheetName}");
+            $targetCompanyName = $this->configValue("sheet_to_company.{$sheetName}");
             $costCenter = $this->resolveTargetCostCenter($costCenters, $targetCostCenterName, $targetCompanyName);
             if (! $costCenter) {
                 $report['missing_cost_centers'][] = [
@@ -84,7 +94,7 @@ class Budget2026DgaImportService
             }
 
             $spreadsheet = $this->loadWorkbook($filePath, [$sheetName]);
-            $sheetReport = $this->analyzeSheet(
+                $sheetReport = $this->analyzeSheet(
                 $spreadsheet->getSheetByName($sheetName),
                 $sheetName,
                 $costCenter,
@@ -320,7 +330,7 @@ class Budget2026DgaImportService
                 $code = strtoupper($matches[1]);
                 $label = $matches[2];
 
-                $alias = config("budget_2026_dga.section_aliases.{$label}");
+                $alias = $this->configValue("section_aliases.{$label}");
                 if ($alias) {
                     return $alias;
                 }
@@ -330,7 +340,7 @@ class Budget2026DgaImportService
                 }
             }
 
-            $alias = config("budget_2026_dga.section_aliases.{$normalized}");
+            $alias = $this->configValue("section_aliases.{$normalized}");
             if ($alias) {
                 return $alias;
             }
@@ -378,6 +388,27 @@ class Budget2026DgaImportService
     {
         /** @var Collection<int, BudgetCedula> $catalog */
         $catalog = $cedulasByCategory->get($categoryCode, collect());
+        $matched = $this->matchCedulaInCatalog($categoryCode, $rowCandidates, $catalog);
+        if ($matched) {
+            return $matched;
+        }
+
+        foreach ($cedulasByCategory as $otherCategoryCode => $otherCatalog) {
+            if ($otherCategoryCode === $categoryCode) {
+                continue;
+            }
+
+            $matched = $this->matchCedulaInCatalog((string) $otherCategoryCode, $rowCandidates, $otherCatalog);
+            if ($matched) {
+                return $matched;
+            }
+        }
+
+        return null;
+    }
+
+    private function matchCedulaInCatalog(string $categoryCode, array $rowCandidates, Collection $catalog): ?BudgetCedula
+    {
         if ($catalog->isEmpty()) {
             return null;
         }
@@ -396,7 +427,7 @@ class Budget2026DgaImportService
                 return $normalizedCatalog->get($normalized);
             }
 
-            $aliasTarget = config("budget_2026_dga.cedula_aliases.{$categoryCode}.{$normalized}");
+            $aliasTarget = $this->configValue("cedula_aliases.{$categoryCode}.{$normalized}");
             if ($aliasTarget) {
                 $matched = $normalizedCatalog->get($this->normalize($aliasTarget));
                 if ($matched) {
@@ -487,15 +518,19 @@ class Budget2026DgaImportService
 
     private function shouldSkipRow(string $categoryCode, array $rowCandidates): bool
     {
-        $global = collect(config('budget_2026_dga.skip_candidates.global', []))
+        $global = collect($this->configValue('skip_candidates.global', []))
             ->map(fn (string $value) => $this->normalize($value));
-        $categorySpecific = collect(config("budget_2026_dga.skip_candidates.{$categoryCode}", []))
+        $categorySpecific = collect($this->configValue("skip_candidates.{$categoryCode}", []))
             ->map(fn (string $value) => $this->normalize($value));
 
         foreach ($rowCandidates as $candidate) {
             $normalized = $this->normalize($candidate);
             if ($normalized === '') {
                 continue;
+            }
+
+            if ($categoryCode !== 'A' && in_array($normalized, ['maxima', 'super', 'diesel'], true)) {
+                return true;
             }
 
             if ($this->matchesSkipPattern($normalized, $global) || $this->matchesSkipPattern($normalized, $categorySpecific)) {

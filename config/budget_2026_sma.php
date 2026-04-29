@@ -1,0 +1,122 @@
+<?php
+
+return [
+    'ignored_sheets' => [
+        'Parametros SMA',
+        'S',
+        'Z',
+        'EDO RESULTADOS MISMAS EST',
+        'TOTAL ESTACIONES',
+        'A',
+        'B',
+        'CONTABILIDAD-FISCAL',
+    ],
+
+    'sheet_to_cost_center' => [
+        'COM-MKT' => 'VENTAS/ COSTO MKT',
+        'Picachos' => 'SMA Picachos',
+        'Ventanas' => 'SMA Ventanas',
+    ],
+
+    'sheet_to_company' => [
+        'COM-MKT' => 'SMA Picachos',
+        'Picachos' => 'SMA Picachos',
+        'Ventanas' => 'SMA Ventanas',
+    ],
+
+    'section_aliases' => [
+        'ingresos' => 'A',
+        'costo de venta' => 'B',
+        'nomina' => 'C',
+        'costo social' => 'D',
+        'gastos de operacion' => 'E',
+        'mantenimiento' => 'F',
+        'gastos fijos' => 'H',
+        'ingresos no operativos' => 'I',
+        'comisiones bancarias' => 'K',
+        'cif' => 'K',
+        'partidas extraordinarias total 2 0' => 'L',
+        'otros proyectos' => 'M',
+    ],
+
+    'cedula_aliases' => [
+        'A' => [
+            'maxima' => 'T-MAXIMA REGULAR',
+            'super' => 'T-SUPER PREMIUM',
+            'sobrante maxima' => 'SOBRANTE REGULAR',
+            'sobrante super' => 'SOBRANTE PREMIUM',
+            'diesel' => 'DIESEL AUTOMOTRIZ',
+        ],
+        'E' => [
+            'recoleccion de basura' => 'Recoleccion de Basura',
+            'gastos de representacion' => 'ViÃ¡ticos y gastos de viaje',
+            'analisis de combustible' => 'Asistencia tÃ©cnica',
+            'certificado para el cumplimiento sat anexo 30 y 31' => 'Licencias y Permisos',
+            'cumplimiento sat anexo 30 y 31' => 'Licencias y Permisos',
+            'responsabilidad social' => 'Eventos',
+            'mantenimiento de cartera' => 'Servicios Administrativos',
+            'cuotas y suscripciones' => 'Otros Gastos',
+            'honorarios fiscales p m' => 'Honorarios Administrativos P.M.',
+            'honorarios fiscales p f' => 'Honorarios Administrativos P.F.',
+        ],
+        'F' => [
+            'cedula de operacion anual coa' => 'Cedula COA',
+            'cedula de operaciones coa' => 'Cedula COA',
+            'analisis de la calidad de combustible nom 016 cre 2016' => 'Analisis calidad de combustible',
+            'analisis de combustible' => 'Analisis calidad de combustible',
+            'dictamen de calidad de los petroliferos nom 016 cre 2016' => 'Analisis calidad de combustible',
+            'dictamen de operacion y mantenimiento nom 005 asea 2026' => 'Verificaciones de estaciones',
+            'dictamen instalacion electricas nom 001 sede 2012' => 'Verificación eléctrica',
+            'mantenimiento de estaciones' => 'Mantenimiento equipo de estación',
+            'recoleccion de residuos peligrosos' => 'Recolección de residuos',
+            'verificaciones profeco' => 'Verificaciones profeco',
+        ],
+        'H' => [
+            'arrendamiento a residentes en el extranjero' => 'Arrendamiento Extranjeros',
+            'arrendamiento pm resid nal' => 'Arrendamiento a personas morales resid nal',
+            'arrendamiento a personas fisicas resid nal' => 'Arrendamiento a personas físicas resid nal',
+            'arrendamiento vehiculos' => 'Arrendamiento',
+        ],
+        'K' => [
+            'i comisiones bancarias' => 'Comisiones bancarias',
+        ],
+    ],
+
+    'skip_candidates' => [
+        'global' => [
+            'ingresos',
+            'a ingresos',
+            'b costo de venta',
+            'c nomina',
+            'd costo social',
+            'e gastos de operacion',
+            'f mantenimiento',
+            'h gastos fijos',
+            'total gasto de estacion',
+            'total gasto staff',
+            'utilidad de estaciones',
+            'utilidad de operacion',
+            'gasto en estacion por litro',
+            'gasto en estacion por litro sin rentas ext',
+            'centavos por litro utilidad',
+            'margen de utilidad',
+            'margen de utilidad por litro',
+            'litros vendidos',
+            'i ingresos no operativos',
+            'efecto inmo diaz en edo resultados',
+        ],
+        'B' => [
+            'regular',
+            'premium',
+            'diesel',
+            'maxima',
+            'super',
+            'aceites y lubricantes',
+        ],
+        'C' => [
+            'recuperacion por alianza gasomex',
+            'recuperacion por alianza sma',
+            'recuperacion ecu syc',
+        ],
+    ],
+];
