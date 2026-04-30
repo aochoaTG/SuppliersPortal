@@ -1,0 +1,4 @@
+interface:
+  display_name: "FRD/FRU Portal Proveedores"
+  short_description: "Documenta requerimientos del portal Laravel"
+  default_prompt: "Use $documentador-frd-fru-portal-proveedores to analyze this Laravel codebase and draft or update the Portal de Proveedores FRD/FRU with validated scope, roles, business rules, integrations, and pending items."
