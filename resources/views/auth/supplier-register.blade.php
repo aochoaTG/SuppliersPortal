@@ -629,7 +629,7 @@
                 <!-- ===== STEP 2: Datos Fiscales ===== -->
                 <div data-step="2" class="step-section hidden">
                     <div class="card-body-form">
-                        <div class="section-title">Datos Fiscales de la Empresa --</div>
+                        <div class="section-title">Datos Fiscales de la Empresa</div>
                         <div class="form-grid">
 
                             <div class="form-group full">
