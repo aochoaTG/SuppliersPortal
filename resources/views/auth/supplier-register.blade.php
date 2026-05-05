@@ -584,7 +584,7 @@
                 <!-- ===== STEP 1: Datos de la Cuenta ===== -->
                 <div data-step="1" class="step-section active">
                     <div class="card-body-form">
-                        <div class="section-title">Datos de la Cuenta --</div>
+                        <div class="section-title">Datos de la Cuenta -</div>
                         <div class="form-grid">
 
                             <div class="form-group">
