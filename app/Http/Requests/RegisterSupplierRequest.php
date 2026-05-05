@@ -6,7 +6,9 @@ use Illuminate\Foundation\Http\FormRequest;
 use App\Rules\EfosNotListed;
 use App\Rules\ValidRfc;
 use App\Enum\PaymentTerm;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
+use Illuminate\Contracts\Validation\Validator;
 
 class RegisterSupplierRequest extends FormRequest
 {
@@ -215,5 +217,67 @@ class RegisterSupplierRequest extends FormRequest
                 }
             }
         });
+    }
+
+    /**
+     * Asegura que el usuario regrese al paso donde se detectó el primer error.
+     */
+    protected function failedValidation(Validator $validator): void
+    {
+        $response = redirect()
+            ->to($this->getRedirectUrl())
+            ->withErrors($validator, $this->errorBag)
+            ->withInput()
+            ->with('supplier_registration_step', $this->resolveStepFromErrors($validator->errors()->keys()));
+
+        throw new HttpResponseException($response);
+    }
+
+    /**
+     * Determina el primer paso que contiene errores.
+     */
+    private function resolveStepFromErrors(array $errorKeys): int
+    {
+        $stepMap = [
+            1 => [
+                'first_name',
+                'last_name',
+                'email',
+                'password',
+                'password_confirmation',
+            ],
+            2 => [
+                'company_name',
+                'rfc',
+                'supplier_type',
+                'tax_regime',
+                'economic_activity',
+                'address',
+            ],
+            3 => [
+                'phone_number',
+                'contact_person',
+                'contact_phone',
+                'default_payment_terms',
+                'provides_specialized_services',
+                'repse_registration_number',
+                'repse_expiry_date',
+                'specialized_services_types',
+                'specialized_services_types.*',
+                'otros_descripcion',
+            ],
+        ];
+
+        foreach ($stepMap as $step => $fields) {
+            foreach ($errorKeys as $errorKey) {
+                foreach ($fields as $field) {
+                    if ($errorKey === $field || str_starts_with($errorKey, $field . '.')) {
+                        return $step;
+                    }
+                }
+            }
+        }
+
+        return 1;
     }
 }

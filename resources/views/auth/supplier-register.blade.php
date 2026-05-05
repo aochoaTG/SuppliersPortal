@@ -578,7 +578,7 @@
                 </div>
             </div>
 
-            <form method="POST" action="{{ route('register') }}" id="supplier-form">
+            <form method="POST" action="{{ route('register') }}" id="supplier-form" novalidate>
                 @csrf
 
                 <!-- ===== STEP 1: Datos de la Cuenta ===== -->
@@ -860,9 +860,13 @@
     </div>
 
     <script>
+        window.__supplierRegisterInitialStep = @json((int) session('supplier_registration_step', 1));
+    </script>
+
+    <script>
         document.addEventListener('DOMContentLoaded', function() {
             // ===== FORM STEP MANAGEMENT (3 steps) =====
-            let currentStep = 1;
+            let currentStep = Number(window.__supplierRegisterInitialStep || 1);
             const totalSteps = 3;
 
             const nextBtn = document.getElementById('next-btn');
@@ -916,10 +920,12 @@
             }
 
             function showStep(step) {
+                window.__supplierRegisterCurrentStep = step;
                 document.querySelectorAll('.step-section').forEach(section => {
-                    section.classList.remove('active');
+                    const isTarget = Number(section.dataset.step) === step;
+                    section.classList.toggle('hidden', !isTarget);
+                    section.classList.toggle('active', isTarget);
                 });
-                document.querySelector(`[data-step="${step}"]`).classList.add('active');
                 updateProgress();
             }
 
@@ -991,6 +997,32 @@
                 return isValid;
             }
 
+            function validateAllSteps() {
+                const allSteps = Array.from(document.querySelectorAll('[data-step]'));
+                let firstInvalidStep = null;
+                let allValid = true;
+
+                allSteps.forEach((stepSection) => {
+                    const stepNumber = Number(stepSection.dataset.step);
+                    if (!validateStep(stepNumber)) {
+                        allValid = false;
+                        if (firstInvalidStep === null) {
+                            firstInvalidStep = stepNumber;
+                        }
+                    }
+                });
+
+                if (!allValid && firstInvalidStep !== null) {
+                    showStep(firstInvalidStep);
+                    const firstInvalid = document.querySelector(`[data-step="${firstInvalidStep}"] :invalid`);
+                    if (firstInvalid && typeof firstInvalid.reportValidity === 'function') {
+                        firstInvalid.reportValidity();
+                    }
+                }
+
+                return allValid;
+            }
+
             if (nextBtn) {
                 nextBtn.addEventListener('click', function() {
                     if (validateStep(currentStep)) {
@@ -1012,7 +1044,7 @@
             }
 
             form.addEventListener('submit', function(e) {
-                if (!validateStep(currentStep)) {
+                if (!validateAllSteps()) {
                     e.preventDefault();
                     return false;
                 }
@@ -1064,7 +1096,7 @@
             const dot2 = document.getElementById('dot-2');
             const dot3 = document.getElementById('dot-3');
 
-            let current = 1;
+            let current = Number(window.__supplierRegisterInitialStep || 1);
             const totalSteps = 3;
 
             // ====== ENFORCERS ======
@@ -1202,6 +1234,7 @@
 
             function showStep(step) {
                 current = step;
+                window.__supplierRegisterCurrentStep = step;
                 steps.forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== step));
                 updateStepIndicator();
                 syncRequired();
@@ -1247,17 +1280,20 @@
 
             if (nextBtn) {
                 nextBtn.addEventListener('click', function () {
+                    current = Number(window.__supplierRegisterCurrentStep || current);
                     if (!validateCurrentStep()) return;
                     if (current < totalSteps) showStep(current + 1);
                 });
             }
             if (backBtn) {
                 backBtn.addEventListener('click', function () {
+                    current = Number(window.__supplierRegisterCurrentStep || current);
                     if (current > 1) showStep(current - 1);
                 });
             }
 
             form.addEventListener('submit', function (e) {
+                current = Number(window.__supplierRegisterCurrentStep || current);
                 if (!validateCurrentStep()) { e.preventDefault(); return; }
 
                 let allValid = true;
@@ -1296,7 +1332,7 @@
             }
 
             // Inicialización
-            showStep(1);
+            showStep(current);
             updateConditionalRequired();
         })();
 

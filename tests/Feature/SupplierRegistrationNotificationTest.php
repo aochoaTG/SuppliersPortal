@@ -122,6 +122,23 @@ class SupplierRegistrationNotificationTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_failed_registration_redirects_back_to_the_first_step_with_errors(): void
+    {
+        Notification::fake();
+
+        $response = $this->from(route('register'))
+            ->post(route('register'), $this->validPayload([
+                'company_name' => '',
+                'rfc' => 'ABC123456T12',
+            ]));
+
+        $response->assertRedirect(route('register'));
+        $response->assertSessionHasErrors(['company_name']);
+        $response->assertSessionHas('supplier_registration_step', 2);
+
+        Notification::assertNothingSent();
+    }
+
     public function test_successful_registration_without_buyers_still_completes(): void
     {
         Notification::fake();
