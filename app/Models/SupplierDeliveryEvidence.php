@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class SupplierDeliveryEvidence extends Model
 {
+    protected $table = 'supplier_delivery_evidences';
+
     protected $fillable = [
         'evidenceable_type',
         'evidenceable_id',

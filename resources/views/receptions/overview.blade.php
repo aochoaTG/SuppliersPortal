@@ -86,6 +86,7 @@
                                         <th>Estado</th>
                                         <th>Fecha Emisión</th>
                                         <th>Días Transcurridos</th>
+                                        <th>Días Restantes</th>
                                         <th width="100px">Acciones</th>
                                     </tr>
                                 </thead>
@@ -106,6 +107,7 @@
                                         <th>Estado</th>
                                         <th>Fecha Emisión</th>
                                         <th>Días Transcurridos</th>
+                                        <th>Días Restantes</th>
                                         <th width="100px">Acciones</th>
                                     </tr>
                                 </thead>
@@ -120,6 +122,18 @@
     </div>
 </div>
 @endsection
+
+@push('styles')
+<style>
+@keyframes pulse-urgente {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+.urgente-pulse {
+    animation: pulse-urgente 1.4s ease-in-out infinite;
+}
+</style>
+@endpush
 
 @push('scripts')
 <script>
@@ -140,8 +154,14 @@ $(document).ready(function () {
             { data: 'estado',            name: 'status',                        orderable: true },
             { data: 'emision',           name: 'issued_at',                     orderable: true },
             { data: 'dias_transcurridos',name: 'issued_at',                     orderable: false, searchable: false },
+            { data: 'dias_restantes',    name: 'dias_restantes',                orderable: false, searchable: false },
             { data: 'actions',           name: 'actions',                       orderable: false, searchable: false }
         ],
+        createdRow: function (row, data, index) {
+            if ($(row).attr('data-urgent') === '1') {
+                $(row).addClass('table-danger');
+            }
+        },
         order: [[4, 'asc']], // Más antiguas primero (más urgentes)
         language: {
             url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"
@@ -185,8 +205,14 @@ $(document).ready(function () {
                     { data: 'estado',            name: 'status',                    orderable: true },
                     { data: 'emision',           name: 'issued_at',                 orderable: true },
                     { data: 'dias_transcurridos',name: 'issued_at',                 orderable: false, searchable: false },
+                    { data: 'dias_restantes',    name: 'dias_restantes',            orderable: false, searchable: false },
                     { data: 'actions',           name: 'actions',                   orderable: false, searchable: false }
                 ],
+                createdRow: function (row, data, index) {
+                    if ($(row).attr('data-urgent') === '1') {
+                        $(row).addClass('table-danger');
+                    }
+                },
                 order: [[5, 'asc']], // Más antiguas primero
                 language: {
                     url: "{{ asset('assets/vendor/datatables.net/es-MX.json') }}"

@@ -36,21 +36,21 @@ class SupplierDeliveryController extends Controller
             abort(403, 'No tienes un perfil de proveedor asociado.');
         }
 
-        // OC Estándar pendientes de entrega
         $purchaseOrders = PurchaseOrder::where('supplier_id', $supplier->id)
             ->whereIn('status', ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION'])
             ->with(['receivingLocation', 'items'])
-            ->orderBy('issued_at', 'desc')
-            ->get();
+            ->get()
+            ->each(fn($o) => $o->order_type = 'standard');
 
-        // OC Directas pendientes de entrega
         $directOrders = DirectPurchaseOrder::where('supplier_id', $supplier->id)
             ->whereIn('status', ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION'])
             ->with(['receivingLocation', 'items'])
-            ->orderBy('issued_at', 'desc')
-            ->get();
+            ->get()
+            ->each(fn($o) => $o->order_type = 'direct');
 
-        return view('supplier.deliveries.index', compact('purchaseOrders', 'directOrders'));
+        $orders = $purchaseOrders->merge($directOrders)->sortByDesc('issued_at')->values();
+
+        return view('supplier.deliveries.index', compact('orders'));
     }
 
     /**
@@ -67,7 +67,7 @@ class SupplierDeliveryController extends Controller
         }
 
         // Validar que la OC pertenece al proveedor autenticado
-        if ($order->supplier_id !== $supplier->id) {
+        if ((int) $order->supplier_id !== (int) $supplier->id) {
             abort(403, 'Esta orden de compra no pertenece a tu cuenta.');
         }
 
@@ -125,7 +125,7 @@ class SupplierDeliveryController extends Controller
 
         $order = $this->resolveOrder($request->order_type, $request->order_id);
 
-        if (!$order || $order->supplier_id !== $supplier->id) {
+        if (!$order || (int) $order->supplier_id !== (int) $supplier->id) {
             abort(403, 'Orden de compra inválida.');
         }
 
