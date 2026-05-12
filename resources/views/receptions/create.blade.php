@@ -9,6 +9,18 @@
     <li class="breadcrumb-item active">Registrar Recepción</li>
 @endsection
 
+@push('styles')
+<style>
+@keyframes pulse-urgente {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+.urgente-pulse {
+    animation: pulse-urgente 1.4s ease-in-out infinite;
+}
+</style>
+@endpush
+
 @section('content')
 <form action="{{ $storeRoute }}" method="POST" enctype="multipart/form-data" id="reception-form">
     @csrf
@@ -95,6 +107,104 @@
                 </div>
             </div>
         </div>
+
+        {{-- ╔══════════════════════════════════════════════════════════════╗
+             ║  CARD — Entrega del proveedor (solo si DELIVERED_PENDING)   ║
+             ╚══════════════════════════════════════════════════════════════╝ --}}
+        @if($order->status === 'DELIVERED_PENDING_RECEPTION' && isset($deliveryEvidence) && $deliveryEvidence)
+        @php
+            $daysLeft = $order->reception_deadline_at
+                ? (int) now()->diffInWeekdays($order->reception_deadline_at, false)
+                : null;
+            $deadlineBadgeClass = match(true) {
+                $daysLeft === null => 'bg-secondary',
+                $daysLeft >= 3     => 'bg-success',
+                $daysLeft === 2    => 'bg-warning text-dark',
+                default            => 'bg-danger',
+            };
+            $deadlineLabel = match(true) {
+                $daysLeft === null => '—',
+                $daysLeft > 0      => "{$daysLeft} día(s) restante(s)",
+                $daysLeft === 0    => 'Vence hoy',
+                default            => 'Plazo vencido',
+            };
+        @endphp
+        <div class="col-12">
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white d-flex align-items-center gap-2">
+                    <i class="ti ti-truck-delivery fs-18"></i>
+                    <h6 class="mb-0 text-white">Entrega registrada por el proveedor — pendiente de captura</h6>
+                    <span class="badge bg-white text-danger ms-auto {{ $daysLeft !== null && $daysLeft <= 2 ? 'urgente-pulse' : '' }}">
+                        <i class="ti ti-clock me-1"></i>{{ $deadlineLabel }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Fecha de entrega física</label>
+                            <p class="mb-0 fw-semibold">
+                                {{ $order->supplier_delivered_at?->format('d/m/Y H:i') ?? '—' }}
+                            </p>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Recibió en la estación</label>
+                            <p class="mb-0">{{ $order->physical_receiver_name ?: '—' }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Fecha límite de captura</label>
+                            <p class="mb-0">
+                                {{ $order->reception_deadline_at?->format('d/m/Y') ?? '—' }}
+                                <span class="badge {{ $deadlineBadgeClass }} ms-1">{{ $deadlineLabel }}</span>
+                            </p>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Observaciones del proveedor</label>
+                            <p class="mb-0 small text-muted">{{ $order->delivery_observations ?: 'Sin observaciones.' }}</p>
+                        </div>
+                    </div>
+
+                    {{-- Remisión digital --}}
+                    <div class="mt-3">
+                        <label class="form-label small fw-bold text-muted">Remisión digital cargada por el proveedor</label>
+                        @if($deliveryEvidence->isPdf())
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <a href="{{ $deliveryEvidenceUrl }}" target="_blank" class="btn btn-sm btn-outline-danger">
+                                    <i class="ti ti-file-type-pdf me-1"></i>Descargar PDF
+                                </a>
+                            </div>
+                            <iframe src="{{ $deliveryEvidenceUrl }}"
+                                    class="w-100 border rounded"
+                                    style="height: 400px;"
+                                    title="Remisión del proveedor">
+                            </iframe>
+                        @elseif($deliveryEvidence->isImage())
+                            <div>
+                                <img src="{{ $deliveryEvidenceUrl }}"
+                                     alt="Remisión del proveedor"
+                                     class="img-fluid rounded border"
+                                     style="max-height: 400px; cursor: zoom-in;"
+                                     data-bs-toggle="modal"
+                                     data-bs-target="#modalRemision">
+                            </div>
+                            <div class="modal fade" id="modalRemision" tabindex="-1">
+                                <div class="modal-dialog modal-xl modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h6 class="modal-title">Remisión del proveedor</h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body text-center">
+                                            <img src="{{ $deliveryEvidenceUrl }}" alt="Remisión" class="img-fluid">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
 
         {{-- ╔══════════════════════════════════════════════════════════════╗
              ║  CARD 2 — Datos generales de recepción                      ║
