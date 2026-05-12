@@ -30,150 +30,73 @@
         </div>
     @endif
 
-    {{-- Tabs: OC Estándar / OC Directas --}}
+    {{-- Listado de órdenes de compra --}}
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <ul class="nav nav-tabs card-header-tabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" data-bs-toggle="tab" href="#tabRegular" role="tab">
-                            <i class="ti ti-file-invoice me-1"></i>
-                            OC Estándar
-                            <span class="badge bg-secondary ms-1">{{ $purchaseOrders->count() }}</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" data-bs-toggle="tab" href="#tabDirect" role="tab">
-                            <i class="ti ti-file-invoice me-1"></i>
-                            OC Directas
-                            <span class="badge bg-secondary ms-1">{{ $directOrders->count() }}</span>
-                        </a>
-                    </li>
-                </ul>
+                <h5 class="card-title mb-0">
+                    <i class="ti ti-truck-delivery me-1"></i>
+                    Órdenes de Compra Pendientes de Entrega
+                    <span class="badge bg-secondary ms-2">{{ $orders->count() }}</span>
+                </h5>
             </div>
-
-            <div class="card-body">
-                <div class="tab-content">
-                    {{-- Tab OC Estándar --}}
-                    <div class="tab-pane show active" id="tabRegular" role="tabpanel">
-                        @if($purchaseOrders->isEmpty())
-                            <div class="text-center py-4 text-muted">
-                                <i class="ti ti-package-off fs-1 d-block mb-2"></i>
-                                No tienes órdenes de compra estándar pendientes de entrega.
-                            </div>
-                        @else
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Folio</th>
-                                            <th>Punto de Entrega</th>
-                                            <th>Total</th>
-                                            <th>Estatus</th>
-                                            <th>Fecha Emisión</th>
-                                            <th class="text-center">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($purchaseOrders as $po)
-                                        <tr>
-                                            <td><strong>{{ $po->folio }}</strong></td>
-                                            <td>
-                                                @if($po->receivingLocation)
-                                                    <span class="badge bg-soft-info text-info">{{ $po->receivingLocation->code }}</span>
-                                                    {{ $po->receivingLocation->name }}
-                                                @else
-                                                    <span class="text-muted">Sin asignar</span>
-                                                @endif
-                                            </td>
-                                            <td>${{ number_format($po->total, 2) }} {{ $po->currency }}</td>
-                                            <td>
-                                                <span class="badge bg-{{ $po->getStatusBadgeClass() }}">
-                                                    {{ $po->getStatusLabel() }}
-                                                </span>
-                                            </td>
-                                            <td>{{ $po->issued_at?->format('d/m/Y') ?? '—' }}</td>
-                                            <td class="text-center">
-                                                @if($po->canReceiveSupplierDelivery())
-                                                    <a href="{{ route('supplier.deliveries.create', ['type' => 'standard', 'id' => $po->id]) }}"
-                                                       class="btn btn-sm btn-primary">
-                                                        <i class="ti ti-truck-delivery me-1"></i> Registrar Entrega
-                                                    </a>
-                                                @elseif($po->isDeliveredPendingReception())
-                                                    <span class="badge bg-warning text-dark">
-                                                        <i class="ti ti-clock me-1"></i>
-                                                        Esperando captura de estación
-                                                    </span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
+            <div class="card-body p-0">
+                @if($orders->isEmpty())
+                    <div class="text-center py-5 text-muted">
+                        <i class="ti ti-package-off fs-1 d-block mb-2"></i>
+                        No tienes órdenes de compra pendientes de entrega.
                     </div>
-
-                    {{-- Tab OC Directas --}}
-                    <div class="tab-pane" id="tabDirect" role="tabpanel">
-                        @if($directOrders->isEmpty())
-                            <div class="text-center py-4 text-muted">
-                                <i class="ti ti-package-off fs-1 d-block mb-2"></i>
-                                No tienes órdenes de compra directas pendientes de entrega.
-                            </div>
-                        @else
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Folio</th>
-                                            <th>Punto de Entrega</th>
-                                            <th>Total</th>
-                                            <th>Estatus</th>
-                                            <th>Fecha Emisión</th>
-                                            <th class="text-center">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($directOrders as $ocd)
-                                        <tr>
-                                            <td><strong>{{ $ocd->folio }}</strong></td>
-                                            <td>
-                                                @if($ocd->receivingLocation)
-                                                    <span class="badge bg-soft-info text-info">{{ $ocd->receivingLocation->code }}</span>
-                                                    {{ $ocd->receivingLocation->name }}
-                                                @else
-                                                    <span class="text-muted">Sin asignar</span>
-                                                @endif
-                                            </td>
-                                            <td>${{ number_format($ocd->total, 2) }} {{ $ocd->currency }}</td>
-                                            <td>
-                                                <span class="badge bg-{{ $ocd->getStatusBadgeClass() }}">
-                                                    {{ $ocd->getStatusLabel() }}
-                                                </span>
-                                            </td>
-                                            <td>{{ $ocd->issued_at?->format('d/m/Y') ?? '—' }}</td>
-                                            <td class="text-center">
-                                                @if($ocd->canReceiveSupplierDelivery())
-                                                    <a href="{{ route('supplier.deliveries.create', ['type' => 'direct', 'id' => $ocd->id]) }}"
-                                                       class="btn btn-sm btn-primary">
-                                                        <i class="ti ti-truck-delivery me-1"></i> Registrar Entrega
-                                                    </a>
-                                                @elseif($ocd->isDeliveredPendingReception())
-                                                    <span class="badge bg-warning text-dark">
-                                                        <i class="ti ti-clock me-1"></i>
-                                                        Esperando captura de estación
-                                                    </span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Punto de Entrega</th>
+                                    <th>Total</th>
+                                    <th>Estatus</th>
+                                    <th>Fecha Emisión</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($orders as $order)
+                                <tr>
+                                    <td><strong>{{ $order->folio }}</strong></td>
+                                    <td>
+                                        @if($order->receivingLocation)
+                                            <span class="badge bg-soft-info text-info">{{ $order->receivingLocation->code }}</span>
+                                            {{ $order->receivingLocation->name }}
+                                        @else
+                                            <span class="text-muted">Sin asignar</span>
+                                        @endif
+                                    </td>
+                                    <td>${{ number_format($order->total, 2) }} {{ $order->currency }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ $order->getStatusBadgeClass() }}">
+                                            {{ $order->getStatusLabel() }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $order->issued_at?->format('d/m/Y') ?? '—' }}</td>
+                                    <td class="text-center">
+                                        @if($order->canReceiveSupplierDelivery())
+                                            <a href="{{ route('supplier.deliveries.create', ['type' => $order->order_type, 'id' => $order->id]) }}"
+                                               class="btn btn-sm btn-primary">
+                                                <i class="ti ti-truck-delivery me-1"></i> Registrar Entrega
+                                            </a>
+                                        @elseif($order->isDeliveredPendingReception())
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="ti ti-clock me-1"></i>
+                                                Esperando captura de estación
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+                @endif
             </div>
         </div>
     </div>

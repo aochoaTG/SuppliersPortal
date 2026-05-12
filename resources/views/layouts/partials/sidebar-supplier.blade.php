@@ -14,7 +14,7 @@
     HOW TO ADD A NEW SECTION:
       1. Add the <li> block inside the post-onboarding @else block below.
       2. If the feature is not yet implemented, add it as a commented-out block
-         with a note: {{-- PENDING: [feature description] --}}
+         with a note:
       3. Update this header comment to document the new section.
 
     SECTIONS:

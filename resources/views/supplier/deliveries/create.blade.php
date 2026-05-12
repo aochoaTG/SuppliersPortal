@@ -54,16 +54,6 @@
                         <p class="fs-5 fw-bold mb-0">{{ $order->folio }}</p>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label fw-semibold text-muted">Tipo</label>
-                        <p class="mb-0">
-                            @if($orderType === 'direct')
-                                <span class="badge bg-soft-warning text-warning">OC Directa</span>
-                            @else
-                                <span class="badge bg-soft-primary text-primary">OC Estándar</span>
-                            @endif
-                        </p>
-                    </div>
-                    <div class="col-md-3">
                         <label class="form-label fw-semibold text-muted">Total</label>
                         <p class="fs-5 mb-0">${{ number_format($order->total, 2) }} {{ $order->currency }}</p>
                     </div>
