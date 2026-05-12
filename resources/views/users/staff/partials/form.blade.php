@@ -22,7 +22,7 @@
 
     <div class="modal-body pt-2">
 
-        {{-- ── Avatar ───────────────────────────────────────────────── --}}
+        {{-- Avatar --}}
         <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
 
             {{-- Preview --}}
@@ -65,7 +65,7 @@
 
         </div>
 
-        {{-- ── Datos personales ─────────────────────────────────────── --}}
+        {{-- Datos personales --}}
         <p class="text-uppercase text-muted fw-semibold mb-2"
            style="font-size:10px;letter-spacing:.7px;">
             <i class="ti ti-user me-1"></i>Datos personales
@@ -170,7 +170,7 @@
 
         <hr class="my-3">
 
-        {{-- ── Cuenta ───────────────────────────────────────────────── --}}
+        {{-- Cuenta --}}
         <p class="text-uppercase text-muted fw-semibold mb-2"
            style="font-size:10px;letter-spacing:.7px;">
             <i class="ti ti-lock me-1"></i>Cuenta
@@ -239,7 +239,7 @@
 
         <hr class="my-3">
 
-        {{-- ── Roles ────────────────────────────────────────────────── --}}
+        {{-- Roles --}}
         <p class="text-uppercase text-muted fw-semibold mb-2"
            style="font-size:10px;letter-spacing:.7px;">
             <i class="ti ti-shield-check me-1"></i>Roles
@@ -256,6 +256,7 @@
                                name="roles[]"
                                id="role_{{ $role->id }}"
                                value="{{ $role->name }}"
+                               data-role-name="{{ $role->name }}"
                                {{ $checked ? 'checked' : '' }}>
                         <label class="form-check-label form-label-sm" for="role_{{ $role->id }}">
                             {{ trans("roles.{$role->name}") }}
@@ -268,54 +269,64 @@
             <p class="text-muted fs-12 mb-0">No hay roles definidos.</p>
         @endif
 
-        <hr class="my-3">
+        @php
+            $hasAuthorizerRoleSelected = in_array('authorizer', old('roles', ($userRoles ?? collect())->toArray()), true);
+            $hasAuthorizationExceptionEnabled = (bool) old('authorization_exception_enabled', $user->activeAuthorizerException?->is_active);
+        @endphp
 
-        <p class="text-uppercase text-muted fw-semibold mb-2"
-           style="font-size:10px;letter-spacing:.7px;">
-            <i class="ti ti-scale me-1"></i>Facultad de autorización
-        </p>
+        <div id="authorizerSettingsWrapper" class="{{ $hasAuthorizerRoleSelected ? '' : 'd-none' }}">
+            <hr class="my-3">
 
-        <div class="row g-2">
-            <div class="col-md-12">
-                <label class="form-label form-label-sm mb-1">Rol autorizador de matriz</label>
-                <select name="authorizer_role_id" class="form-select form-select-sm">
-                    <option value="">Sin rol autorizador asignado</option>
-                    @foreach(($authorizerRoles ?? collect()) as $authorizerRole)
-                        <option value="{{ $authorizerRole->id }}"
-                            {{ (string) old('authorizer_role_id', $user->authorizerAssignment?->authorizer_role_id) === (string) $authorizerRole->id ? 'selected' : '' }}>
-                            {{ $authorizerRole->name }}
-                        </option>
-                    @endforeach
-                </select>
-                <div class="form-text">Este rol es independiente de los roles técnicos del portal.</div>
-            </div>
+            <p class="text-uppercase text-muted fw-semibold mb-2"
+               style="font-size:10px;letter-spacing:.7px;">
+                <i class="ti ti-scale me-1"></i>Facultad de autorización
+            </p>
 
-            <div class="col-md-12 mt-2">
-                <input type="hidden" name="authorization_exception_enabled" value="0">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="authorizationExceptionSwitch"
-                           name="authorization_exception_enabled" value="1"
-                           {{ old('authorization_exception_enabled', $user->activeAuthorizerException?->is_active) ? 'checked' : '' }}>
-                    <label class="form-check-label form-label-sm" for="authorizationExceptionSwitch">
-                        Usar excepción personalizada de monto
-                    </label>
+            <div class="row g-2">
+                <div class="col-md-12">
+                    <label class="form-label form-label-sm mb-1">Rol autorizador</label>
+                    <select name="authorizer_role_id" id="authorizerRoleSelect" class="form-select form-select-sm">
+                        <option value="">Sin rol autorizador asignado</option>
+                        @foreach(($authorizerRoles ?? collect()) as $authorizerRole)
+                            <option value="{{ $authorizerRole->id }}"
+                                {{ (string) old('authorizer_role_id', $user->authorizerAssignment?->authorizer_role_id) === (string) $authorizerRole->id ? 'selected' : '' }}>
+                                {{ $authorizerRole->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
-            </div>
 
-            <div class="col-md-6">
-                <label class="form-label form-label-sm mb-1">Límite personalizado</label>
-                <input type="number" step="0.01" min="0" name="authorization_exception_limit"
-                       value="{{ old('authorization_exception_limit', $user->activeAuthorizerException?->approval_limit) }}"
-                       class="form-control form-control-sm"
-                       placeholder="0.00">
-            </div>
+                <div class="col-md-12 mt-2">
+                    <input type="hidden" name="authorization_exception_enabled" value="0">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="authorizationExceptionSwitch"
+                               name="authorization_exception_enabled" value="1"
+                               {{ old('authorization_exception_enabled', $user->activeAuthorizerException?->is_active) ? 'checked' : '' }}>
+                        <label class="form-check-label form-label-sm" for="authorizationExceptionSwitch">
+                            Usar excepción personalizada de monto
+                        </label>
+                    </div>
+                </div>
 
-            <div class="col-md-6">
-                <label class="form-label form-label-sm mb-1">Motivo de excepción</label>
-                <input type="text" name="authorization_exception_reason"
-                       value="{{ old('authorization_exception_reason', $user->activeAuthorizerException?->reason) }}"
-                       class="form-control form-control-sm"
-                       placeholder="Temporal, suplencia, acuerdo especial...">
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm mb-1">Límite personalizado</label>
+                    <input type="number" step="0.01" min="0" name="authorization_exception_limit"
+                           id="authorizationExceptionLimit"
+                           value="{{ old('authorization_exception_limit', $user->activeAuthorizerException?->approval_limit) }}"
+                           class="form-control form-control-sm"
+                           {{ $hasAuthorizationExceptionEnabled ? '' : 'disabled' }}
+                           placeholder="0.00">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm mb-1">Motivo de excepción</label>
+                    <input type="text" name="authorization_exception_reason"
+                           id="authorizationExceptionReason"
+                           value="{{ old('authorization_exception_reason', $user->activeAuthorizerException?->reason) }}"
+                           class="form-control form-control-sm"
+                           {{ $hasAuthorizationExceptionEnabled ? '' : 'disabled' }}
+                           placeholder="Temporal, suplencia, acuerdo especial...">
+                </div>
             </div>
         </div>
 
@@ -334,3 +345,66 @@
     </div>
 
 </form>
+
+<script>
+    (function () {
+        const form = document.getElementById('userForm');
+
+        if (! form) {
+            return;
+        }
+
+        const wrapper = document.getElementById('authorizerSettingsWrapper');
+        const roleSelect = document.getElementById('authorizerRoleSelect');
+        const exceptionSwitch = document.getElementById('authorizationExceptionSwitch');
+        const exceptionLimit = document.getElementById('authorizationExceptionLimit');
+        const exceptionReason = document.getElementById('authorizationExceptionReason');
+        const roleInputs = form.querySelectorAll('input[name="roles[]"]');
+
+        const syncExceptionFields = () => {
+            const exceptionEnabled = Boolean(exceptionSwitch && exceptionSwitch.checked);
+
+            if (exceptionLimit) {
+                exceptionLimit.disabled = ! exceptionEnabled;
+            }
+
+            if (exceptionReason) {
+                exceptionReason.disabled = ! exceptionEnabled;
+            }
+        };
+
+        const syncAuthorizerVisibility = () => {
+            const hasAuthorizerRole = Array.from(roleInputs).some((input) => {
+                return input.dataset.roleName === 'authorizer' && input.checked;
+            });
+
+            wrapper.classList.toggle('d-none', ! hasAuthorizerRole);
+
+            if (! hasAuthorizerRole) {
+                if (roleSelect) {
+                    roleSelect.value = '';
+                }
+
+                if (exceptionSwitch) {
+                    exceptionSwitch.checked = false;
+                }
+
+                if (exceptionLimit) {
+                    exceptionLimit.value = '';
+                }
+
+                if (exceptionReason) {
+                    exceptionReason.value = '';
+                }
+            }
+
+            syncExceptionFields();
+        };
+
+        roleInputs.forEach((input) => input.addEventListener('change', syncAuthorizerVisibility));
+        if (exceptionSwitch) {
+            exceptionSwitch.addEventListener('change', syncExceptionFields);
+        }
+        syncAuthorizerVisibility();
+    })();
+</script>

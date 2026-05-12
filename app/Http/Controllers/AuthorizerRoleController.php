@@ -3,15 +3,47 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuthorizerRole;
+use App\Models\QuotationSummary;
+use App\Models\UserAuthorizerRole;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AuthorizerRoleController extends Controller
 {
     public function index()
     {
-        $roles = AuthorizerRole::orderBy('display_order')->orderBy('name')->get();
+        $roles = AuthorizerRole::query()
+            ->withCount(['assignments', 'quotationSummaries'])
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get();
 
         return view('authorizer_roles.index', compact('roles'));
+    }
+
+    public function create()
+    {
+        $authorizerRole = new AuthorizerRole([
+            'is_active' => true,
+        ]);
+
+        return view('authorizer_roles.create', compact('authorizerRole'));
+    }
+
+    public function store(Request $request)
+    {
+        $data = $this->validateRole($request);
+
+        AuthorizerRole::create([
+            'name' => $data['name'],
+            'approval_limit' => $data['approval_limit'] ?? null,
+            'is_active' => (bool) ($data['is_active'] ?? false),
+        ]);
+
+        return redirect()->route('authorizer-roles.index')
+            ->with('success', 'Rol autorizador creado correctamente.');
     }
 
     public function edit(AuthorizerRole $authorizerRole)
@@ -21,25 +53,71 @@ class AuthorizerRoleController extends Controller
 
     public function update(Request $request, AuthorizerRole $authorizerRole)
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'approval_limit' => ['nullable', 'numeric', 'min:0'],
-            'display_order' => ['nullable', 'integer', 'min:0'],
-            'matrix_sheet' => ['nullable', 'string', 'max:100'],
-            'matrix_reference' => ['nullable', 'string', 'max:100'],
-            'is_active' => ['nullable', 'boolean'],
-        ]);
+        $data = $this->validateRole($request, $authorizerRole);
 
         $authorizerRole->update([
             'name' => $data['name'],
             'approval_limit' => $data['approval_limit'] ?? null,
-            'display_order' => $data['display_order'] ?? 0,
-            'matrix_sheet' => $data['matrix_sheet'] ?? null,
-            'matrix_reference' => $data['matrix_reference'] ?? null,
             'is_active' => (bool) ($data['is_active'] ?? false),
         ]);
 
         return redirect()->route('authorizer-roles.index')
             ->with('success', 'Rol autorizador actualizado correctamente.');
+    }
+
+    public function destroy(Request $request, AuthorizerRole $authorizerRole)
+    {
+        $assignmentsCount = $authorizerRole->assignments()->count();
+        $summariesCount = $authorizerRole->quotationSummaries()->count();
+        $forceDelete = (bool) $request->boolean('force_delete');
+
+        if ($assignmentsCount > 0 && ! $forceDelete) {
+            return redirect()->route('authorizer-roles.index')
+                ->with('warning', "El rol '{$authorizerRole->name}' tiene {$assignmentsCount} usuario(s) ligado(s). Confirma el borrado para continuar.");
+        }
+
+        DB::transaction(function () use ($authorizerRole) {
+            UserAuthorizerRole::query()
+                ->where('authorizer_role_id', $authorizerRole->id)
+                ->delete();
+
+            QuotationSummary::query()
+                ->where('authorizer_role_id', $authorizerRole->id)
+                ->update(['authorizer_role_id' => null]);
+
+            $authorizerRole->delete();
+        });
+
+        $message = 'Rol autorizador eliminado correctamente.';
+
+        if ($assignmentsCount > 0 || $summariesCount > 0) {
+            $message .= " Se limpiaron {$assignmentsCount} asignación(es) de usuario y {$summariesCount} referencia(s) en aprobaciones.";
+        }
+
+        return redirect()->route('authorizer-roles.index')->with('success', $message);
+    }
+
+    private function validateRole(Request $request, ?AuthorizerRole $authorizerRole = null): array
+    {
+        $data = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:150',
+                Rule::unique('authorizer_roles', 'name')->ignore($authorizerRole?->id),
+            ],
+            'approval_limit' => ['nullable', 'numeric', 'min:0'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $isCouncilRole = mb_strtolower(trim((string) $data['name'])) === mb_strtolower('Consejo de Administración');
+
+        if (($data['approval_limit'] ?? null) === null && ! $isCouncilRole) {
+            throw ValidationException::withMessages([
+                'approval_limit' => 'Solo el Consejo de Administración puede quedar sin límite de autorización.',
+            ]);
+        }
+
+        return $data;
     }
 }

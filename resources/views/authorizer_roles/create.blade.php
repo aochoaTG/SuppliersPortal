@@ -1,12 +1,12 @@
 @extends('layouts.zircos')
 
-@section('title', 'Editar Rol Autorizador')
-@section('page.title', 'Editar Rol Autorizador')
+@section('title', 'Nuevo Rol Autorizador')
+@section('page.title', 'Nuevo Rol Autorizador')
 
 @section('page.breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ url('/') }}">Inicio</a></li>
     <li class="breadcrumb-item"><a href="{{ route('authorizer-roles.index') }}">Roles autorizadores</a></li>
-    <li class="breadcrumb-item active">{{ $authorizerRole->name }}</li>
+    <li class="breadcrumb-item active">Nuevo</li>
 @endsection
 
 @section('content')
@@ -14,12 +14,11 @@
     <div class="col-xl-7">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0">Editar facultad</h5>
+                <h5 class="mb-0">Crear facultad</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ route('authorizer-roles.update', $authorizerRole) }}">
+                <form method="POST" action="{{ route('authorizer-roles.store') }}">
                     @csrf
-                    @method('PUT')
 
                     <div class="mb-3">
                         <label class="form-label">Nombre</label>
@@ -30,6 +29,7 @@
                         <label class="form-label">Límite con IVA</label>
                         <input type="number" step="0.01" min="0" name="approval_limit" class="form-control"
                             value="{{ old('approval_limit', $authorizerRole->approval_limit) }}">
+                        <div class="form-text">Déjalo vacío solo si este rol debe autorizar cualquier monto.</div>
                     </div>
 
                     <div class="form-check form-switch mb-4">
@@ -41,7 +41,7 @@
 
                     <div class="d-flex justify-content-end gap-2">
                         <a href="{{ route('authorizer-roles.index') }}" class="btn btn-light">Cancelar</a>
-                        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
                     </div>
                 </form>
             </div>

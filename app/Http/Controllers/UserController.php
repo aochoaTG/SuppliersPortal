@@ -392,6 +392,19 @@ class UserController extends Controller
 
     private function syncAuthorizerData(User $user, array $validated): void
     {
+        $technicalRoles = $validated['roles'] ?? [];
+        $hasAuthorizerTechnicalRole = in_array('authorizer', $technicalRoles, true);
+
+        if (! $hasAuthorizerTechnicalRole) {
+            UserAuthorizerRole::where('user_id', $user->id)->delete();
+
+            AuthorizerException::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->update(['is_active' => false, 'ends_at' => now()]);
+
+            return;
+        }
+
         $roleId = $validated['authorizer_role_id'] ?? null;
 
         if ($roleId) {

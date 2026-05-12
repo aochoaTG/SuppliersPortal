@@ -10,8 +10,6 @@ class AuthorizerRole extends Model
     protected $fillable = [
         'name',
         'approval_limit',
-        'matrix_sheet',
-        'matrix_reference',
         'display_order',
         'is_active',
     ];

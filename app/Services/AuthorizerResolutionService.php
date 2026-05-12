@@ -89,8 +89,13 @@ class AuthorizerResolutionService
                 $bossUser
                 && $bossUser->is_active
                 && $role
-                && $effectiveLimit !== null
-                && (float) $effectiveLimit + 0.000001 >= $amount
+                && (
+                    $this->isUnlimitedCouncilRole($role)
+                    || (
+                        $effectiveLimit !== null
+                        && (float) $effectiveLimit + 0.000001 >= $amount
+                    )
+                )
             ) {
                 return [
                     'requester_employee' => $requesterEmployee,
@@ -143,6 +148,10 @@ class AuthorizerResolutionService
             return 'no_authorizer_role';
         }
 
+        if ($this->isUnlimitedCouncilRole($role)) {
+            return 'eligible';
+        }
+
         if ($effectiveLimit === null) {
             return 'role_without_limit';
         }
@@ -152,5 +161,10 @@ class AuthorizerResolutionService
         }
 
         return 'eligible';
+    }
+
+    private function isUnlimitedCouncilRole($role): bool
+    {
+        return mb_strtolower((string) $role?->name) === mb_strtolower('Consejo de Administración');
     }
 }

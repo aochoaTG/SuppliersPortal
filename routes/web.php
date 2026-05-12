@@ -505,7 +505,7 @@ Route::middleware(['auth', 'lock', 'role:superadmin'])->group(function () {
         ->names('approval-levels');
 
     Route::resource('authorizer-roles', AuthorizerRoleController::class)
-        ->only(['index', 'edit', 'update'])
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
         ->names('authorizer-roles');
 
     // SAT Retenciones
