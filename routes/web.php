@@ -1,51 +1,50 @@
 <?php
 
+use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\AnnualBudgetController;
+use App\Http\Controllers\ApprovalLevelController;
+use App\Http\Controllers\AuthorizerRoleController;
+use App\Http\Controllers\BudgetMonthlyDistributionController;
+use App\Http\Controllers\BudgetMovementController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CatSupplierController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CostCenterController;
+use App\Http\Controllers\CostCenterImportController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\DirectPurchaseOrderController;
+use App\Http\Controllers\DocumentReviewController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\ExpenseCategoryController;
+use App\Http\Controllers\IncidentController;
+use App\Http\Controllers\LockScreenController;
+use App\Http\Controllers\LogViewerController;
+use App\Http\Controllers\ProductServiceController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProfilePasswordController;
+use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\QuotationApprovalController;
+use App\Http\Controllers\QuotationPlannerController;
+use App\Http\Controllers\ReceivingLocationController;
+use App\Http\Controllers\ReceptionController;
+use App\Http\Controllers\RequisitionController;
+use App\Http\Controllers\RequisitionWorkflowController;
+use App\Http\Controllers\RfqComparisonController;
+use App\Http\Controllers\RfqController;
+use App\Http\Controllers\RfqInboxController;
+use App\Http\Controllers\SatEfos69bController;
+use App\Http\Controllers\SatRetencionController;
+use App\Http\Controllers\StationController;
+use App\Http\Controllers\SupplierBankController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierDeliveryController;
+use App\Http\Controllers\SupplierDocumentController;
+use App\Http\Controllers\SupplierPortalController;
+use App\Http\Controllers\SupplierSirocController;
+use App\Http\Controllers\TaxController;
+use App\Http\Controllers\UserController;
 use App\Models\Requisition;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\{
-    ProfileController,
-    ProfilePasswordController,
-    LockScreenController,
-    UserController,
-    IncidentController,
-    AnnouncementController,
-    SupplierController,
-    SupplierDocumentController,
-    SupplierBankController,
-    SupplierSirocController,
-    DocumentReviewController,
-    CatSupplierController,
-    SatEfos69bController,
-    CompanyController,
-    TaxController,
-    StationController,
-    CategoryController,
-    CostCenterController,
-    AnnualBudgetController,
-    RequisitionController,
-    DepartmentController,
-    EmployeeController,
-    BudgetMovementController,
-    RequisitionWorkflowController,
-    ProductServiceController,
-    BudgetMonthlyDistributionController,
-    ExpenseCategoryController,
-    QuotationPlannerController,
-    RfqController,
-    SupplierPortalController,
-    RfqInboxController,
-    RfqComparisonController,
-    ApprovalLevelController,
-    QuotationApprovalController,
-    PurchaseOrderController,
-    DirectPurchaseOrderController,
-    ReceivingLocationController,
-    ReceptionController,
-    LogViewerController,
-    SupplierDeliveryController,
-    CostCenterImportController,
-    SatRetencionController,
-};
 
 // ============================================================================
 //  Serve storage files via PHP when symlink to network path won't work (local dev)
@@ -55,6 +54,7 @@ Route::get('/storage/{path}', function (string $path) {
         abort(404);
     }
     $mime = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($path) ?: 'application/octet-stream';
+
     return response(\Illuminate\Support\Facades\Storage::disk('public')->get($path), 200)
         ->header('Content-Type', $mime);
 })->where('path', '.*');
@@ -62,7 +62,7 @@ Route::get('/storage/{path}', function (string $path) {
 // ============================================================================
 //  Default redirect
 // ============================================================================
-Route::get('/', fn() => redirect()->route('login'));
+Route::get('/', fn () => redirect()->route('login'));
 
 // ============================================================================
 //  Lock Screen (solo requiere autenticación, no lock)
@@ -81,7 +81,7 @@ Route::middleware(['auth', 'lock'])->group(function () {
     // ------------------------------------------------------------------------
     //  Dashboard
     // ------------------------------------------------------------------------
-    Route::get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+    Route::get('/dashboard', fn () => view('dashboard'))->name('dashboard');
 
     // ------------------------------------------------------------------------
     //  Profile & Account
@@ -399,7 +399,7 @@ Route::middleware(['auth', 'lock'])->group(function () {
     Route::get('rfq/{rfq}/comparison', [RfqComparisonController::class, 'index'])->name('rfq.comparison.index');
 
     // RFQ Manage & Wizard
-    Route::get('/rfq/manage', fn() => view('rfq.manage'))->name('quotes.index');
+    Route::get('/rfq/manage', fn () => view('rfq.manage'))->name('quotes.index');
     Route::get('/rfq/wizard/{requisition}', function (Requisition $requisition) {
         return view('rfq.wizard', compact('requisition'));
     })->name('rfq.wizard.steps');
@@ -504,8 +504,9 @@ Route::middleware(['auth', 'lock', 'role:superadmin'])->group(function () {
         ->only(['index', 'edit', 'update'])
         ->names('approval-levels');
 
-    Route::get('/approvals/quotations', [QuotationApprovalController::class, 'index'])->name('approvals.quotations.index');
-    Route::post('/approvals/quotations/{summary}/handle', [QuotationApprovalController::class, 'handle'])->name('approvals.quotations.handle');
+    Route::resource('authorizer-roles', AuthorizerRoleController::class)
+        ->only(['index', 'edit', 'update'])
+        ->names('authorizer-roles');
 
     // SAT Retenciones
     Route::get('sat-retenciones/datatable', [SatRetencionController::class, 'datatable'])
@@ -515,10 +516,15 @@ Route::middleware(['auth', 'lock', 'role:superadmin'])->group(function () {
         ->parameters(['sat-retenciones' => 'sat_retencion']);
 });
 
+Route::middleware(['auth', 'lock'])->group(function () {
+    Route::get('/approvals/quotations', [QuotationApprovalController::class, 'index'])->name('approvals.quotations.index');
+    Route::post('/approvals/quotations/{summary}/handle', [QuotationApprovalController::class, 'handle'])->name('approvals.quotations.handle');
+});
+
 // ============================================================================
 //  Purchase Orders & RFQ Selection (superadmin | buyer)
 // ============================================================================
-Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () {
+Route::middleware(['auth', 'lock', 'role:superadmin|buyer|staff'])->group(function () {
     // RFQ Selection
     Route::post('/rfq/{rfq}/select', [RfqComparisonController::class, 'select'])->name('rfq.comparison.select');
 
@@ -541,9 +547,9 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
     Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
 
     // Recepciones — rutas estáticas ANTES de {reception} para evitar conflictos de parámetro
-    Route::get('/receptions/overview',                [ReceptionController::class, 'overview'])->name('receptions.overview');
+    Route::get('/receptions/overview', [ReceptionController::class, 'overview'])->name('receptions.overview');
     Route::get('/receptions/datatable/regular-pending', [ReceptionController::class, 'datatableRegularPending'])->name('receptions.datatable.regular-pending');
-    Route::get('/receptions/datatable/direct-pending',  [ReceptionController::class, 'datatableDirectPending'])->name('receptions.datatable.direct-pending');
+    Route::get('/receptions/datatable/direct-pending', [ReceptionController::class, 'datatableDirectPending'])->name('receptions.datatable.direct-pending');
     Route::get('/receptions/pending', [ReceptionController::class, 'pending'])->name('receptions.pending');
     Route::get('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'create'])->name('receptions.create');
     Route::post('/purchase-orders/{purchaseOrder}/receive', [ReceptionController::class, 'store'])->name('receptions.store');
@@ -562,15 +568,14 @@ Route::middleware(['auth', 'lock', 'role:superadmin|buyer'])->group(function () 
 // ============================================================================
 //  Dev Tools (solo usuario id=1)
 // ============================================================================
-    Route::get('/dev/logs',   [LogViewerController::class, 'index'])->name('dev.log.index');
-    Route::delete('/dev/logs', [LogViewerController::class, 'clear'])->name('dev.log.clear');
+Route::get('/dev/logs', [LogViewerController::class, 'index'])->name('dev.log.index');
+Route::delete('/dev/logs', [LogViewerController::class, 'clear'])->name('dev.log.clear');
 
 // ============================================================================
 //  Rutas comentadas (sin uso actual, conservadas por decisión)
 // ============================================================================
 
-
 // ============================================================================
 //  Autenticación
 // ============================================================================
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

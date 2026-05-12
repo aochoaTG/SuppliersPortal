@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Employee extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'user_id',
         'archivo_origen',
@@ -44,13 +46,13 @@ class Employee extends Model
     ];
 
     protected $casts = [
-        'hire_date'         => 'date',
-        'termination_date'  => 'date',
-        'vacation_balance'  => 'decimal:4',
-        'savings_fund'      => 'decimal:4',
-        'daily_salary'      => 'decimal:4',
-        'severance_bonus'   => 'decimal:4',
-        'indemnization'     => 'decimal:4',
+        'hire_date' => 'date',
+        'termination_date' => 'date',
+        'vacation_balance' => 'decimal:4',
+        'savings_fund' => 'decimal:4',
+        'daily_salary' => 'decimal:4',
+        'severance_bonus' => 'decimal:4',
+        'indemnization' => 'decimal:4',
         'seniority_premium' => 'decimal:4',
     ];
 
@@ -60,10 +62,10 @@ class Employee extends Model
      */
     public function getFullNameAttribute(): string
     {
-        return trim($this->first_name . ' ' . ($this->last_name ?? ''));
+        return trim($this->first_name.' '.($this->last_name ?? ''));
     }
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }

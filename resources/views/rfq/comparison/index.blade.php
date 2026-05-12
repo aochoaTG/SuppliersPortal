@@ -36,7 +36,7 @@
                         <div>
                             <h5 class="alert-heading fw-bold mb-1">ADJUDICACIÓN RECHAZADA ANTERIORMENTE</h5>
                             <p class="mb-1 text-dark"><strong>Motivo:</strong> {{ $rfq->quotationSummary->rejection_reason }}</p>
-                            <small class="text-muted">Por: <strong>{{ $rfq->quotationSummary->rejectedBy?->name }}</strong> el {{ $rfq->quotationSummary->rejected_at?->format('d/m/Y H:i') }}</small>
+                            <small class="text-muted">Por: <strong>{{ $rfq->quotationSummary->rejector?->name }}</strong> el {{ $rfq->quotationSummary->rejected_at?->format('d/m/Y H:i') }}</small>
                         </div>
                     </div>
                 </div>
@@ -67,7 +67,9 @@
                         </div>
                         <div class="ms-auto text-end">
                             <small class="text-muted d-block italic">Disponible para esta compra</small>
-                            <h4 class="mb-0 text-dark fw-bold">${{ number_format($presupuestoDisponible, 2) }}</h4>
+                            <h4 class="mb-0 text-dark fw-bold">
+                                {{ $presupuestoDisponible !== null ? '$' . number_format($presupuestoDisponible, 2) : 'Se valida al adjudicar' }}
+                            </h4>
                         </div>
                     </div>
                 </div>
@@ -288,7 +290,7 @@
                                     $subtotal = $rfq->rfqResponses->where('supplier_id', $supplier->id)->sum('subtotal');
                                     $iva = $rfq->rfqResponses->where('supplier_id', $supplier->id)->sum('iva_amount');
                                     $total = $subtotal + $iva;
-                                    $isOver = $total > $presupuestoDisponible;
+                                    $isOver = $presupuestoDisponible !== null ? $total > $presupuestoDisponible : false;
                                 @endphp
                                 <td class="text-center border-0">
                                     @if($hasResponded)
@@ -336,7 +338,7 @@
                                                 data-total="{{ number_format($totalFinal, 2) }}"
                                                 data-delivery="{{ $maxDelivery ?? '—' }}"
                                                 data-currency="{{ $supplierCurrencies ?: 'MXN' }}"
-                                                {{ ($totalFinal > $presupuestoDisponible || $supplierExpired) ? 'disabled' : '' }}
+                                                {{ (($presupuestoDisponible !== null && $totalFinal > $presupuestoDisponible) || $supplierExpired) ? 'disabled' : '' }}
                                                 title="{{ $supplierExpired ? 'No se puede adjudicar: la oferta está vencida' : '' }}">
                                             <i class="ti ti-trophy me-1"></i>Adjudicar
                                         </button>

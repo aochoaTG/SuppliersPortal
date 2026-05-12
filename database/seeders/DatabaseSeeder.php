@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -29,6 +28,7 @@ class DatabaseSeeder extends Seeder
             ReceivingLocationSeeder::class,
             QuotationPlannerTestSeeder::class,
             ApprovalLevelSeeder::class,
+            AuthorizerRoleSeeder::class,
             SatRetencionSeeder::class,
         ]);
     }

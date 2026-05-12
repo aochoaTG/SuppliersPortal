@@ -15,6 +15,7 @@ class BudgetCommitment extends Model
     protected $fillable = [
         'direct_purchase_order_id',
         'purchase_order_id',
+        'quotation_summary_id',
         'cost_center_id',
         'application_month',
         'expense_category_id',
@@ -38,7 +39,6 @@ class BudgetCommitment extends Model
      * RELACIONES
      * =========================================
      */
-
     public function directPurchaseOrder(): BelongsTo
     {
         return $this->belongsTo(DirectPurchaseOrder::class);
@@ -47,6 +47,11 @@ class BudgetCommitment extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function quotationSummary(): BelongsTo
+    {
+        return $this->belongsTo(QuotationSummary::class);
     }
 
     public function costCenter(): BelongsTo
@@ -117,7 +122,7 @@ class BudgetCommitment extends Model
     public function markAsReceived(): void
     {
         $this->update([
-            'status'      => 'RECEIVED',
+            'status' => 'RECEIVED',
             'received_at' => now(),
         ]);
     }
@@ -159,6 +164,10 @@ class BudgetCommitment extends Model
         if ($this->purchase_order_id) {
             return 'OC';
         }
+        if ($this->quotation_summary_id) {
+            return 'COT';
+        }
+
         return 'Desconocido';
     }
 
@@ -173,6 +182,10 @@ class BudgetCommitment extends Model
         if ($this->purchase_order_id) {
             return $this->purchaseOrder?->folio;
         }
+        if ($this->quotation_summary_id) {
+            return $this->quotationSummary?->rfq?->folio;
+        }
+
         return null;
     }
 
@@ -222,6 +235,11 @@ class BudgetCommitment extends Model
     public function scopeFromPurchaseOrders($query)
     {
         return $query->whereNotNull('purchase_order_id');
+    }
+
+    public function scopeFromQuotationSummaries($query)
+    {
+        return $query->whereNotNull('quotation_summary_id');
     }
 
     /**

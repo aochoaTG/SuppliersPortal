@@ -3,19 +3,19 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Company;
-use App\Models\CostCenter;
-
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, SoftDeletes;
+    use HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -37,8 +37,8 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'last_login'        => 'datetime',
-        'is_active'         => 'boolean',
+        'last_login' => 'datetime',
+        'is_active' => 'boolean',
     ];
 
     /**
@@ -68,15 +68,42 @@ class User extends Authenticatable
     }
 
     // app/Models/User.php
-    public function employee()
+    public function employee(): HasOne
     {
         return $this->hasOne(Employee::class);
+    }
+
+    public function authorizerAssignment(): HasOne
+    {
+        return $this->hasOne(UserAuthorizerRole::class);
+    }
+
+    public function authorizerRole(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            AuthorizerRole::class,
+            UserAuthorizerRole::class,
+            'user_id',
+            'id',
+            'id',
+            'authorizer_role_id'
+        );
+    }
+
+    public function authorizerExceptions(): HasMany
+    {
+        return $this->hasMany(AuthorizerException::class);
+    }
+
+    public function activeAuthorizerException(): HasOne
+    {
+        return $this->hasOne(AuthorizerException::class)->active()->latestOfMany();
     }
 
     // Accesor útil para mostrar nombre completo
     public function getFullNameAttribute(): string
     {
-        return trim(($this->first_name ?? '') . ' ' . ($this->last_name ?? '')) ?: ($this->name ?? '');
+        return trim(($this->first_name ?? '').' '.($this->last_name ?? '')) ?: ($this->name ?? '');
     }
 
     public function isSupplier(): bool
@@ -87,7 +114,9 @@ class User extends Authenticatable
     public function supplierStatus(?string $status = null): bool
     {
         $supplier = $this->supplier; // usa relación ya cargada si existe
-        if (!$supplier) return false;
+        if (! $supplier) {
+            return false;
+        }
 
         return $status ? $supplier->status === $status : (bool) $supplier->status;
     }

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Gate; // 👈 AGREGAR ESTA LÍNEA
 use App\Models\ExchangeRate;
@@ -40,9 +41,18 @@ class AppServiceProvider extends ServiceProvider
             $view->with('pendingReviewCount', $pendingCount);
         });
 
-        // Tipo de cambio USD/MXN para el navbar (solo en contexto web)
-        if (! $this->app->runningInConsole()) {
-            View::share('exchangeRate', rescue(fn () => ExchangeRate::current('USD', 'MXN'), null));
+        // Compartir siempre la variable para evitar excepciones en vistas que la esperan.
+        View::share('exchangeRate', null);
+
+        // Tipo de cambio USD/MXN solo para pantallas autenticadas que muestran navbar.
+        if (! $this->app->runningInConsole() && request()->user()) {
+            View::share(
+                'exchangeRate',
+                rescue(
+                    fn () => Cache::remember('exchange_rate_usd_mxn_current', 300, fn () => ExchangeRate::current('USD', 'MXN')),
+                    null
+                )
+            );
         }
     }
 }

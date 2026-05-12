@@ -8,6 +8,7 @@ use App\Models\BudgetMonthlyDistribution;
 use App\Models\CostCenter;
 use App\Models\DirectPurchaseOrder;
 use App\Models\PurchaseOrder;
+use App\Models\QuotationSummary;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -116,6 +117,49 @@ class BudgetAllocationService
         });
     }
 
+    public function reserveQuotationSummary(QuotationSummary $summary): void
+    {
+        DB::transaction(function () use ($summary) {
+            foreach ($this->getQuotationSummaryBudgetLines($summary) as $line) {
+                $this->commitLine($summary, $line);
+            }
+
+            $summary->forceFill([
+                'budget_reserved_at' => now(),
+                'budget_released_at' => null,
+            ])->save();
+        });
+    }
+
+    public function releaseQuotationSummary(QuotationSummary $summary): void
+    {
+        DB::transaction(function () use ($summary) {
+            foreach ($this->getQuotationSummaryBudgetLines($summary) as $line) {
+                $this->releaseLine($summary, $line);
+            }
+
+            $summary->forceFill([
+                'budget_released_at' => now(),
+            ])->save();
+        });
+    }
+
+    public function transferQuotationSummaryToPurchaseOrder(QuotationSummary $summary, PurchaseOrder $purchaseOrder): void
+    {
+        DB::transaction(function () use ($summary, $purchaseOrder) {
+            BudgetCommitment::query()
+                ->where('quotation_summary_id', $summary->id)
+                ->where('status', 'COMMITTED')
+                ->get()
+                ->each(function (BudgetCommitment $commitment) use ($purchaseOrder) {
+                    $commitment->update([
+                        'quotation_summary_id' => null,
+                        'purchase_order_id' => $purchaseOrder->id,
+                    ]);
+                });
+        });
+    }
+
     private function commitLine(Model $order, array $line): void
     {
         $existing = $this->findCommitments($order, $line['expense_category_id'])
@@ -126,10 +170,11 @@ class BudgetAllocationService
         }
 
         if ($line['budget_type'] !== 'ANNUAL') {
-            $commitment = new BudgetCommitment();
+            $commitment = new BudgetCommitment;
             $this->fillCommitment($commitment, $order, $line, 'COMMITTED', null, $line['amount']);
             $commitment->committed_at = now();
             $commitment->save();
+
             return;
         }
 
@@ -153,7 +198,7 @@ class BudgetAllocationService
                 );
             }
 
-            $commitment = new BudgetCommitment();
+            $commitment = new BudgetCommitment;
             $this->fillCommitment(
                 $commitment,
                 $order,
@@ -358,6 +403,30 @@ class BudgetAllocationService
         throw new RuntimeException('Tipo de orden no soportado para asignación presupuestal.');
     }
 
+    private function getQuotationSummaryBudgetLines(QuotationSummary $summary): array
+    {
+        $summary->loadMissing('rfq.rfqResponses.requisitionItem', 'requisition.costCenter');
+        $applicationMonth = now()->format('Y-m');
+
+        return $summary->rfq->rfqResponses
+            ->where('supplier_id', $summary->selected_supplier_id)
+            ->groupBy(fn ($response) => $response->requisitionItem?->expense_category_id)
+            ->filter(fn ($items, $categoryId) => ! empty($categoryId))
+            ->map(function ($items, $categoryId) use ($summary, $applicationMonth) {
+                return [
+                    'cost_center_id' => (int) $summary->requisition->cost_center_id,
+                    'expense_category_id' => (int) $categoryId,
+                    'amount' => (float) $items->sum('total'),
+                    'year' => (int) substr($applicationMonth, 0, 4),
+                    'month' => (int) substr($applicationMonth, 5, 2),
+                    'application_month' => $applicationMonth,
+                    'budget_type' => $summary->requisition->costCenter?->budget_type ?? 'ANNUAL',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     private function findCommitments(Model $order, int $expenseCategoryId): Collection
     {
         $query = BudgetCommitment::query()->where('expense_category_id', $expenseCategoryId);
@@ -366,6 +435,8 @@ class BudgetAllocationService
             $query->where('direct_purchase_order_id', $order->id);
         } elseif ($order instanceof PurchaseOrder) {
             $query->where('purchase_order_id', $order->id);
+        } elseif ($order instanceof QuotationSummary) {
+            $query->where('quotation_summary_id', $order->id);
         } else {
             throw new RuntimeException('Tipo de orden no soportado para compromisos.');
         }
@@ -383,6 +454,7 @@ class BudgetAllocationService
     ): void {
         $commitment->direct_purchase_order_id = $order instanceof DirectPurchaseOrder ? $order->id : null;
         $commitment->purchase_order_id = $order instanceof PurchaseOrder ? $order->id : null;
+        $commitment->quotation_summary_id = $order instanceof QuotationSummary ? $order->id : null;
         $commitment->cost_center_id = $line['cost_center_id'];
         $commitment->application_month = $line['application_month'];
         $commitment->expense_category_id = $line['expense_category_id'];
