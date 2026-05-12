@@ -25,7 +25,7 @@ class ReceptionController extends Controller
      */
     public function overview()
     {
-        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED'];
+        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION'];
 
         $regularCount = PurchaseOrder::whereIn('status', $pendingStatuses)->count();
         $directCount  = DirectPurchaseOrder::whereIn('status', $pendingStatuses)->count();
@@ -42,7 +42,7 @@ class ReceptionController extends Controller
             abort(403);
         }
 
-        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED'];
+        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION'];
 
         $query = PurchaseOrder::with(['supplier', 'receivingLocation', 'creator'])
             ->whereIn('status', $pendingStatuses)
@@ -101,7 +101,7 @@ class ReceptionController extends Controller
             abort(403);
         }
 
-        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED'];
+        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION'];
 
         $query = DirectPurchaseOrder::with(['supplier', 'receivingLocation', 'creator'])
             ->whereIn('status', $pendingStatuses)
@@ -171,7 +171,7 @@ class ReceptionController extends Controller
             $locationIds = $user->receivingLocations()->pluck('receiving_locations.id');
         }
 
-        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED'];
+        $pendingStatuses = ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION'];
 
         $purchaseOrders = PurchaseOrder::with(['supplier', 'receivingLocation', 'creator'])
             ->whereIn('status', $pendingStatuses)
@@ -429,5 +429,24 @@ class ReceptionController extends Controller
             $reception->remission_path,
             'Remision-' . $reception->folio . '.' . pathinfo($reception->remission_path, PATHINFO_EXTENSION)
         );
+    }
+
+    private function getRemainingBusinessDaysBadge(mixed $order): string
+    {
+        if ($order->status !== 'DELIVERED_PENDING_RECEPTION' || ! $order->reception_deadline_at) {
+            return '<span class="text-muted">—</span>';
+        }
+
+        $days = (int) now()->diffInWeekdays($order->reception_deadline_at, false);
+
+        [$class, $label] = match (true) {
+            $days >= 3  => ['bg-success',          "{$days} día(s)"],
+            $days === 2 => ['bg-warning text-dark', '2 días'],
+            $days === 1 => ['bg-danger',            '1 día'],
+            $days === 0 => ['bg-danger',            'Vence hoy'],
+            default     => ['bg-danger',            'Vencida'],
+        };
+
+        return "<span class=\"badge {$class}\"><i class=\"ti ti-clock me-1\"></i>{$label}</span>";
     }
 }
