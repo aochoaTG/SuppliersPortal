@@ -8,6 +8,18 @@
     <li class="breadcrumb-item active">Recepciones Pendientes</li>
 @endsection
 
+@push('styles')
+<style>
+@keyframes pulse-urgente {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+.urgente-pulse {
+    animation: pulse-urgente 1.4s ease-in-out infinite;
+}
+</style>
+@endpush
+
 @section('content')
 <div class="row">
     <div class="col-12">
@@ -65,12 +77,31 @@
                                             <th>Total</th>
                                             <th>Estado</th>
                                             <th>Emitida</th>
+                                            <th class="text-center">Días Restantes</th>
                                             <th class="text-center">Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($purchaseOrders as $po)
-                                        <tr>
+                                        @php
+                                            $isUrgent = $po->status === 'DELIVERED_PENDING_RECEPTION';
+                                            $daysLeft = $isUrgent && $po->reception_deadline_at
+                                                ? (int) now()->diffInWeekdays($po->reception_deadline_at, false)
+                                                : null;
+                                            $daysBadgeClass = match(true) {
+                                                $daysLeft === null => '',
+                                                $daysLeft >= 3     => 'bg-success',
+                                                $daysLeft === 2    => 'bg-warning text-dark',
+                                                default            => 'bg-danger',
+                                            };
+                                            $daysLabel = match(true) {
+                                                $daysLeft === null => '—',
+                                                $daysLeft > 0      => "{$daysLeft} día(s)",
+                                                $daysLeft === 0    => 'Vence hoy',
+                                                default            => 'Vencida',
+                                            };
+                                        @endphp
+                                        <tr class="{{ $isUrgent ? 'table-danger' : '' }}">
                                             <td class="fw-bold">{{ $po->folio }}</td>
                                             <td>{{ $po->supplier->company_name ?? '—' }}</td>
                                             <td>
@@ -90,14 +121,26 @@
                                                 <span class="badge bg-{{ $po->getStatusBadgeClass() }}">
                                                     {{ $po->getStatusLabel() }}
                                                 </span>
+                                                @if($isUrgent)
+                                                    <span class="badge bg-danger urgente-pulse ms-1">URGENTE</span>
+                                                @endif
                                             </td>
                                             <td class="text-muted small">
                                                 {{ $po->issued_at?->format('d/m/Y') ?? $po->created_at->format('d/m/Y') }}
                                             </td>
                                             <td class="text-center">
+                                                @if($daysLeft !== null)
+                                                    <span class="badge {{ $daysBadgeClass }}">
+                                                        <i class="ti ti-clock me-1"></i>{{ $daysLabel }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-center">
                                                 <a href="{{ route('receptions.create', $po) }}"
-                                                   class="btn btn-sm btn-success">
-                                                    <i class="ti ti-package-import me-1"></i>Recibir
+                                                   class="btn btn-sm {{ $isUrgent ? 'btn-danger' : 'btn-success' }}">
+                                                    <i class="ti {{ $isUrgent ? 'ti-clock' : 'ti-package-import' }} me-1"></i>Recibir
                                                 </a>
                                             </td>
                                         </tr>
@@ -127,12 +170,31 @@
                                             <th>Total</th>
                                             <th>Estado</th>
                                             <th>Emitida</th>
+                                            <th class="text-center">Días Restantes</th>
                                             <th class="text-center">Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($directOrders as $ocd)
-                                        <tr>
+                                        @php
+                                            $isUrgent = $ocd->status === 'DELIVERED_PENDING_RECEPTION';
+                                            $daysLeft = $isUrgent && $ocd->reception_deadline_at
+                                                ? (int) now()->diffInWeekdays($ocd->reception_deadline_at, false)
+                                                : null;
+                                            $daysBadgeClass = match(true) {
+                                                $daysLeft === null => '',
+                                                $daysLeft >= 3     => 'bg-success',
+                                                $daysLeft === 2    => 'bg-warning text-dark',
+                                                default            => 'bg-danger',
+                                            };
+                                            $daysLabel = match(true) {
+                                                $daysLeft === null => '—',
+                                                $daysLeft > 0      => "{$daysLeft} día(s)",
+                                                $daysLeft === 0    => 'Vence hoy',
+                                                default            => 'Vencida',
+                                            };
+                                        @endphp
+                                        <tr class="{{ $isUrgent ? 'table-danger' : '' }}">
                                             <td class="fw-bold">{{ $ocd->folio }}</td>
                                             <td>{{ $ocd->supplier->company_name ?? '—' }}</td>
                                             <td>
@@ -152,14 +214,26 @@
                                                 <span class="badge bg-{{ $ocd->getStatusBadgeClass() }}">
                                                     {{ $ocd->getStatusLabel() }}
                                                 </span>
+                                                @if($isUrgent)
+                                                    <span class="badge bg-danger urgente-pulse ms-1">URGENTE</span>
+                                                @endif
                                             </td>
                                             <td class="text-muted small">
                                                 {{ $ocd->issued_at?->format('d/m/Y') ?? '—' }}
                                             </td>
                                             <td class="text-center">
+                                                @if($daysLeft !== null)
+                                                    <span class="badge {{ $daysBadgeClass }}">
+                                                        <i class="ti ti-clock me-1"></i>{{ $daysLabel }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-center">
                                                 <a href="{{ route('receptions.create-direct', $ocd) }}"
-                                                   class="btn btn-sm btn-success">
-                                                    <i class="ti ti-package-import me-1"></i>Recibir
+                                                   class="btn btn-sm {{ $isUrgent ? 'btn-danger' : 'btn-success' }}">
+                                                    <i class="ti {{ $isUrgent ? 'ti-clock' : 'ti-package-import' }} me-1"></i>Recibir
                                                 </a>
                                             </td>
                                         </tr>
