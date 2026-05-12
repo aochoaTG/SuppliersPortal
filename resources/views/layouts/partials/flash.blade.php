@@ -1,14 +1,15 @@
 {{-- resources/views/partials/flash.blade.php --}}
 @if (session()->has('success') ||
+        session()->has('error') ||
         session()->has('warning') ||
         session()->has('danger') ||
         session()->has('info') ||
         $errors->any())
     {{-- Fallback Bootstrap (si no hay SweetAlert) --}}
     <div class="d-none container mt-2" id="flash-fallback">
-        @foreach (['success', 'warning', 'danger', 'info'] as $lvl)
+        @foreach (['success', 'warning', 'danger', 'error', 'info'] as $lvl)
             @if (session($lvl))
-                <div class="alert alert-{{ $lvl }} mb-2">
+                <div class="alert alert-{{ $lvl === 'error' ? 'danger' : $lvl }} mb-2">
                     {!! session($lvl) !!}
                 </div>
             @endif
@@ -32,6 +33,7 @@
             const hasSwal = typeof window.Swal !== 'undefined';
             const payload = {
                 success: @json(session('success')),
+                error: @json(session('error')),
                 warning: @json(session('warning')),
                 danger: @json(session('danger')),
                 info: @json(session('info')),
@@ -50,6 +52,7 @@
                     });
                 };
                 if (payload.success) show('success', 'Listo', payload.success);
+                if (payload.error) show('error', 'Error', payload.error);
                 if (payload.warning) show('warning', 'Atención', payload.warning);
                 if (payload.danger) show('error', 'Error', payload.danger);
                 if (payload.info) show('info', 'Info', payload.info);

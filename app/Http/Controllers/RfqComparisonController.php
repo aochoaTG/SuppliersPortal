@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class RfqComparisonController extends Controller
 {
@@ -25,6 +26,7 @@ class RfqComparisonController extends Controller
     public function index(Rfq $rfq)
     {
         $rfq->load([
+            'requisition.requester',
             'requisition.costCenter',
             'suppliers',
             'rfqResponses' => fn ($query) => $query->whereIn('status', ['SUBMITTED', 'SELECTED', 'REJECTED']),
@@ -34,12 +36,18 @@ class RfqComparisonController extends Controller
 
         $items = $rfq->getItemsToQuote();
         $approvalLevels = $this->approvalService->getAllLevels();
+        $supplierDiagnostics = $rfq->suppliers
+            ->mapWithKeys(fn ($supplier) => [
+                $supplier->id => $this->buildSupplierDiagnostics($rfq, $supplier->id),
+            ])
+            ->all();
 
         return view('rfq.comparison.index', [
             'rfq' => $rfq,
             'items' => $items,
             'presupuestoDisponible' => null,
             'approvalLevels' => $approvalLevels,
+            'supplierDiagnostics' => $supplierDiagnostics,
         ]);
     }
 
@@ -60,6 +68,12 @@ class RfqComparisonController extends Controller
 
         if (! $totals || (float) ($totals->total ?? 0) <= 0) {
             return back()->with('error', 'El proveedor seleccionado no tiene cotizaciones enviadas para esta RFQ.');
+        }
+
+        $diagnostics = $this->buildSupplierDiagnostics($rfq, $request->integer('supplier_id'));
+
+        if (! $diagnostics['allowed']) {
+            return back()->with('error', 'No se puede adjudicar esta oferta: '.implode(' ', $diagnostics['reasons']));
         }
 
         try {
@@ -111,10 +125,90 @@ class RfqComparisonController extends Controller
             return redirect()
                 ->route('rfq.index')
                 ->with('status', 'Adjudicación registrada y enviada a aprobación de '.($summary->currentApprover?->name ?? 'aprobador asignado').'.');
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::error("Error en adjudicación RFQ {$rfq->id}: {$exception->getMessage()}");
 
             return back()->with('error', 'No fue posible registrar la adjudicación: '.$exception->getMessage());
         }
+    }
+
+    private function buildSupplierDiagnostics(Rfq $rfq, int $supplierId): array
+    {
+        $responses = $rfq->rfqResponses
+            ->where('supplier_id', $supplierId)
+            ->where('status', 'SUBMITTED')
+            ->values();
+
+        $reasons = [];
+        $budgetMessages = [];
+
+        if ($responses->isEmpty()) {
+            $reasons[] = 'El proveedor no tiene cotizaciones enviadas para esta RFQ.';
+        }
+
+        $quotationDate = $responses->whereNotNull('quotation_date')->min('quotation_date');
+        $minValidityDays = $responses->whereNotNull('validity_days')->min('validity_days');
+
+        if ($quotationDate && $minValidityDays) {
+            $expiryDate = now()->parse($quotationDate)->addDays((int) $minValidityDays);
+
+            if ($expiryDate->isPast()) {
+                $reasons[] = 'La oferta está vencida desde el '.$expiryDate->format('d/m/Y').'.';
+            }
+        }
+
+        if ($responses->isNotEmpty()) {
+            try {
+                $summary = new QuotationSummary([
+                    'requisition_id' => $rfq->requisition_id,
+                    'rfq_id' => $rfq->id,
+                    'subtotal' => (float) $responses->sum('subtotal'),
+                    'iva_amount' => (float) $responses->sum('iva_amount'),
+                    'total' => (float) $responses->sum('total'),
+                    'selected_supplier_id' => $supplierId,
+                    'requested_by_user_id' => $rfq->requisition->requested_by,
+                ]);
+
+                $summary->setRelation('requisition', $rfq->requisition);
+                $summary->setRelation('requester', $rfq->requisition->requester);
+
+                $this->authorizerResolutionService->resolveForSummary($summary);
+            } catch (Throwable $exception) {
+                $reasons[] = $exception->getMessage();
+            }
+
+            $applicationYear = (int) now()->format('Y');
+            $applicationMonth = (int) now()->format('m');
+
+            $responses
+                ->groupBy(fn ($response) => $response->requisitionItem?->expense_category_id)
+                ->filter(fn ($items, $categoryId) => ! empty($categoryId))
+                ->each(function ($items, $categoryId) use ($rfq, $applicationYear, $applicationMonth, &$reasons, &$budgetMessages) {
+                    try {
+                        $budgetCheck = $this->budgetAllocationService->checkAvailability(
+                            (int) $rfq->requisition->cost_center_id,
+                            $applicationYear,
+                            $applicationMonth,
+                            (int) $categoryId,
+                            (float) $items->sum('total')
+                        );
+
+                        if (! $budgetCheck['available']) {
+                            $budgetMessages[] = $budgetCheck['message'];
+                            $reasons[] = $budgetCheck['message'];
+                        }
+                    } catch (Throwable $exception) {
+                        $budgetMessages[] = $exception->getMessage();
+                        $reasons[] = $exception->getMessage();
+                    }
+                });
+        }
+
+        return [
+            'allowed' => empty($reasons),
+            'reasons' => array_values(array_unique($reasons)),
+            'budget_blocked' => ! empty($budgetMessages),
+            'budget_messages' => array_values(array_unique($budgetMessages)),
+        ];
     }
 }

@@ -88,6 +88,7 @@
                             @foreach($rfq->suppliers as $supplier)
                                 @php 
                                     $hasResponded = !is_null($supplier->pivot->responded_at);
+                                    $selection = $supplierDiagnostics[$supplier->id] ?? ['allowed' => false, 'reasons' => []];
                                     
                                     // Cálculo de montos para nivel dinámico vía ApprovalService
                                     $subtotal = $rfq->rfqResponses->where('supplier_id', $supplier->id)->sum('subtotal');
@@ -331,6 +332,7 @@
                                                 $supplierExpired = \Carbon\Carbon::parse($sQDate)->addDays($sMinVal)->isPast();
                                             }
                                         @endphp
+                                        @if($selection['allowed'])
                                         <button type="button"
                                                 class="btn btn-primary btn-sm btn-select-winner shadow-sm px-4 rounded-pill"
                                                 data-supplier-id="{{ $supplier->id }}"
@@ -342,6 +344,19 @@
                                                 title="{{ $supplierExpired ? 'No se puede adjudicar: la oferta está vencida' : '' }}">
                                             <i class="ti ti-trophy me-1"></i>Adjudicar
                                         </button>
+                                        @else
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm btn-show-restrictions shadow-sm px-4 rounded-pill"
+                                                    data-supplier-name="{{ $supplier->company_name }}"
+                                                    data-reasons='@json($selection["reasons"])'>
+                                                <i class="ti ti-lock-exclamation me-1"></i>Bloqueada
+                                            </button>
+                                            @if(!empty($selection['reasons']))
+                                                <div class="mt-2 text-danger small fw-semibold">
+                                                    {{ $selection['reasons'][0] }}
+                                                </div>
+                                            @endif
+                                        @endif
                                     @else
                                         <button class="btn btn-light btn-sm rounded-pill" disabled>En espera</button>
                                     @endif
@@ -424,6 +439,21 @@
             $('#winner_delivery').text(delivery !== '—' ? delivery + ' días' : '—');
             $('#winner_currency_label').text(currency !== 'MXN' ? '⚠ Cotización en ' + currency : '');
             $('#modalAdjudicar').modal('show');
+        });
+
+        $('.btn-show-restrictions').on('click', function() {
+            const name = $(this).data('supplier-name');
+            const reasons = $(this).data('reasons') || [];
+            const html = Array.isArray(reasons) && reasons.length
+                ? '<ul class="text-start mb-0 ps-3">' + reasons.map(reason => `<li>${reason}</li>`).join('') + '</ul>'
+                : '<p class="mb-0">No se pudo determinar el motivo del bloqueo.</p>';
+
+            Swal.fire({
+                icon: 'warning',
+                title: 'AdjudicaciÃ³n bloqueada',
+                html: `<p class="mb-3"><strong>${name}</strong> no puede adjudicarse en este momento.</p>${html}`,
+                confirmButtonText: 'Entendido'
+            });
         });
     });
 </script>
