@@ -65,10 +65,14 @@ class ReceptionController extends Controller
                     . '</span>'
                     . e($po->receivingLocation->name);
             })
-            ->addColumn('estado', fn($po) =>
-                '<span class="badge bg-' . $po->getStatusBadgeClass() . '">'
-                . $po->getStatusLabel() . '</span>'
-            )
+            ->addColumn('estado', function ($po) {
+                $badge = '<span class="badge bg-' . $po->getStatusBadgeClass() . '">'
+                    . $po->getStatusLabel() . '</span>';
+                if ($po->status === 'DELIVERED_PENDING_RECEPTION') {
+                    $badge .= ' <span class="badge bg-danger urgente-pulse">URGENTE</span>';
+                }
+                return $badge;
+            })
             ->addColumn('emision', fn($po) =>
                 $po->issued_at
                     ? '<span class="text-muted small">' . $po->issued_at->format('d/m/Y') . '</span>'
@@ -77,18 +81,28 @@ class ReceptionController extends Controller
             ->addColumn('dias_transcurridos', fn($po) =>
                 $this->receptionService->getElapsedDaysBadge($po)
             )
+            ->addColumn('dias_restantes', fn($po) =>
+                $this->getRemainingBusinessDaysBadge($po)
+            )
             ->addColumn('actions', function ($po) {
                 $showUrl    = route('purchase-orders.show', $po->id);
                 $receiveUrl = route('receptions.create', $po->id);
 
+                $isUrgent = $po->status === 'DELIVERED_PENDING_RECEPTION';
+                $btnClass = $isUrgent ? 'btn-danger' : 'btn-outline-success';
+                $icon     = $isUrgent ? 'ti-clock' : 'ti-package-import';
+
                 return '<a href="' . $showUrl . '" class="btn btn-sm btn-outline-primary" title="Ver Detalle">
                             <i class="ti ti-eye"></i>
                         </a>
-                        <a href="' . $receiveUrl . '" class="btn btn-sm btn-outline-success ms-1" title="Registrar Recepción">
-                            <i class="ti ti-package-import"></i>
+                        <a href="' . $receiveUrl . '" class="btn btn-sm ' . $btnClass . ' ms-1" title="Registrar Recepción">
+                            <i class="ti ' . $icon . '"></i>
                         </a>';
             })
-            ->rawColumns(['folio', 'punto_entrega', 'estado', 'emision', 'dias_transcurridos', 'actions'])
+            ->setRowAttr([
+                'data-urgent' => fn($po) => $po->status === 'DELIVERED_PENDING_RECEPTION' ? '1' : '0',
+            ])
+            ->rawColumns(['folio', 'punto_entrega', 'estado', 'emision', 'dias_transcurridos', 'dias_restantes', 'actions'])
             ->make(true);
     }
 
@@ -129,10 +143,14 @@ class ReceptionController extends Controller
                 . e($ocd->creator->name)
                 . '</span>'
             )
-            ->addColumn('estado', fn($ocd) =>
-                '<span class="badge bg-' . $ocd->getStatusBadgeClass() . '">'
-                . $ocd->getStatusLabel() . '</span>'
-            )
+            ->addColumn('estado', function ($ocd) {
+                $badge = '<span class="badge bg-' . $ocd->getStatusBadgeClass() . '">'
+                    . $ocd->getStatusLabel() . '</span>';
+                if ($ocd->status === 'DELIVERED_PENDING_RECEPTION') {
+                    $badge .= ' <span class="badge bg-danger urgente-pulse">URGENTE</span>';
+                }
+                return $badge;
+            })
             ->addColumn('emision', fn($ocd) =>
                 $ocd->issued_at
                     ? '<span class="text-muted small">' . $ocd->issued_at->format('d/m/Y') . '</span>'
@@ -141,18 +159,28 @@ class ReceptionController extends Controller
             ->addColumn('dias_transcurridos', fn($ocd) =>
                 $this->receptionService->getElapsedDaysBadge($ocd)
             )
+            ->addColumn('dias_restantes', fn($ocd) =>
+                $this->getRemainingBusinessDaysBadge($ocd)
+            )
             ->addColumn('actions', function ($ocd) {
                 $showUrl    = route('direct-purchase-orders.show', $ocd->id);
                 $receiveUrl = route('receptions.create-direct', $ocd->id);
 
+                $isUrgent = $ocd->status === 'DELIVERED_PENDING_RECEPTION';
+                $btnClass = $isUrgent ? 'btn-danger' : 'btn-outline-success';
+                $icon     = $isUrgent ? 'ti-clock' : 'ti-package-import';
+
                 return '<a href="' . $showUrl . '" class="btn btn-sm btn-outline-primary" title="Ver Detalle">
                             <i class="ti ti-eye"></i>
                         </a>
-                        <a href="' . $receiveUrl . '" class="btn btn-sm btn-outline-success ms-1" title="Registrar Recepción">
-                            <i class="ti ti-package-import"></i>
+                        <a href="' . $receiveUrl . '" class="btn btn-sm ' . $btnClass . ' ms-1" title="Registrar Recepción">
+                            <i class="ti ' . $icon . '"></i>
                         </a>';
             })
-            ->rawColumns(['folio', 'punto_entrega', 'solicitante', 'estado', 'emision', 'dias_transcurridos', 'actions'])
+            ->setRowAttr([
+                'data-urgent' => fn($ocd) => $ocd->status === 'DELIVERED_PENDING_RECEPTION' ? '1' : '0',
+            ])
+            ->rawColumns(['folio', 'punto_entrega', 'solicitante', 'estado', 'emision', 'dias_transcurridos', 'dias_restantes', 'actions'])
             ->make(true);
     }
 
@@ -193,19 +221,22 @@ class ReceptionController extends Controller
      */
     public function create(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['items.requisitionItem', 'supplier', 'receivingLocation']);
+        $purchaseOrder->load(['items.requisitionItem', 'supplier', 'receivingLocation', 'deliveryEvidences']);
 
         $this->authorize('useMassReception', $purchaseOrder->receivingLocation);
 
         $repseWarning      = $this->receptionService->validateRepseIfService($purchaseOrder);
         $receivingLocations = ReceivingLocation::active()->orderBy('name')->get();
+        $evidence           = $purchaseOrder->deliveryEvidences->first();
 
         return view('receptions.create', [
-            'order'              => $purchaseOrder,
-            'orderType'          => 'purchase_order',
-            'storeRoute'         => route('receptions.store', $purchaseOrder),
-            'repseWarning'       => $repseWarning,
-            'receivingLocations' => $receivingLocations,
+            'order'               => $purchaseOrder,
+            'orderType'           => 'purchase_order',
+            'storeRoute'          => route('receptions.store', $purchaseOrder),
+            'repseWarning'        => $repseWarning,
+            'receivingLocations'  => $receivingLocations,
+            'deliveryEvidence'    => $evidence,
+            'deliveryEvidenceUrl' => $evidence ? Storage::disk('public')->url($evidence->file_path) : null,
         ]);
     }
 
@@ -274,19 +305,22 @@ class ReceptionController extends Controller
      */
     public function createDirect(DirectPurchaseOrder $directPurchaseOrder)
     {
-        $directPurchaseOrder->load(['items.expenseCategory', 'supplier', 'receivingLocation']);
+        $directPurchaseOrder->load(['items.expenseCategory', 'supplier', 'receivingLocation', 'deliveryEvidences']);
 
         $this->authorize('useMassReception', $directPurchaseOrder->receivingLocation);
 
         $repseWarning      = $this->receptionService->validateRepseIfService($directPurchaseOrder);
         $receivingLocations = ReceivingLocation::active()->orderBy('name')->get();
+        $evidence           = $directPurchaseOrder->deliveryEvidences->first();
 
         return view('receptions.create', [
-            'order'              => $directPurchaseOrder,
-            'orderType'          => 'direct_purchase_order',
-            'storeRoute'         => route('receptions.store-direct', $directPurchaseOrder),
-            'repseWarning'       => $repseWarning,
-            'receivingLocations' => $receivingLocations,
+            'order'               => $directPurchaseOrder,
+            'orderType'           => 'direct_purchase_order',
+            'storeRoute'          => route('receptions.store-direct', $directPurchaseOrder),
+            'repseWarning'        => $repseWarning,
+            'receivingLocations'  => $receivingLocations,
+            'deliveryEvidence'    => $evidence,
+            'deliveryEvidenceUrl' => $evidence ? Storage::disk('public')->url($evidence->file_path) : null,
         ]);
     }
 
