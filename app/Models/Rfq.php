@@ -6,13 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Rfq extends Model
 {
-    use SoftDeletes;
     use LogsActivity;
+    use SoftDeletes;
 
     protected $table = 'rfqs';
 
@@ -89,7 +89,7 @@ class Rfq extends Model
                 'invited_at',
                 'responded_at',
                 'quotation_pdf_path', // 👈 Agregar campo
-                'notes'
+                'notes',
             ])
             ->withTimestamps();
     }
@@ -132,9 +132,9 @@ class Rfq extends Model
         return $this->belongsTo(User::class, 'cancelled_by');
     }
 
-    public function quotationSummary(): BelongsTo
+    public function quotationSummary()
     {
-        return $this->belongsTo(QuotationSummary::class);
+        return $this->hasOne(QuotationSummary::class);
     }
 
     // =========================================================================
@@ -150,7 +150,7 @@ class Rfq extends Model
         $year = date('Y');
         $prefix = "RFQ-{$year}-";
 
-        $last = static::where('folio', 'like', $prefix . '%')
+        $last = static::where('folio', 'like', $prefix.'%')
             ->orderBy('folio', 'desc')
             ->value('folio');
 
@@ -168,7 +168,7 @@ class Rfq extends Model
      */
     public function isGroupRfq(): bool
     {
-        return !is_null($this->quotation_group_id);
+        return ! is_null($this->quotation_group_id);
     }
 
     /**
@@ -176,7 +176,7 @@ class Rfq extends Model
      */
     public function isItemRfq(): bool
     {
-        return !is_null($this->requisition_item_id);
+        return ! is_null($this->requisition_item_id);
     }
 
     /**
@@ -336,7 +336,7 @@ class Rfq extends Model
      */
     public function getDaysRemainingAttribute(): ?int
     {
-        if (!$this->response_deadline) {
+        if (! $this->response_deadline) {
             return null;
         }
 
@@ -349,7 +349,7 @@ class Rfq extends Model
     public function getTypeLabelAttribute(): string
     {
         if ($this->isGroupRfq()) {
-            return 'Grupo: ' . $this->quotationGroup->name;
+            return 'Grupo: '.$this->quotationGroup->name;
         }
 
         if ($this->isItemRfq()) {

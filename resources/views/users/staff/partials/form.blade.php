@@ -268,6 +268,57 @@
             <p class="text-muted fs-12 mb-0">No hay roles definidos.</p>
         @endif
 
+        <hr class="my-3">
+
+        <p class="text-uppercase text-muted fw-semibold mb-2"
+           style="font-size:10px;letter-spacing:.7px;">
+            <i class="ti ti-scale me-1"></i>Facultad de autorización
+        </p>
+
+        <div class="row g-2">
+            <div class="col-md-12">
+                <label class="form-label form-label-sm mb-1">Rol autorizador de matriz</label>
+                <select name="authorizer_role_id" class="form-select form-select-sm">
+                    <option value="">Sin rol autorizador asignado</option>
+                    @foreach(($authorizerRoles ?? collect()) as $authorizerRole)
+                        <option value="{{ $authorizerRole->id }}"
+                            {{ (string) old('authorizer_role_id', $user->authorizerAssignment?->authorizer_role_id) === (string) $authorizerRole->id ? 'selected' : '' }}>
+                            {{ $authorizerRole->name }}
+                        </option>
+                    @endforeach
+                </select>
+                <div class="form-text">Este rol es independiente de los roles técnicos del portal.</div>
+            </div>
+
+            <div class="col-md-12 mt-2">
+                <input type="hidden" name="authorization_exception_enabled" value="0">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="authorizationExceptionSwitch"
+                           name="authorization_exception_enabled" value="1"
+                           {{ old('authorization_exception_enabled', $user->activeAuthorizerException?->is_active) ? 'checked' : '' }}>
+                    <label class="form-check-label form-label-sm" for="authorizationExceptionSwitch">
+                        Usar excepción personalizada de monto
+                    </label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label form-label-sm mb-1">Límite personalizado</label>
+                <input type="number" step="0.01" min="0" name="authorization_exception_limit"
+                       value="{{ old('authorization_exception_limit', $user->activeAuthorizerException?->approval_limit) }}"
+                       class="form-control form-control-sm"
+                       placeholder="0.00">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label form-label-sm mb-1">Motivo de excepción</label>
+                <input type="text" name="authorization_exception_reason"
+                       value="{{ old('authorization_exception_reason', $user->activeAuthorizerException?->reason) }}"
+                       class="form-control form-control-sm"
+                       placeholder="Temporal, suplencia, acuerdo especial...">
+            </div>
+        </div>
+
         <div class="mt-3 d-none" id="formErrors"></div>
 
     </div>{{-- /modal-body --}}

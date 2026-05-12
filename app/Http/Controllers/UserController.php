@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\AuthorizerException;
+use App\Models\AuthorizerRole;
+use App\Models\Company;
+use App\Models\CostCenter;
 use App\Models\User;
-use Illuminate\Validation\Rule;
+use App\Models\UserAuthorizerRole;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
-use Spatie\Permission\Models\Role;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Http\UploadedFile;
-use App\Models\Company;
-use Illuminate\Support\Facades\Auth;
-use App\Models\CostCenter;
+use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -23,7 +25,7 @@ class UserController extends Controller
         return view('users.staff.index');
     }
 
-    function SupplierIndex(Request $request)
+    public function SupplierIndex(Request $request)
     {
         return view('users.suppliers.index');
     }
@@ -31,12 +33,12 @@ class UserController extends Controller
     // En tu UserController
     public function datatable(Request $request)
     {
-        $draw        = $request->get('draw');
-        $start       = $request->get('start');
-        $length      = $request->get('length');
-        $search      = $request->get('search')['value'] ?? '';
+        $draw = $request->get('draw');
+        $start = $request->get('start');
+        $length = $request->get('length');
+        $search = $request->get('search')['value'] ?? '';
         $orderColumn = $request->get('order')[0]['column'] ?? 0;
-        $orderDir    = $request->get('order')[0]['dir'] ?? 'asc';
+        $orderDir = $request->get('order')[0]['dir'] ?? 'asc';
 
         // Índices de columnas (ya incluye 'empresas')
         $columns = [
@@ -57,7 +59,7 @@ class UserController extends Controller
         $recordsTotal = User::count();
 
         // Búsqueda global
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'LIKE', "%{$search}%")
                     ->orWhere('email', 'LIKE', "%{$search}%")
@@ -74,7 +76,7 @@ class UserController extends Controller
 
         // Ordenamiento
         $orderable = $columns[$orderColumn] ?? 'id';
-        if (!in_array($orderable, ['empresas', 'roles', 'acciones'])) {
+        if (! in_array($orderable, ['empresas', 'roles', 'acciones'])) {
             $query->orderBy($orderable, $orderDir);
         } else {
             $query->orderBy('id', 'desc');
@@ -86,11 +88,11 @@ class UserController extends Controller
         // Paleta de colores por rol
         $roleColors = [
             'super-admin' => 'dark',
-            'admin'       => 'primary',
-            'manager'     => 'info',
-            'editor'      => 'warning',
-            'staff'       => 'secondary',
-            'supplier'    => 'success',
+            'admin' => 'primary',
+            'manager' => 'info',
+            'editor' => 'warning',
+            'staff' => 'secondary',
+            'supplier' => 'success',
         ];
 
         // Formatear respuesta
@@ -99,7 +101,8 @@ class UserController extends Controller
             // === BADGES DE ROLES ===
             $rolesHtml = $user->roles->pluck('name')->map(function ($name) use ($roleColors) {
                 $color = $roleColors[$name] ?? 'secondary';
-                return '<span class="badge bg-' . $color . ' me-1">' . e(trans("roles.{$name}")) . '</span>';
+
+                return '<span class="badge bg-'.$color.' me-1">'.e(trans("roles.{$name}")).'</span>';
             })->implode('');
 
             // === BADGES DE EMPRESAS ===
@@ -107,44 +110,44 @@ class UserController extends Controller
             if ($user->companies->isNotEmpty()) {
 
                 // Tooltip con lista completa
-                $tooltip = $user->companies->map(fn($c) => '[' . $c->code . '] ' . $c->name)->implode("\n");
+                $tooltip = $user->companies->map(fn ($c) => '['.$c->code.'] '.$c->name)->implode("\n");
 
                 // Mostrar solo las primeras 3 empresas
                 $badges = $user->companies->take(3)->map(function ($c) {
-                    return '<span class="badge bg-light text-dark border me-1">[' . e($c->code) . ']</span>';
+                    return '<span class="badge bg-light text-dark border me-1">['.e($c->code).']</span>';
                 })->implode('');
 
                 // Si hay más de 3, mostrar contador adicional
                 if ($user->companies->count() > 3) {
-                    $badges .= '<span class="badge bg-secondary">+' . ($user->companies->count() - 3) . '</span>';
+                    $badges .= '<span class="badge bg-secondary">+'.($user->companies->count() - 3).'</span>';
                 }
 
                 // Tooltip Bootstrap con saltos de línea
                 $empresasHtml = '<span data-bs-toggle="tooltip" data-bs-placement="top"
                                     data-bs-html="true"
-                                    title="' . e(nl2br($tooltip)) . '">' . $badges . '</span>';
+                                    title="'.e(nl2br($tooltip)).'">'.$badges.'</span>';
             }
 
             return [
-                'id'       => $user->id,
-                'name'     => e($user->name),
-                'email'    => e($user->email),
+                'id' => $user->id,
+                'name' => e($user->name),
+                'email' => e($user->email),
                 'telefono' => e($user->phone),
-                'puesto'   => e($user->job_title),
+                'puesto' => e($user->job_title),
                 'empresas' => $empresasHtml,
                 'centros_costo' => $this->formatCostCentersHtml($user),
-                'roles'    => $rolesHtml,
-                'activo'   => $user->is_active,
+                'roles' => $rolesHtml,
+                'activo' => $user->is_active,
                 'acciones' => view('users.staff.partials.actions', compact('user'))->render(),
             ];
         });
 
         // === RESPUESTA JSON PARA DATATABLES ===
         return response()->json([
-            'draw'            => intval($draw),
-            'recordsTotal'    => $recordsTotal,
+            'draw' => intval($draw),
+            'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
-            'data'            => $data,
+            'data' => $data,
         ]);
     }
 
@@ -162,7 +165,7 @@ class UserController extends Controller
         foreach ($grouped as $companyId => $centers) {
             $company = $user->companies->firstWhere('id', $companyId);
             if ($company) {
-                $tooltipHtml .= '<strong>[' . $company->code . ']</strong><br>';
+                $tooltipHtml .= '<strong>['.$company->code.']</strong><br>';
                 $tooltipHtml .= $centers->pluck('name')->implode('<br>');
                 $tooltipHtml .= '<br><br>';
             }
@@ -171,17 +174,18 @@ class UserController extends Controller
         // Mostrar solo los primeros 2 centros
         $badges = $user->costCenters->take(2)->map(function ($cc) {
             $badge = $cc->is_default ? 'bg-primary' : 'bg-light text-dark border';
-            return '<span class="badge ' . $badge . ' me-1">' . e($cc->code) . '</span>';
+
+            return '<span class="badge '.$badge.' me-1">'.e($cc->code).'</span>';
         })->implode('');
 
         // Contador si hay más
         if ($user->costCenters->count() > 2) {
-            $badges .= '<span class="badge bg-secondary">+' . ($user->costCenters->count() - 2) . '</span>';
+            $badges .= '<span class="badge bg-secondary">+'.($user->costCenters->count() - 2).'</span>';
         }
 
         return '<span data-bs-toggle="tooltip" data-bs-placement="top"
                   data-bs-html="true"
-                  title="' . $tooltipHtml . '">' . $badges . '</span>';
+                  title="'.$tooltipHtml.'">'.$badges.'</span>';
     }
 
     public function costCentersForm(User $user)
@@ -200,7 +204,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'cost_centers' => 'nullable|array',
             'cost_centers.*' => 'exists:cost_centers,id',
-            'default_cost_center' => 'nullable|exists:cost_centers,id'
+            'default_cost_center' => 'nullable|exists:cost_centers,id',
         ]);
 
         // Sincronizar centros de costo
@@ -211,7 +215,7 @@ class UserController extends Controller
                 'is_active' => true,
                 'created_by' => Auth::id(),
                 'created_at' => now(),
-                'updated_at' => now()
+                'updated_at' => now(),
             ];
         }
 
@@ -222,41 +226,48 @@ class UserController extends Controller
 
     public function create()
     {
-        $user  = new User();
+        $user = new User;
         $roles = Role::orderBy('name')->get(['id', 'name']);
+        $authorizerRoles = AuthorizerRole::where('is_active', true)->orderBy('display_order')->orderBy('name')->get(['id', 'name']);
 
         if (request()->ajax()) {
             return view('users.staff.partials.form', [
-                'user'      => $user,
-                'roles'     => $roles,
+                'user' => $user,
+                'roles' => $roles,
+                'authorizerRoles' => $authorizerRoles,
                 'userRoles' => collect(),
-                'mode'      => 'create',
-                'action'    => route('users.store'),
-                'method'    => 'POST',
-                'title'     => 'Crear usuario',
+                'mode' => 'create',
+                'action' => route('users.store'),
+                'method' => 'POST',
+                'title' => 'Crear usuario',
             ]);
         }
-        return view('users.staff.partials.form', compact('user', 'roles') + ['userRoles' => collect()]);
+
+        return view('users.staff.partials.form', compact('user', 'roles', 'authorizerRoles') + ['userRoles' => collect()]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'first_name' => ['nullable', 'string', 'max:120'],
-            'last_name'  => ['nullable', 'string', 'max:120'],
-            'name'       => ['required', 'string', 'max:180'],
-            'email'      => ['required', 'email', 'max:180', 'unique:users,email'],
-            'password'   => ['required', 'string', 'min:8'],
-            'phone'      => ['nullable', 'string', 'max:30'],
-            'job_title'  => ['nullable', 'string', 'max:120'],
-            'is_active'  => ['nullable', 'boolean'],
-            'avatar'     => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
-            'roles'      => ['nullable', 'array'],
-            'roles.*'    => ['string', 'exists:roles,name'],
+            'last_name' => ['nullable', 'string', 'max:120'],
+            'name' => ['required', 'string', 'max:180'],
+            'email' => ['required', 'email', 'max:180', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'job_title' => ['nullable', 'string', 'max:120'],
+            'is_active' => ['nullable', 'boolean'],
+            'avatar' => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', 'exists:roles,name'],
+            'authorizer_role_id' => ['nullable', 'exists:authorizer_roles,id'],
+            'authorization_exception_enabled' => ['nullable', 'boolean'],
+            'authorization_exception_limit' => ['nullable', 'numeric', 'min:0'],
+            'authorization_exception_reason' => ['nullable', 'string', 'max:255'],
         ]);
 
         if (blank($validated['name'])) {
-            $validated['name'] = trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? ''));
+            $validated['name'] = trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? ''));
         }
 
         $validated['is_active'] = (bool) ($validated['is_active'] ?? true);
@@ -269,9 +280,11 @@ class UserController extends Controller
                 $user->update(['avatar' => $path]);
             }
 
-            if (!empty($validated['roles'])) {
+            if (! empty($validated['roles'])) {
                 $user->syncRoles($validated['roles']);
             }
+
+            $this->syncAuthorizerData($user, $validated);
         });
 
         return redirect()->route('users.staff.index')->with('success', 'Usuario creado correctamente.');
@@ -279,58 +292,65 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        $user->load(['roles.permissions', 'companies', 'costCenters', 'employee']);
+        $user->load(['roles.permissions', 'companies', 'costCenters', 'employee', 'authorizerAssignment.authorizerRole', 'activeAuthorizerException']);
 
         return view('users.staff.show', compact('user'));
     }
 
     public function edit(User $user)
     {
-        $roles     = Role::orderBy('name')->get(['id', 'name']);
+        $roles = Role::orderBy('name')->get(['id', 'name']);
+        $authorizerRoles = AuthorizerRole::where('is_active', true)->orderBy('display_order')->orderBy('name')->get(['id', 'name']);
         $userRoles = $user->roles->pluck('name');
+        $user->loadMissing('authorizerAssignment.authorizerRole', 'activeAuthorizerException');
 
         return view('users.staff.partials.form', [
-            'user'      => $user,
-            'roles'     => $roles,
+            'user' => $user,
+            'roles' => $roles,
+            'authorizerRoles' => $authorizerRoles,
             'userRoles' => $userRoles,
-            'mode'      => 'edit',
-            'action'    => route('users.update', $user),
-            'method'    => 'PUT',
-            'title'     => 'Editar usuario',
+            'mode' => 'edit',
+            'action' => route('users.update', $user),
+            'method' => 'PUT',
+            'title' => 'Editar usuario',
         ]);
     }
 
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'first_name'    => ['nullable', 'string', 'max:120'],
-            'last_name'     => ['nullable', 'string', 'max:120'],
-            'name'          => ['required', 'string', 'max:150'],
-            'email'         => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone'         => ['nullable', 'string', 'max:30'],
-            'job_title'     => ['nullable', 'string', 'max:100'],
-            'is_active'     => ['nullable', 'boolean'],
-            'avatar'        => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
+            'first_name' => ['nullable', 'string', 'max:120'],
+            'last_name' => ['nullable', 'string', 'max:120'],
+            'name' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'job_title' => ['nullable', 'string', 'max:100'],
+            'is_active' => ['nullable', 'boolean'],
+            'avatar' => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp'],
             'remove_avatar' => ['nullable', 'boolean'],
-            'roles'         => ['nullable', 'array'],
-            'roles.*'       => ['string', 'exists:roles,name'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', 'exists:roles,name'],
+            'authorizer_role_id' => ['nullable', 'exists:authorizer_roles,id'],
+            'authorization_exception_enabled' => ['nullable', 'boolean'],
+            'authorization_exception_limit' => ['nullable', 'numeric', 'min:0'],
+            'authorization_exception_reason' => ['nullable', 'string', 'max:255'],
         ], [], [
-            'name'  => 'nombre',
+            'name' => 'nombre',
             'email' => 'correo',
         ]);
 
         $removeAvatar = (bool) ($validated['remove_avatar'] ?? false);
-        $newAvatar    = $request->file('avatar');
+        $newAvatar = $request->file('avatar');
 
         DB::transaction(function () use ($user, $validated, $removeAvatar, $newAvatar) {
 
             $user->first_name = $validated['first_name'] ?? $user->first_name;
-            $user->last_name  = $validated['last_name']  ?? $user->last_name;
-            $user->name       = $validated['name'];
-            $user->email      = $validated['email'];
-            $user->phone      = $validated['phone']      ?? $user->phone;
-            $user->job_title  = $validated['job_title']  ?? $user->job_title;
-            $user->is_active  = (bool) ($validated['is_active'] ?? false);
+            $user->last_name = $validated['last_name'] ?? $user->last_name;
+            $user->name = $validated['name'];
+            $user->email = $validated['email'];
+            $user->phone = $validated['phone'] ?? $user->phone;
+            $user->job_title = $validated['job_title'] ?? $user->job_title;
+            $user->is_active = (bool) ($validated['is_active'] ?? false);
 
             if ($removeAvatar && $user->avatar) {
                 Storage::disk('public')->delete($user->avatar);
@@ -347,20 +367,21 @@ class UserController extends Controller
             $user->save();
 
             $user->syncRoles($validated['roles'] ?? []);
+            $this->syncAuthorizerData($user, $validated);
         });
 
         if ($request->wantsJson()) {
             return response()->json([
-                'ok'      => true,
+                'ok' => true,
                 'message' => 'Usuario actualizado correctamente.',
-                'user'    => [
-                    'id'         => $user->id,
-                    'name'       => $user->name,
-                    'email'      => $user->email,
-                    'job_title'  => $user->job_title,
-                    'is_active'  => (bool) $user->is_active,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'job_title' => $user->job_title,
+                    'is_active' => (bool) $user->is_active,
                     'avatar_url' => $user->avatar
-                        ? asset('storage/' . $user->avatar)
+                        ? asset('storage/'.$user->avatar)
                         : null,
                 ],
             ]);
@@ -369,9 +390,50 @@ class UserController extends Controller
         return back()->with('success', 'Usuario actualizado correctamente.');
     }
 
+    private function syncAuthorizerData(User $user, array $validated): void
+    {
+        $roleId = $validated['authorizer_role_id'] ?? null;
+
+        if ($roleId) {
+            UserAuthorizerRole::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'authorizer_role_id' => $roleId,
+                    'assigned_by' => Auth::id(),
+                ]
+            );
+        } else {
+            UserAuthorizerRole::where('user_id', $user->id)->delete();
+        }
+
+        $exceptionEnabled = (bool) ($validated['authorization_exception_enabled'] ?? false);
+
+        if (
+            $exceptionEnabled
+            && isset($validated['authorization_exception_limit'])
+            && $validated['authorization_exception_limit'] !== null
+            && ! blank($validated['authorization_exception_reason'] ?? null)
+        ) {
+            AuthorizerException::updateOrCreate(
+                ['user_id' => $user->id, 'is_active' => true],
+                [
+                    'approval_limit' => $validated['authorization_exception_limit'],
+                    'reason' => $validated['authorization_exception_reason'],
+                    'created_by' => Auth::id(),
+                    'starts_at' => now(),
+                    'ends_at' => null,
+                ]
+            );
+        } else {
+            AuthorizerException::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->update(['is_active' => false, 'ends_at' => now()]);
+        }
+    }
+
     public function toggleActive(User $user)
     {
-        $user->is_active = !$user->is_active;
+        $user->is_active = ! $user->is_active;
         $user->save();
 
         return response()->json(['ok' => true, 'is_active' => $user->is_active]);
@@ -380,6 +442,7 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         $user->delete();
+
         return redirect()->route('users.staff.index')->with('success', 'Usuario eliminado.');
     }
 
@@ -396,7 +459,7 @@ class UserController extends Controller
     {
         // Validar arreglo de roles por nombre
         $data = $request->validate([
-            'roles'   => ['nullable', 'array'],
+            'roles' => ['nullable', 'array'],
             'roles.*' => ['string', 'exists:roles,name'],
         ]);
 
@@ -418,8 +481,8 @@ class UserController extends Controller
      */
     public function suppliersDatatable(Request $request)
     {
-        $draw   = intval($request->input('draw', 1));
-        $start  = intval($request->input('start', 0));
+        $draw = intval($request->input('draw', 1));
+        $start = intval($request->input('start', 0));
         $length = intval($request->input('length', 10));
         $search = trim($request->input('search.value', '')) ?: null;
 
@@ -529,12 +592,12 @@ class UserController extends Controller
             $rolesArr = $rolesByUser[$row->id] ?? [];
             $rolesHtml = empty($rolesArr)
                 ? '<span class="text-muted">—</span>'
-                : collect($rolesArr)->map(fn($r) => '<span class="badge bg-secondary me-1">' . e(trans("roles.{$r}")) . '</span>')->implode(' ');
+                : collect($rolesArr)->map(fn ($r) => '<span class="badge bg-secondary me-1">'.e(trans("roles.{$r}")).'</span>')->implode(' ');
 
-            $editUrl   = route('users.suppliers.edit', $row->id);
+            $editUrl = route('users.suppliers.edit', $row->id);
             $toggleUrl = route('users.suppliers.toggle', $row->id);
-            $delUrl    = route('users.suppliers.destroy', $row->id);
-            $docsUrl   = route('admin.review.suppliers.show', $row->supplier_id);
+            $delUrl = route('users.suppliers.destroy', $row->id);
+            $docsUrl = route('admin.review.suppliers.show', $row->supplier_id);
 
             $acciones = <<<HTML
                 <div class="d-flex justify-content-end gap-1">
@@ -546,14 +609,14 @@ class UserController extends Controller
                 HTML;
 
             return [
-                'id'             => $row->id,
-                'company_name'   => $row->company_name,
-                'rfc'            => $row->rfc,
+                'id' => $row->id,
+                'company_name' => $row->company_name,
+                'rfc' => $row->rfc,
                 'contact_person' => $row->contact_person,
-                'contact_phone'  => $row->contact_phone,
-                'email'          => $row->email,
-                'bank_name'      => $row->bank_name,
-                'last_login'     => optional($row->last_login)->format('Y-m-d H:i'), // 👈 NUEVO
+                'contact_phone' => $row->contact_phone,
+                'email' => $row->email,
+                'bank_name' => $row->bank_name,
+                'last_login' => optional($row->last_login)->format('Y-m-d H:i'), // 👈 NUEVO
                 'status' => match ($row->status) {
                     'pending_docs' => '
                         <span class="badge bg-warning text-dark">
@@ -569,19 +632,19 @@ class UserController extends Controller
                         </span>',
                     default => '
                         <span class="badge bg-secondary">
-                            <i class="ti ti-question-mark me-1"></i> ' . $row->status . '
+                            <i class="ti ti-question-mark me-1"></i> '.$row->status.'
                         </span>',
                 },
                 'is_active' => (bool) $row->is_active,
-                'acciones'       => $acciones,
+                'acciones' => $acciones,
             ];
         })->values();
 
         return response()->json([
-            'draw'            => $draw,
-            'recordsTotal'    => $recordsTotal,
+            'draw' => $draw,
+            'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
-            'data'            => $data,
+            'data' => $data,
         ]);
     }
 
@@ -593,7 +656,7 @@ class UserController extends Controller
         return response()->json([
             'message' => $user->is_active
                 ? 'Usuario activado correctamente'
-                : 'Usuario desactivado correctamente'
+                : 'Usuario desactivado correctamente',
         ]);
     }
 
@@ -603,7 +666,7 @@ class UserController extends Controller
         $user->delete();
 
         return response()->json([
-            'message' => "El proveedor {$name} fue eliminado correctamente"
+            'message' => "El proveedor {$name} fue eliminado correctamente",
         ]);
     }
 
@@ -612,7 +675,7 @@ class UserController extends Controller
         $user->load('supplier');
 
         // Opciones para selects
-        $statuses   = ['Pending_docs' => 'Documentos en revisión', 'approved' => 'Aprobado', 'rejected' => 'Rechazado'];
+        $statuses = ['Pending_docs' => 'Documentos en revisión', 'approved' => 'Aprobado', 'rejected' => 'Rechazado'];
         $currencies = ['MXN' => 'MXN (Peso Mexicano)', 'USD' => 'USD (Dólar USA)'];
 
         return view('users.suppliers.partials.form', compact('user', 'statuses', 'currencies'));
@@ -628,79 +691,79 @@ class UserController extends Controller
         // =====================================================================
         $request->validate([
             // --- Usuario ---
-            'user.name'      => ['required', 'string', 'max:150'],
-            'user.email'     => ['required', 'email', 'max:150',
-                                  Rule::unique('users', 'email')->ignore($user->id)],
+            'user.name' => ['required', 'string', 'max:150'],
+            'user.email' => ['required', 'email', 'max:150',
+                Rule::unique('users', 'email')->ignore($user->id)],
             'user.job_title' => ['nullable', 'string', 'max:100'],
             'user.is_active' => ['nullable', 'boolean'],
-            'user.avatar'    => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'user.avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 
             // --- Empresa / Contacto ---
-            'supplier.company_name'    => ['required', 'string', 'max:255'],
-            'supplier.rfc'             => ['required', 'string', 'max:13',
-                                           Rule::unique('suppliers', 'rfc')->ignore($supplierId)],
-            'supplier.phone_number'    => ['nullable', 'string', 'max:15'],
-            'supplier.contact_person'  => ['nullable', 'string', 'max:100'],
-            'supplier.contact_phone'   => ['nullable', 'string', 'max:10'],
-            'supplier.email'           => ['nullable', 'email', 'max:150'],
-            'supplier.address'         => ['nullable', 'string', 'max:500'],
-            'supplier.supplier_type'   => ['nullable', 'in:product,service,product_service'],
-            'supplier.currency'        => ['nullable', 'string', 'max:3'],
-            'supplier.tax_regime'      => ['nullable', 'in:individual,corporation,resico'],
-            'supplier.status'          => ['nullable', 'in:pending_docs,approved,rejected'],
-            'supplier.economic_activity'     => ['nullable', 'string', 'max:150'],
+            'supplier.company_name' => ['required', 'string', 'max:255'],
+            'supplier.rfc' => ['required', 'string', 'max:13',
+                Rule::unique('suppliers', 'rfc')->ignore($supplierId)],
+            'supplier.phone_number' => ['nullable', 'string', 'max:15'],
+            'supplier.contact_person' => ['nullable', 'string', 'max:100'],
+            'supplier.contact_phone' => ['nullable', 'string', 'max:10'],
+            'supplier.email' => ['nullable', 'email', 'max:150'],
+            'supplier.address' => ['nullable', 'string', 'max:500'],
+            'supplier.supplier_type' => ['nullable', 'in:product,service,product_service'],
+            'supplier.currency' => ['nullable', 'string', 'max:3'],
+            'supplier.tax_regime' => ['nullable', 'in:individual,corporation,resico'],
+            'supplier.status' => ['nullable', 'in:pending_docs,approved,rejected'],
+            'supplier.economic_activity' => ['nullable', 'string', 'max:150'],
             'supplier.default_payment_terms' => ['nullable', Rule::in(array_column(\App\Enum\PaymentTerm::cases(), 'value'))],
 
             // --- Bancario MX ---
-            'supplier.bank_name'       => ['nullable', 'string', 'max:100'],
-            'supplier.account_number'  => ['nullable', 'string', 'max:20'],
-            'supplier.clabe'           => ['nullable', 'digits:18'],
+            'supplier.bank_name' => ['nullable', 'string', 'max:100'],
+            'supplier.account_number' => ['nullable', 'string', 'max:20'],
+            'supplier.clabe' => ['nullable', 'digits:18'],
 
             // --- Bancario Internacional ---
-            'supplier.us_bank_name'    => ['nullable', 'string', 'max:100'],
-            'supplier.swift_bic'       => ['nullable', 'string', 'min:8', 'max:11'],
-            'supplier.aba_routing'     => ['nullable', 'digits:9'],
-            'supplier.iban'            => ['nullable', 'string', 'max:34'],
-            'supplier.bank_address'    => ['nullable', 'string', 'max:255'],
+            'supplier.us_bank_name' => ['nullable', 'string', 'max:100'],
+            'supplier.swift_bic' => ['nullable', 'string', 'min:8', 'max:11'],
+            'supplier.aba_routing' => ['nullable', 'digits:9'],
+            'supplier.iban' => ['nullable', 'string', 'max:34'],
+            'supplier.bank_address' => ['nullable', 'string', 'max:255'],
 
             // --- REPSE ---
             'supplier.provides_specialized_services' => ['nullable', 'boolean'],
-            'supplier.repse_registration_number'     => [
+            'supplier.repse_registration_number' => [
                 'nullable', 'string',
                 Rule::requiredIf(fn () => (bool) $request->input('supplier.provides_specialized_services')),
             ],
-            'supplier.repse_expiry_date'             => [
+            'supplier.repse_expiry_date' => [
                 'nullable', 'date',
                 Rule::requiredIf(fn () => (bool) $request->input('supplier.provides_specialized_services')),
             ],
-            'supplier.specialized_services_types'    => ['nullable', 'array'],
-            'supplier.specialized_services_types.*'  => ['string'],
+            'supplier.specialized_services_types' => ['nullable', 'array'],
+            'supplier.specialized_services_types.*' => ['string'],
         ], [
             // Mensajes personalizados
-            'user.name.required'              => 'El nombre del usuario es obligatorio.',
-            'user.email.required'             => 'El correo electrónico es obligatorio.',
-            'user.email.unique'               => 'Este correo ya está registrado en otro usuario.',
-            'user.avatar.image'               => 'El avatar debe ser una imagen.',
-            'user.avatar.max'                 => 'El avatar no debe superar 2 MB.',
-            'supplier.company_name.required'  => 'La razón social es obligatoria.',
-            'supplier.rfc.required'           => 'El RFC es obligatorio.',
-            'supplier.rfc.unique'             => 'Este RFC ya está registrado en otro proveedor.',
-            'supplier.email.email'            => 'El correo del proveedor no tiene un formato válido.',
-            'supplier.clabe.digits'           => 'La CLABE debe tener exactamente 18 dígitos.',
-            'supplier.aba_routing.digits'     => 'El ABA/Routing Number debe tener exactamente 9 dígitos.',
-            'supplier.swift_bic.min'          => 'El código SWIFT/BIC debe tener entre 8 y 11 caracteres.',
-            'supplier.swift_bic.max'          => 'El código SWIFT/BIC debe tener entre 8 y 11 caracteres.',
+            'user.name.required' => 'El nombre del usuario es obligatorio.',
+            'user.email.required' => 'El correo electrónico es obligatorio.',
+            'user.email.unique' => 'Este correo ya está registrado en otro usuario.',
+            'user.avatar.image' => 'El avatar debe ser una imagen.',
+            'user.avatar.max' => 'El avatar no debe superar 2 MB.',
+            'supplier.company_name.required' => 'La razón social es obligatoria.',
+            'supplier.rfc.required' => 'El RFC es obligatorio.',
+            'supplier.rfc.unique' => 'Este RFC ya está registrado en otro proveedor.',
+            'supplier.email.email' => 'El correo del proveedor no tiene un formato válido.',
+            'supplier.clabe.digits' => 'La CLABE debe tener exactamente 18 dígitos.',
+            'supplier.aba_routing.digits' => 'El ABA/Routing Number debe tener exactamente 9 dígitos.',
+            'supplier.swift_bic.min' => 'El código SWIFT/BIC debe tener entre 8 y 11 caracteres.',
+            'supplier.swift_bic.max' => 'El código SWIFT/BIC debe tener entre 8 y 11 caracteres.',
             'supplier.default_payment_terms.in' => 'Las condiciones de pago seleccionadas no son válidas.',
             'supplier.repse_registration_number.required' => 'El número de registro REPSE es obligatorio cuando el proveedor presta servicios especializados.',
-            'supplier.repse_expiry_date.required'         => 'La vigencia REPSE es obligatoria cuando el proveedor presta servicios especializados.',
+            'supplier.repse_expiry_date.required' => 'La vigencia REPSE es obligatoria cuando el proveedor presta servicios especializados.',
         ]);
 
         // =====================================================================
         // GUARDAR USUARIO
         // =====================================================================
         $user->fill([
-            'name'      => $request->input('user.name'),
-            'email'     => $request->input('user.email'),
+            'name' => $request->input('user.name'),
+            'email' => $request->input('user.email'),
             'job_title' => $request->input('user.job_title'),
         ]);
         $user->is_active = (bool) $request->input('user.is_active', false);
@@ -735,46 +798,46 @@ class UserController extends Controller
 
         $supplierData = [
             // Empresa / Contacto
-            'company_name'     => $request->input('supplier.company_name'),
-            'rfc'              => strtoupper((string) $request->input('supplier.rfc')),
-            'phone_number'     => $request->input('supplier.phone_number'),
-            'contact_person'   => $request->input('supplier.contact_person'),
-            'contact_phone'    => $request->input('supplier.contact_phone'),
-            'email'            => $request->input('supplier.email'),
-            'address'          => $request->input('supplier.address'),
-            'supplier_type'    => $request->input('supplier.supplier_type'),
-            'currency'         => $request->input('supplier.currency', 'MXN'),
-            'tax_regime'       => $request->input('supplier.tax_regime'),
-            'status'           => $request->input('supplier.status', $user->supplier->status ?? 'pending_docs'),
-            'economic_activity'     => $request->input('supplier.economic_activity'),
+            'company_name' => $request->input('supplier.company_name'),
+            'rfc' => strtoupper((string) $request->input('supplier.rfc')),
+            'phone_number' => $request->input('supplier.phone_number'),
+            'contact_person' => $request->input('supplier.contact_person'),
+            'contact_phone' => $request->input('supplier.contact_phone'),
+            'email' => $request->input('supplier.email'),
+            'address' => $request->input('supplier.address'),
+            'supplier_type' => $request->input('supplier.supplier_type'),
+            'currency' => $request->input('supplier.currency', 'MXN'),
+            'tax_regime' => $request->input('supplier.tax_regime'),
+            'status' => $request->input('supplier.status', $user->supplier->status ?? 'pending_docs'),
+            'economic_activity' => $request->input('supplier.economic_activity'),
             'default_payment_terms' => $request->input('supplier.default_payment_terms', 'CASH'),
 
             // Bancario MX
-            'bank_name'        => $request->input('supplier.bank_name'),
-            'account_number'   => $request->input('supplier.account_number') ?: null,
-            'clabe'            => $request->input('supplier.clabe') ?: null,
+            'bank_name' => $request->input('supplier.bank_name'),
+            'account_number' => $request->input('supplier.account_number') ?: null,
+            'clabe' => $request->input('supplier.clabe') ?: null,
 
             // Bancario Internacional
-            'us_bank_name'     => $request->input('supplier.us_bank_name'),
-            'swift_bic'        => $request->input('supplier.swift_bic')
+            'us_bank_name' => $request->input('supplier.us_bank_name'),
+            'swift_bic' => $request->input('supplier.swift_bic')
                                     ? strtoupper($request->input('supplier.swift_bic'))
                                     : null,
-            'aba_routing'      => $request->input('supplier.aba_routing') ?: null,
-            'iban'             => $request->input('supplier.iban')
+            'aba_routing' => $request->input('supplier.aba_routing') ?: null,
+            'iban' => $request->input('supplier.iban')
                                     ? strtoupper($request->input('supplier.iban'))
                                     : null,
-            'bank_address'     => $request->input('supplier.bank_address'),
+            'bank_address' => $request->input('supplier.bank_address'),
 
             // REPSE (los campos condicionales se limpian cuando el toggle está desactivado)
             'provides_specialized_services' => $providesSpecialized,
-            'repse_registration_number'     => $providesSpecialized
+            'repse_registration_number' => $providesSpecialized
                                                 ? $request->input('supplier.repse_registration_number')
                                                 : null,
-            'repse_expiry_date'             => $providesSpecialized
+            'repse_expiry_date' => $providesSpecialized
                                                 ? $request->input('supplier.repse_expiry_date')
                                                 : null,
             // El modelo tiene cast 'array', Laravel serializa el array a JSON automáticamente
-            'specialized_services_types'    => $providesSpecialized
+            'specialized_services_types' => $providesSpecialized
                                                 ? ($request->input('supplier.specialized_services_types') ?? [])
                                                 : [],
         ];
@@ -789,7 +852,7 @@ class UserController extends Controller
     public function editCompanies(User $user)
     {
         $companies = Company::orderBy('name')->get(['id', 'code', 'name']);
-        $attached  = $user->companies()->pluck('companies.id')->all();
+        $attached = $user->companies()->pluck('companies.id')->all();
 
         return view('users.staff.partials.companies', compact('user', 'companies', 'attached'));
     }
@@ -817,7 +880,7 @@ class UserController extends Controller
             'companies.costCenters' => function ($query) {
                 $query->orderBy('code');
             },
-            'costCenters'
+            'costCenters',
         ]);
 
         // Obtener IDs de centros de costo ya asignados al usuario
@@ -827,7 +890,7 @@ class UserController extends Controller
         if ($user->companies->isEmpty()) {
             return response()->json([
                 'error' => true,
-                'message' => 'El usuario no tiene compañías asignadas. Primero asigna compañías.'
+                'message' => 'El usuario no tiene compañías asignadas. Primero asigna compañías.',
             ], 422);
         }
 
@@ -844,10 +907,10 @@ class UserController extends Controller
         $validated = $request->validate([
             'cost_centers' => 'nullable|array',
             'cost_centers.*' => 'exists:cost_centers,id',
-            'default_cost_center' => 'nullable|exists:cost_centers,id'
+            'default_cost_center' => 'nullable|exists:cost_centers,id',
         ], [
             'cost_centers.*.exists' => 'Uno o más centros de costo no son válidos.',
-            'default_cost_center.exists' => 'El centro de costo predeterminado no es válido.'
+            'default_cost_center.exists' => 'El centro de costo predeterminado no es válido.',
         ]);
 
         try {
@@ -857,7 +920,7 @@ class UserController extends Controller
             $userCompanyIds = $user->companies()->pluck('companies.id')->toArray();
 
             // Validar que todos los centros de costo pertenezcan a las compañías del usuario
-            if (!empty($validated['cost_centers'])) {
+            if (! empty($validated['cost_centers'])) {
                 $invalidCostCenters = CostCenter::whereIn('id', $validated['cost_centers'])
                     ->whereNotIn('company_id', $userCompanyIds)
                     ->exists();
@@ -865,7 +928,7 @@ class UserController extends Controller
                 if ($invalidCostCenters) {
                     return response()->json([
                         'error' => true,
-                        'message' => 'Algunos centros de costo no pertenecen a las compañías del usuario.'
+                        'message' => 'Algunos centros de costo no pertenecen a las compañías del usuario.',
                     ], 422);
                 }
             }
@@ -885,7 +948,7 @@ class UserController extends Controller
                     'created_at' => $user->costCenters->contains($costCenterId)
                         ? $user->costCenters->find($costCenterId)->pivot->created_at
                         : now(),
-                    'updated_at' => now()
+                    'updated_at' => now(),
                 ];
             }
 
@@ -896,7 +959,7 @@ class UserController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Centros de costo actualizados correctamente'
+                'message' => 'Centros de costo actualizados correctamente',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -904,12 +967,12 @@ class UserController extends Controller
             Log::error('Error al actualizar centros de costo del usuario', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'error' => true,
-                'message' => 'Error al actualizar centros de costo: ' . $e->getMessage()
+                'message' => 'Error al actualizar centros de costo: '.$e->getMessage(),
             ], 500);
         }
     }

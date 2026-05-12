@@ -3,14 +3,12 @@
 namespace App\Models;
 
 use App\Enum\RequisitionStatus;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\Log;
-
 
 class Requisition extends Model
 {
@@ -62,13 +60,13 @@ class Requisition extends Model
     ];
 
     protected $casts = [
-        'required_date'  => 'date',
-        'paused_at'      => 'datetime',
+        'required_date' => 'date',
+        'paused_at' => 'datetime',
         'reactivated_at' => 'datetime',
-        'cancelled_at'   => 'datetime',
-        'rejected_at'    => 'datetime',
-        'created_at'     => 'datetime',
-        'updated_at'     => 'datetime',
+        'cancelled_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
 
         // ======= NUEVO: Casts para booleanos =======
         'validation_specs_clear' => 'boolean',
@@ -201,9 +199,9 @@ class Requisition extends Model
     /**
      * Resumen de cotización.
      */
-    public function quotationSummary(): HasOne
+    public function quotationSummaries(): HasMany
     {
-        return $this->hasOne(QuotationSummary::class);
+        return $this->hasMany(QuotationSummary::class);
     }
 
     // =========================================================================
@@ -218,7 +216,7 @@ class Requisition extends Model
     {
         $year = date('Y');
         $prefix = "REQ-{$year}-";
-        $last = static::where('folio', 'like', $prefix . '%')
+        $last = static::where('folio', 'like', $prefix.'%')
             ->orderBy('folio', 'desc')
             ->value('folio');
 
@@ -340,8 +338,9 @@ class Requisition extends Model
             'status_actual' => $this->status->value ?? $this->status,
         ]);
 
-        if (!$this->canBeSubmitted()) {
+        if (! $this->canBeSubmitted()) {
             Log::warning('❌ No se puede enviar - canBeSubmitted() = false');
+
             return false;
         }
 
@@ -362,7 +361,7 @@ class Requisition extends Model
             'nuevo_status' => $this->status->value ?? $this->status,
         ]);
 
-        if (!$saved) {
+        if (! $saved) {
             return false;
         }
 
@@ -396,7 +395,7 @@ class Requisition extends Model
 
             if ($purchasingUsers->isEmpty()) {
                 Log::warning('⚠️ No se encontraron usuarios con rol buyer', [
-                    'rol_buscado' => 'buyer'
+                    'rol_buscado' => 'buyer',
                 ]);
             } else {
                 Log::info('🛒 Notificando al Departamento de Compras', [
@@ -423,7 +422,7 @@ class Requisition extends Model
         } catch (\Exception $e) {
             Log::error('❌ Error general al notificar a Compras', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
         }
 
@@ -452,7 +451,7 @@ class Requisition extends Model
      */
     public function reactivate(int $userId): bool
     {
-        if (!$this->isPaused()) {
+        if (! $this->isPaused()) {
             return false;
         }
 
@@ -469,9 +468,9 @@ class Requisition extends Model
      */
     public function cancel(string $reason, int $userId): void
     {
-        if (!$this->canBeCancelled()) {
+        if (! $this->canBeCancelled()) {
             throw new \RuntimeException(
-                'No se puede cancelar una requisición en estado "' . $this->status->label() . '".'
+                'No se puede cancelar una requisición en estado "'.$this->status->label().'".'
             );
         }
 
@@ -489,7 +488,7 @@ class Requisition extends Model
      */
     public function reject(string $reason, int $userId): bool
     {
-        if (!$this->canBeRejected()) {
+        if (! $this->canBeRejected()) {
             return false;
         }
 
@@ -609,10 +608,9 @@ class Requisition extends Model
     {
         return $query->whereBetween('created_at', [
             "{$year}-01-01 00:00:00",
-            "{$year}-12-31 23:59:59"
+            "{$year}-12-31 23:59:59",
         ]);
     }
-
 
     /**
      * Scope para el dashboard de proveedores (ver solo lo que les compete).
@@ -633,9 +631,10 @@ class Requisition extends Model
             get: function ($value) {
                 // Manejar el default 'draft' que viene de la migración si no está en mayúsculas
                 $val = strtoupper($value);
+
                 return RequisitionStatus::tryFrom($val) ?? RequisitionStatus::DRAFT;
             },
-            set: fn(RequisitionStatus|string $value) => is_string($value) ? strtoupper($value) : $value->value,
+            set: fn (RequisitionStatus|string $value) => is_string($value) ? strtoupper($value) : $value->value,
         );
     }
 }

@@ -95,7 +95,11 @@
             {{-- Aprobar cotización — visible to: superadmin, staff, authorizer, general_director --}}
             @php
                 try {
-                    $pendingApprovalsCount = \App\Models\QuotationSummary::where('approval_status', 'pending')->count();
+                    $pendingApprovalsCount = auth()->check()
+                        ? \App\Models\QuotationSummary::where('approval_status', 'pending')
+                            ->where('current_approver_user_id', auth()->id())
+                            ->count()
+                        : 0;
                 } catch (\Exception $e) {
                     $pendingApprovalsCount = 0;
                 }
@@ -388,6 +392,7 @@ $openConfiguration =
     request()->routeIs('departments.*') ||
     request()->routeIs('receiving-locations.*') ||
     request()->routeIs('taxes.*') ||
+    request()->routeIs('authorizer-roles.*') ||
     request()->routeIs('approval-levels.*') ||
     request()->routeIs('sat-retenciones.*');
 @endphp
@@ -430,6 +435,12 @@ $openConfiguration =
                 <a href="{{ route('taxes.index') }}"
                     class="side-nav-link {{ request()->routeIs('taxes.*') ? 'active' : '' }}">
                     <span class="menu-text">IVA</span>
+                </a>
+            </li>
+            <li class="side-nav-item">
+                <a href="{{ route('authorizer-roles.index') }}"
+                    class="side-nav-link {{ request()->routeIs('authorizer-roles.*') ? 'active' : '' }}">
+                    <span class="menu-text">Roles Autorizadores</span>
                 </a>
             </li>
             <li class="side-nav-item">

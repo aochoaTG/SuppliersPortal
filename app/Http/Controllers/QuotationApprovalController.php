@@ -2,32 +2,37 @@
 
 namespace App\Http\Controllers;
 
+use App\Enum\RequisitionStatus;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\QuotationSummary;
+use App\Models\RfqResponse;
+use App\Notifications\QuotationApprovalApprovedNotification;
+use App\Notifications\QuotationApprovalRejectedNotification;
+use App\Services\BudgetAllocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Models\RfqResponse;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
-use App\Services\BudgetAllocationService;
 
 class QuotationApprovalController extends Controller
 {
     public function __construct(
         private BudgetAllocationService $budgetAllocationService
-    ) {
-    }
+    ) {}
 
     public function index()
     {
         $pendingApprovals = QuotationSummary::with([
-            'requisition.rfqs',
-            'approvalLevel',
-            'selectedSupplier'
+            'requisition',
+            'rfq.rfqResponses.requisitionItem',
+            'selectedSupplier',
+            'authorizerRole',
+            'requester',
         ])
-            ->where('approval_status', 'pending')
-            ->orderBy('created_at', 'desc')
+            ->pending()
+            ->assignedTo(Auth::id())
+            ->orderByDesc('created_at')
             ->get();
 
         return view('quotations.index', compact('pendingApprovals'));
@@ -35,108 +40,141 @@ class QuotationApprovalController extends Controller
 
     public function handle(Request $request, QuotationSummary $summary)
     {
+        abort_unless($summary->current_approver_user_id === Auth::id(), 403);
+
         $request->validate([
             'status' => 'required|in:approved,rejected',
-            'reason' => 'required_if:status,rejected|nullable|string|min:10'
+            'reason' => 'required_if:status,rejected|nullable|string|min:10',
         ]);
+
+        $summary->loadMissing('rfq.rfqResponses.requisitionItem', 'requisition.requester', 'selector', 'selectedSupplier', 'currentApprover');
 
         try {
             DB::transaction(function () use ($request, $summary) {
-                $rfq = $summary->requisition->rfqs()->first();
-                if ($request->status === 'approved') {
-                    // A. Actualizar el sumario
-                    $summary->update([
-                        'approval_status' => 'approved',
-                        'approved_by' => Auth::id(),
-                        'approved_at' => now(),
-                    ]);
+                $rfq = $summary->rfq;
 
-                    // B. Sellar estados comerciales
-                    // Marcamos al ganador como APPROVED (según tu migración)
-                    $rfq->rfqResponses()->where('supplier_id', $summary->selected_supplier_id)
+                if ($request->status === 'approved') {
+                    $summary->approve(Auth::id(), $summary->notes);
+
+                    $rfq->rfqResponses()
+                        ->where('supplier_id', $summary->selected_supplier_id)
                         ->update(['status' => 'SELECTED']);
 
-                    // Perdedores
-                    $rfq->rfqResponses()->where('supplier_id', '!=', $summary->selected_supplier_id)
+                    $rfq->rfqResponses()
+                        ->where('supplier_id', '!=', $summary->selected_supplier_id)
                         ->update(['status' => 'REJECTED']);
 
                     $rfq->update(['status' => 'COMPLETED']);
 
-                    // 🚀 3. GENERAR LA ORDEN DE COMPRA (OC)
-                    $this->generatePurchaseOrder($summary, $rfq);
+                    $purchaseOrder = $this->generatePurchaseOrder($summary);
+                    $this->budgetAllocationService->transferQuotationSummaryToPurchaseOrder($summary, $purchaseOrder);
+
+                    $this->refreshRequisitionStatus($summary->requisition_id);
                 } else {
-                    // --- FLUJO DE RETORNO (RECHAZO) ---
+                    $summary->reject(Auth::id(), $request->string('reason')->toString());
+                    $this->budgetAllocationService->releaseQuotationSummary($summary);
 
-                    // A. Registrar el rechazo con su motivo
-                    $summary->update([
-                        'approval_status' => 'rejected',
-                        'rejected_by' => Auth::id(),
-                        'rejected_at' => now(),
-                        'rejection_reason' => $request->reason
-                    ]);
-
-                    // B. Liberar la RFQ para el comprador
-                    // La regresamos a 'RECEIVED' para que vuelva a aparecer en su panel de evaluación
                     $rfq->update(['status' => 'RECEIVED']);
-
-                    // Reseteamos los estados de las respuestas para que el comprador pueda re-evaluar
                     $rfq->rfqResponses()->update(['status' => 'SUBMITTED']);
 
-                    // C. La Requisición vuelve a estar en fase de evaluación
-                    $summary->requisition->update(['status' => 'EVALUATING']);
+                    $summary->requisition->update(['status' => RequisitionStatus::IN_QUOTATION->value]);
                 }
             });
 
-            $msg = $request->status === 'approved'
-                ? '✅ Adjudicación autorizada y Orden de Compra generada.'
-                : '❌ Adjudicación rechazada. Se ha notificado al comprador para su re-evaluación.';
+            if ($request->status === 'approved') {
+                $this->notifyApprovalOutcome($summary->fresh(['requisition.requester', 'selector', 'rfq', 'selectedSupplier']), true);
 
-            return redirect()->route('approvals.quotations.index')->with('status', $msg);
-        } catch (\Exception $e) {
-            Log::error("Error en flujo de aprobación: " . $e->getMessage());
-            return back()->with('error', 'Falla en la operación: ' . $e->getMessage());
+                return redirect()
+                    ->route('approvals.quotations.index')
+                    ->with('status', 'Adjudicación autorizada y Orden de Compra generada.');
+            }
+
+            $this->notifyApprovalOutcome($summary->fresh(['requisition.requester', 'selector', 'rfq', 'selectedSupplier']), false);
+
+            return redirect()
+                ->route('approvals.quotations.index')
+                ->with('status', 'Adjudicación rechazada y devuelta a evaluación.');
+        } catch (\Throwable $exception) {
+            Log::error('Error en flujo de aprobación de cotización: '.$exception->getMessage());
+
+            return back()->with('error', 'No fue posible procesar la aprobación: '.$exception->getMessage());
         }
     }
 
-    private function generatePurchaseOrder(QuotationSummary $summary, $rfq)
+    private function generatePurchaseOrder(QuotationSummary $summary): PurchaseOrder
     {
         $winningResponses = RfqResponse::with('requisitionItem')
-            ->where('rfq_id', $rfq->id)
+            ->where('rfq_id', $summary->rfq_id)
             ->where('supplier_id', $summary->selected_supplier_id)
             ->get();
 
-        // 1. Crear Cabecera
-        $po = PurchaseOrder::create([
-            'folio'                    => 'OC-' . now()->format('Y') . '-' . str_pad($summary->id, 5, '0', STR_PAD_LEFT),
-            'requisition_id'           => $summary->requisition_id,
-            'supplier_id'              => $summary->selected_supplier_id,
-            'quotation_summary_id'     => $summary->id,
-            'receiving_location_id'    => $summary->requisition->receiving_location_id,
-            'subtotal'                 => $summary->subtotal,
-            'iva_amount'               => $summary->iva_amount,
-            'total'                    => $summary->total,
-            'payment_terms'            => $winningResponses->first()->payment_terms ?? 'Crédito',
-            'estimated_delivery_days'  => $winningResponses->max('delivery_days') ?? 0,
-            'status'                   => 'OPEN',
-            'created_by'               => Auth::id(),
+        $purchaseOrder = PurchaseOrder::create([
+            'folio' => 'OC-'.now()->format('Y').'-'.str_pad((string) $summary->id, 5, '0', STR_PAD_LEFT),
+            'requisition_id' => $summary->requisition_id,
+            'supplier_id' => $summary->selected_supplier_id,
+            'quotation_summary_id' => $summary->id,
+            'receiving_location_id' => $summary->requisition->receiving_location_id,
+            'subtotal' => $summary->subtotal,
+            'iva_amount' => $summary->iva_amount,
+            'total' => $summary->total,
+            'payment_terms' => $winningResponses->first()->payment_terms ?? 'Crédito',
+            'estimated_delivery_days' => $winningResponses->max('delivery_days') ?? 0,
+            'status' => 'OPEN',
+            'created_by' => Auth::id(),
         ]);
 
-        // 2. Crear Partidas
-        foreach ($winningResponses as $resp) {
+        foreach ($winningResponses as $response) {
             PurchaseOrderItem::create([
-                'purchase_order_id'   => $po->id,
-                'requisition_item_id' => $resp->requisition_item_id,
-                'description'         => $resp->requisitionItem->description ?? 'Sin descripción',
-                'quantity'            => $resp->quantity,
-                'unit_price'          => $resp->unit_price,
-                'subtotal'            => $resp->subtotal,
-                'iva_amount'          => $resp->iva_amount,
-                'total'               => $resp->total,
+                'purchase_order_id' => $purchaseOrder->id,
+                'requisition_item_id' => $response->requisition_item_id,
+                'description' => $response->requisitionItem->description ?? 'Sin descripción',
+                'quantity' => $response->quantity,
+                'unit_price' => $response->unit_price,
+                'subtotal' => $response->subtotal,
+                'iva_amount' => $response->iva_amount,
+                'total' => $response->total,
             ]);
         }
 
-        // 3. Finalizar la Requisición
-        $this->budgetAllocationService->commitOrder($po);
-        $summary->requisition->update(['status' => 'COMPLETED']);
+        return $purchaseOrder;
+    }
+
+    private function refreshRequisitionStatus(int $requisitionId): void
+    {
+        $requisition = \App\Models\Requisition::with(['rfqs.quotationSummary'])->findOrFail($requisitionId);
+        $activeRfqs = $requisition->rfqs->where('status', '!=', 'CANCELLED');
+
+        if ($activeRfqs->isEmpty()) {
+            $requisition->update(['status' => RequisitionStatus::IN_QUOTATION->value]);
+
+            return;
+        }
+
+        if ($activeRfqs->every(fn ($rfq) => $rfq->status === 'COMPLETED')) {
+            $requisition->update(['status' => RequisitionStatus::COMPLETED->value]);
+
+            return;
+        }
+
+        if ($activeRfqs->contains(fn ($rfq) => $rfq->quotationSummary && $rfq->quotationSummary->approval_status === 'pending')) {
+            $requisition->update(['status' => RequisitionStatus::QUOTED->value]);
+
+            return;
+        }
+
+        $requisition->update(['status' => RequisitionStatus::IN_QUOTATION->value]);
+    }
+
+    private function notifyApprovalOutcome(QuotationSummary $summary, bool $approved): void
+    {
+        $notification = $approved
+            ? new QuotationApprovalApprovedNotification($summary)
+            : new QuotationApprovalRejectedNotification($summary);
+
+        collect([$summary->selector, $summary->requisition?->requester])
+            ->filter()
+            ->unique('id')
+            ->each
+            ->notify($notification);
     }
 }

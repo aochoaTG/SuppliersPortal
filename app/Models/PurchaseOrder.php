@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Carbon\Carbon;
 
 class PurchaseOrder extends Model
 {
@@ -115,6 +114,11 @@ class PurchaseOrder extends Model
         return $this->hasMany(BudgetCommitment::class);
     }
 
+    public function quotationSummary()
+    {
+        return $this->belongsTo(QuotationSummary::class);
+    }
+
     public function receivingLocation()
     {
         return $this->belongsTo(ReceivingLocation::class);
@@ -186,30 +190,30 @@ class PurchaseOrder extends Model
     public function getStatusLabel(): string
     {
         return match ($this->status) {
-            'OPEN'               => 'Abierta',
-            'ISSUED'             => 'Emitida',
+            'OPEN' => 'Abierta',
+            'ISSUED' => 'Emitida',
             'PARTIALLY_RECEIVED' => 'Parcialmente Recibida',
-            'RECEIVED'           => 'Recibida',
-            'CANCELLED'          => 'Cancelada',
-            'PAID'               => 'Pagada',
+            'RECEIVED' => 'Recibida',
+            'CANCELLED' => 'Cancelada',
+            'PAID' => 'Pagada',
             'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
             'DELIVERED_PENDING_RECEPTION' => 'Entregada — Pendiente de Captura',
-            default              => 'Desconocido',
+            default => 'Desconocido',
         };
     }
 
     public function getStatusBadgeClass(): string
     {
         return match ($this->status) {
-            'OPEN'               => 'warning',
-            'ISSUED'             => 'info',
+            'OPEN' => 'warning',
+            'ISSUED' => 'info',
             'PARTIALLY_RECEIVED' => 'primary',
-            'RECEIVED'           => 'success',
-            'CANCELLED'          => 'danger',
-            'PAID'               => 'success',
+            'RECEIVED' => 'success',
+            'CANCELLED' => 'danger',
+            'PAID' => 'success',
             'CLOSED_BY_INACTIVITY' => 'dark',
             'DELIVERED_PENDING_RECEPTION' => 'danger',
-            default              => 'secondary',
+            default => 'secondary',
         };
     }
 
