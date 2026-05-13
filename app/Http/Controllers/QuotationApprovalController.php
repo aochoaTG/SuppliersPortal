@@ -40,7 +40,7 @@ class QuotationApprovalController extends Controller
 
     public function handle(Request $request, QuotationSummary $summary)
     {
-        abort_unless($summary->current_approver_user_id === Auth::id(), 403);
+        abort_unless((int) $summary->current_approver_user_id === (int) Auth::id(), 403);
 
         $request->validate([
             'status' => 'required|in:approved,rejected',
