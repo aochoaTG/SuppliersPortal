@@ -40,6 +40,18 @@ class QuotationApprovalController extends Controller
 
     public function handle(Request $request, QuotationSummary $summary)
     {
+        if ($summary->isApproved()) {
+            return redirect()
+                ->route('approvals.quotations.index')
+                ->with('status', 'La adjudicación ya había sido autorizada previamente.');
+        }
+
+        if ($summary->isRejected()) {
+            return redirect()
+                ->route('approvals.quotations.index')
+                ->with('warning', 'La adjudicación ya había sido rechazada previamente.');
+        }
+
         abort_unless((int) $summary->current_approver_user_id === (int) Auth::id(), 403);
 
         $request->validate([

@@ -166,9 +166,9 @@
             </div>
 
             <div class="modal-footer bg-light border-0">
-                <button type="button" class="btn btn-outline-danger" onclick="setDecision('rejected')">Rechazar</button>
+                <button type="button" class="btn btn-outline-danger" id="btn-reject" onclick="setDecision('rejected')">Rechazar</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                <button type="button" class="btn btn-success" onclick="setDecision('approved')">Autorizar</button>
+                <button type="button" class="btn btn-success" id="btn-approve" onclick="setDecision('approved')">Autorizar</button>
             </div>
         </form>
     </div>
@@ -177,7 +177,13 @@
 
 @push('scripts')
 <script>
+    let approvalSubmitting = false;
+
     function setDecision(status) {
+        if (approvalSubmitting) {
+            return;
+        }
+
         const reasonField = $('#rejection_reason');
 
         if (status === 'rejected') {
@@ -192,7 +198,11 @@
             }
         }
 
+        approvalSubmitting = true;
         $('#decision_status').val(status);
+        $('#btn-approve, #btn-reject').prop('disabled', true);
+        $('#btn-approve').text(status === 'approved' ? 'Procesando...' : 'Autorizar');
+        $('#btn-reject').text(status === 'rejected' ? 'Procesando...' : 'Rechazar');
         $('#approval-form').submit();
     }
 
@@ -228,6 +238,10 @@
         $('#approval-form').attr('action', `/approvals/quotations/${data.id}/handle`);
         $('#rejection_area').hide();
         $('#rejection_reason').val('').removeClass('is-invalid');
+        approvalSubmitting = false;
+        $('#btn-approve, #btn-reject').prop('disabled', false);
+        $('#btn-approve').text('Autorizar');
+        $('#btn-reject').text('Rechazar');
         $('#modalReview').modal('show');
     });
 </script>
