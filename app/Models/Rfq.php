@@ -22,6 +22,7 @@ class Rfq extends Model
         'quotation_group_id',
         'requisition_item_id',
         'supplier_id',
+        'supersedes_rfq_id',
         'source',
         'external_contact_method',
         'external_notes',
@@ -31,6 +32,9 @@ class Rfq extends Model
         'cancelled_at',
         'cancelled_by',
         'cancellation_reason',
+        'rejected_at',
+        'rejected_by',
+        'rejection_reason',
         'notes',
         'message',
         'requirements',
@@ -42,6 +46,7 @@ class Rfq extends Model
         'sent_at' => 'datetime',
         'response_deadline' => 'datetime',
         'cancelled_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions
@@ -68,6 +73,11 @@ class Rfq extends Model
     public function quotationGroup(): BelongsTo
     {
         return $this->belongsTo(QuotationGroup::class);
+    }
+
+    public function supersededRfq(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'supersedes_rfq_id');
     }
 
     /**
@@ -132,9 +142,19 @@ class Rfq extends Model
         return $this->belongsTo(User::class, 'cancelled_by');
     }
 
+    public function rejector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
     public function quotationSummary()
     {
         return $this->hasOne(QuotationSummary::class);
+    }
+
+    public function successorRfqs(): HasMany
+    {
+        return $this->hasMany(self::class, 'supersedes_rfq_id');
     }
 
     // =========================================================================
@@ -219,6 +239,21 @@ class Rfq extends Model
         return $this->status === 'CANCELLED';
     }
 
+    public function isRejected(): bool
+    {
+        return $this->status === 'REJECTED';
+    }
+
+    public function isClosed(): bool
+    {
+        return in_array($this->status, ['COMPLETED', 'CANCELLED', 'REJECTED'], true);
+    }
+
+    public function isActive(): bool
+    {
+        return ! $this->isClosed();
+    }
+
     /**
      * Marca la RFQ como enviada.
      */
@@ -237,6 +272,28 @@ class Rfq extends Model
     {
         $this->update([
             'status' => 'RECEIVED',
+        ]);
+    }
+
+    public function cancel(string $reason, int $userId): void
+    {
+        $this->update([
+            'status' => 'CANCELLED',
+            'cancelled_at' => now(),
+            'cancelled_by' => $userId,
+            'cancellation_reason' => $reason,
+            'updated_by' => $userId,
+        ]);
+    }
+
+    public function reject(string $reason, int $userId): void
+    {
+        $this->update([
+            'status' => 'REJECTED',
+            'rejected_at' => now(),
+            'rejected_by' => $userId,
+            'rejection_reason' => $reason,
+            'updated_by' => $userId,
         ]);
     }
 
@@ -286,13 +343,23 @@ class Rfq extends Model
         return $query->where('status', 'CANCELLED');
     }
 
+    public function scopeRejected($query)
+    {
+        return $query->where('status', 'REJECTED');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereNotIn('status', ['COMPLETED', 'CANCELLED', 'REJECTED']);
+    }
+
     /**
      * Scope para filtrar solo RFQs que están en proceso activo.
      */
     public function scopePending($query)
     {
         // Solo las que fueron enviadas a proveedores o ya tienen respuestas
-        return $query->whereIn('status', ['SENT', 'RECEIVED']);
+        return $query->whereIn('status', ['SENT', 'RECEIVED', 'EVALUATED']);
     }
 
     /**

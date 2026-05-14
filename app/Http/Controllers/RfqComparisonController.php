@@ -9,6 +9,7 @@ use App\Notifications\QuotationApprovalRequestNotification;
 use App\Services\ApprovalService;
 use App\Services\AuthorizerResolutionService;
 use App\Services\BudgetAllocationService;
+use App\Services\QuotationRejectionWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,8 @@ class RfqComparisonController extends Controller
     public function __construct(
         protected ApprovalService $approvalService,
         protected BudgetAllocationService $budgetAllocationService,
-        protected AuthorizerResolutionService $authorizerResolutionService
+        protected AuthorizerResolutionService $authorizerResolutionService,
+        protected QuotationRejectionWorkflowService $quotationRejectionWorkflowService
     ) {}
 
     public function index(Rfq $rfq)
@@ -53,6 +55,10 @@ class RfqComparisonController extends Controller
 
     public function select(Request $request, Rfq $rfq)
     {
+        if ($rfq->isRejected()) {
+            return back()->with('error', 'Esta RFQ ya fue rechazada en autorización. Usa la opción de re-adjudicar para crear una nueva vuelta.');
+        }
+
         $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',
             'justification' => 'required|string|min:15',
@@ -129,6 +135,64 @@ class RfqComparisonController extends Controller
             Log::error("Error en adjudicación RFQ {$rfq->id}: {$exception->getMessage()}");
 
             return back()->with('error', 'No fue posible registrar la adjudicación: '.$exception->getMessage());
+        }
+    }
+
+    public function reaward(Request $request, Rfq $rfq)
+    {
+        $request->validate([
+            'supplier_id' => 'required|exists:suppliers,id',
+            'justification' => 'required|string|min:15',
+        ]);
+
+        $diagnostics = $this->buildSupplierDiagnostics($rfq, $request->integer('supplier_id'));
+
+        if (! $diagnostics['allowed']) {
+            return back()->with('error', 'No se puede re-adjudicar esta oferta: '.implode(' ', $diagnostics['reasons']));
+        }
+
+        try {
+            $summary = $this->quotationRejectionWorkflowService->reawardRejectedQuotation(
+                $rfq,
+                $request->integer('supplier_id'),
+                $request->string('justification')->toString(),
+                Auth::id(),
+                $request->input('notes')
+            );
+
+            $escalated = collect($summary->approval_chain_snapshot)->contains(fn ($step) => ($step['status'] ?? null) !== 'eligible');
+            $summary->currentApprover?->notify(new QuotationApprovalRequestNotification($summary, $escalated));
+
+            return redirect()
+                ->route('rfq.comparison.index', $summary->rfq_id)
+                ->with('status', 'Nueva vuelta de adjudicación registrada y enviada a aprobación de '.($summary->currentApprover?->name ?? 'aprobador asignado').'.');
+        } catch (Throwable $exception) {
+            Log::error("Error en re-adjudicación RFQ {$rfq->id}: {$exception->getMessage()}");
+
+            return back()->with('error', 'No fue posible crear la nueva vuelta de adjudicación: '.$exception->getMessage());
+        }
+    }
+
+    public function cancelRejected(Request $request, Rfq $rfq)
+    {
+        $request->validate([
+            'reason' => 'required|string|min:10|max:500',
+        ]);
+
+        try {
+            $this->quotationRejectionWorkflowService->cancelRejectedRfq(
+                $rfq,
+                Auth::id(),
+                $request->string('reason')->toString()
+            );
+
+            return redirect()
+                ->route('quotes.index')
+                ->with('status', 'Cotización cerrada sin borrar registros. El expediente quedó conservado.');
+        } catch (Throwable $exception) {
+            Log::error("Error al cerrar RFQ rechazada {$rfq->id}: {$exception->getMessage()}");
+
+            return back()->with('error', 'No fue posible cerrar la cotización: '.$exception->getMessage());
         }
     }
 

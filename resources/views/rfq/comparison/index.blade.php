@@ -39,6 +39,14 @@
                             <small class="text-muted">Por: <strong>{{ $rfq->quotationSummary->rejector?->name }}</strong> el {{ $rfq->quotationSummary->rejected_at?->format('d/m/Y H:i') }}</small>
                         </div>
                     </div>
+                    <div class="mt-3 d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-warning btn-sm" id="btnCancelRejectedRfq">
+                            <i class="ti ti-ban me-1"></i>Cancelar CotizaciÃ³n
+                        </button>
+                        <button type="button" class="btn btn-outline-dark btn-sm" id="btnCancelRejectedRequisition">
+                            <i class="ti ti-archive me-1"></i>Cancelar RequisiciÃ³n
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -373,11 +381,11 @@
 {{-- MODAL DE ADJUDICACIÓN --}}
 <div class="modal fade" id="modalAdjudicar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
-        <form action="{{ route('rfq.comparison.select', $rfq) }}" method="POST" class="modal-content border-0 shadow-lg">
+        <form id="awardForm" action="{{ route('rfq.comparison.select', $rfq) }}" method="POST" class="modal-content border-0 shadow-lg">
             @csrf
             <input type="hidden" name="supplier_id" id="winner_id">
             <div class="modal-header bg-primary text-white border-0">
-                <h5 class="modal-title"><i class="ti ti-shield-check me-2"></i>Confirmar Selección de Proveedor</h5>
+                <h5 class="modal-title" id="awardModalTitle"><i class="ti ti-shield-check me-2"></i>Confirmar Selección de Proveedor</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
@@ -415,12 +423,20 @@
             <div class="modal-footer bg-light border-0">
                 <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Cancelar</button>
                 <button type="submit" class="btn btn-primary px-4 shadow rounded-pill">
-                    <i class="ti ti-device-floppy me-1"></i>Enviar a Aprobación
+                    <i class="ti ti-device-floppy me-1"></i><span id="awardSubmitText">Enviar a Aprobación</span>
                 </button>
             </div>
         </form>
     </div>
 </div>
+<form id="cancelRejectedRfqForm" action="{{ route('rfq.comparison.cancel-rejected', $rfq) }}" method="POST" class="d-none">
+    @csrf
+    <input type="hidden" name="reason" id="cancelRejectedRfqReason">
+</form>
+<form id="cancelRejectedRequisitionForm" action="{{ route('requisitions.workflow.cancel', $rfq->requisition_id) }}" method="POST" class="d-none">
+    @csrf
+    <input type="hidden" name="reason" id="cancelRejectedRequisitionReason">
+</form>
 @endsection
 
 @push('scripts')
@@ -453,6 +469,103 @@
                 title: 'AdjudicaciÃ³n bloqueada',
                 html: `<p class="mb-3"><strong>${name}</strong> no puede adjudicarse en este momento.</p>${html}`,
                 confirmButtonText: 'Entendido'
+            });
+        });
+    });
+</script>
+@endpush
+
+@push('scripts')
+<script>
+    $(document).ready(function() {
+        const rejectedFlow = @json($rfq->isRejected() && $rfq->quotationSummary?->approval_status === 'rejected');
+        const selectAction = @json(route('rfq.comparison.select', $rfq));
+        const reawardAction = @json(route('rfq.comparison.reaward', $rfq));
+
+        $('.btn-select-winner').off('click').on('click', function() {
+            const id = $(this).data('supplier-id');
+            const name = $(this).data('supplier-name');
+            const total = $(this).data('total');
+            const delivery = $(this).data('delivery');
+            const currency = $(this).data('currency');
+
+            $('#awardForm').attr('action', rejectedFlow ? reawardAction : selectAction);
+            $('#awardModalTitle').html(
+                rejectedFlow
+                    ? '<i class="ti ti-refresh me-2"></i>Confirmar Nueva Vuelta de Adjudicacion'
+                    : '<i class="ti ti-shield-check me-2"></i>Confirmar Seleccion de Proveedor'
+            );
+            $('#awardSubmitText').text(
+                rejectedFlow ? 'Crear nueva vuelta y enviar a aprobacion' : 'Enviar a Aprobacion'
+            );
+            $('#winner_id').val(id);
+            $('#winner_name').text(name);
+            $('#winner_total').text('$' + total);
+            $('#winner_delivery').text(delivery !== '—' ? delivery + ' dias' : '—');
+            $('#winner_currency_label').text(currency !== 'MXN' ? 'Cotizacion en ' + currency : '');
+            $('#modalAdjudicar').modal('show');
+        });
+
+        $('#btnCancelRejectedRfq').off('click').on('click', function() {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Cancelar cotizacion',
+                input: 'textarea',
+                inputLabel: 'Motivo de cancelacion',
+                inputPlaceholder: 'Describe por que Compras decide cerrar esta cotizacion...',
+                inputAttributes: {
+                    maxlength: 500
+                },
+                showCancelButton: true,
+                confirmButtonText: 'Cancelar cotizacion',
+                cancelButtonText: 'Volver',
+                preConfirm: (value) => {
+                    const reason = (value || '').trim();
+
+                    if (reason.length < 10) {
+                        Swal.showValidationMessage('Captura un motivo de al menos 10 caracteres.');
+                        return false;
+                    }
+
+                    return reason;
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    $('#cancelRejectedRfqReason').val(result.value);
+                    $('#cancelRejectedRfqForm').trigger('submit');
+                }
+            });
+        });
+
+        $('#btnCancelRejectedRequisition').off('click').on('click', function() {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Cancelar requisicion completa',
+                html: '<p class="mb-2">Esta accion cerrara la requisicion y todas sus RFQ activas sin borrar registros.</p>',
+                input: 'textarea',
+                inputLabel: 'Motivo de cancelacion',
+                inputPlaceholder: 'Explica por que Compras decide cerrar la requisicion completa...',
+                inputAttributes: {
+                    maxlength: 500
+                },
+                showCancelButton: true,
+                confirmButtonText: 'Cancelar requisicion',
+                cancelButtonText: 'Volver',
+                preConfirm: (value) => {
+                    const reason = (value || '').trim();
+
+                    if (reason.length < 10) {
+                        Swal.showValidationMessage('Captura un motivo de al menos 10 caracteres.');
+                        return false;
+                    }
+
+                    return reason;
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    $('#cancelRejectedRequisitionReason').val(result.value);
+                    $('#cancelRejectedRequisitionForm').trigger('submit');
+                }
             });
         });
     });

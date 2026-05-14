@@ -307,7 +307,7 @@ class QuotationWizard extends Component
             foreach ($groupsData as $groupData) {
                 $existingRfq = Rfq::where('requisition_id', $this->requisition->id)
                     ->where('quotation_group_id', $groupData['group_id'])
-                    ->where('status', '!=', 'CANCELLED')
+                    ->active()
                     ->first();
 
                 if ($existingRfq) {
@@ -450,3 +450,4 @@ class QuotationWizard extends Component
         return view('livewire.rfq.quotation-wizard');
     }
 }
+

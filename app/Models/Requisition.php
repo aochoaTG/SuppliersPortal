@@ -307,9 +307,7 @@ class Requisition extends Model
      */
     public function canBeCancelled(): bool
     {
-        return $this->status === RequisitionStatus::DRAFT
-            || $this->status === RequisitionStatus::PAUSED
-            || $this->status === RequisitionStatus::PENDING;
+        return $this->status->isCancellable();
     }
 
     /**
@@ -323,7 +321,7 @@ class Requisition extends Model
 
     public function canBeDeleted(): bool
     {
-        return $this->status === RequisitionStatus::DRAFT;
+        return false;
     }
 
     /**

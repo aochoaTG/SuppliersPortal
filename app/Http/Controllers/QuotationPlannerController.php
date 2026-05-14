@@ -44,9 +44,9 @@ class QuotationPlannerController extends Controller
 
         // Obtener grupos existentes con sus partidas
         $groups = $requisition->quotationGroups()
+            ->active()
             ->with('items.product.category')
             ->get();
-
         return view('requisitions.quotation-planner.show', compact(
             'requisition',
             'unassignedItems',
@@ -123,15 +123,13 @@ class QuotationPlannerController extends Controller
                 ];
             }
 
-            // ✅ ELIMINAR grupos que NO están en los procesados
-            if (empty($processedGroupIds)) {
-                // Si no hay grupos procesados, eliminar todos
-                QuotationGroup::where('requisition_id', $requisition->id)->delete();
-            } else {
-                // Eliminar los que no están en la lista de procesados
-                QuotationGroup::where('requisition_id', $requisition->id)
-                    ->whereNotIn('id', $processedGroupIds)
-                    ->delete();
+            $groupsToClose = QuotationGroup::where('requisition_id', $requisition->id)
+                ->active()
+                ->when(!empty($processedGroupIds), fn ($query) => $query->whereNotIn('id', $processedGroupIds))
+                ->get();
+
+            foreach ($groupsToClose as $groupToClose) {
+                $groupToClose->cancel('Grupo retirado de la estrategia de cotizacion.', Auth::id());
             }
 
             DB::commit();
@@ -222,11 +220,11 @@ class QuotationPlannerController extends Controller
         }
 
         try {
-            $group->delete();
+            $group->cancel('Grupo cancelado desde el planificador.', Auth::id());
 
             return response()->json([
                 'success' => true,
-                'message' => 'Grupo eliminado exitosamente.'
+                'message' => 'Grupo cancelado exitosamente.'
             ]);
         } catch (\Exception $e) {
             Log::error('Error al eliminar grupo', [
@@ -404,3 +402,4 @@ class QuotationPlannerController extends Controller
         }
     }
 }
+

@@ -16,11 +16,13 @@ use Yajra\DataTables\Facades\DataTables;
 use App\Models\Supplier;
 use App\Notifications\RfqSentToSuppliersNotification;
 use App\Notifications\NewRfqForSupplierNotification;
-use App\Notifications\RfqCancelledForRequesterNotification;
-use App\Notifications\RfqCancelledForSupplierNotification;
-
+use App\Services\QuotationRejectionWorkflowService;
 class RfqController extends Controller
 {
+    public function __construct(
+        private QuotationRejectionWorkflowService $quotationRejectionWorkflowService
+    ) {}
+
     /**
      * Listado general de RFQs.
      * 
@@ -118,7 +120,9 @@ class RfqController extends Controller
                     'DRAFT' => ['class' => 'secondary', 'icon' => 'ti ti-pencil', 'label' => 'Borrador'],
                     'SENT' => ['class' => 'info', 'icon' => 'ti ti-send', 'label' => 'Enviada'],
                     'RESPONSES_RECEIVED' => ['class' => 'success', 'icon' => 'ti ti-check', 'label' => 'Con Respuestas'],
+                    'RECEIVED' => ['class' => 'success', 'icon' => 'ti ti-check', 'label' => 'Con Respuestas'],
                     'EVALUATED' => ['class' => 'primary', 'icon' => 'ti ti-check-circle', 'label' => 'Evaluada'],
+                    'REJECTED' => ['class' => 'warning', 'icon' => 'ti ti-alert-circle', 'label' => 'Rechazada'],
                     'CANCELLED' => ['class' => 'danger', 'icon' => 'ti ti-x', 'label' => 'Cancelada'],
                 ];
 
@@ -186,7 +190,7 @@ class RfqController extends Controller
                 }
 
                 // Botón Cancelar (si no está cancelada)
-                if ($row->status !== 'CANCELLED') {
+                if (!in_array($row->status, ['CANCELLED', 'COMPLETED', 'REJECTED'], true)) {
                     $actions .= '<button type="button" 
                                class="btn btn-sm btn-danger btn-cancel-rfq" 
                                data-rfq-id="' . $row->id . '" 
@@ -269,7 +273,9 @@ class RfqController extends Controller
                     'DRAFT' => ['class' => 'warning', 'icon' => 'ti ti-pencil', 'label' => 'Borrador'],
                     'SENT' => ['class' => 'info', 'icon' => 'ti ti-send', 'label' => 'Enviada'],
                     'RESPONSES_RECEIVED' => ['class' => 'success', 'icon' => 'ti ti-check', 'label' => 'Con Respuestas'],
+                    'RECEIVED' => ['class' => 'success', 'icon' => 'ti ti-check', 'label' => 'Con Respuestas'],
                     'EVALUATED' => ['class' => 'primary', 'icon' => 'ti ti-check-circle', 'label' => 'Evaluada'],
+                    'REJECTED' => ['class' => 'warning', 'icon' => 'ti ti-alert-circle', 'label' => 'Rechazada'],
                     'CANCELLED' => ['class' => 'danger', 'icon' => 'ti ti-x', 'label' => 'Cancelada'],
                 ];
 
@@ -325,7 +331,7 @@ class RfqController extends Controller
                      </button>';
 
                 // 🔴 NUEVO: Botón Cancelar (solo si no está cancelado o completado)
-                if (!in_array($row->status, ['CANCELLED', 'COMPLETED'])) {
+                if (!in_array($row->status, ['CANCELLED', 'COMPLETED', 'REJECTED'], true)) {
                     $actions .= '<button type="button" class="btn btn-sm btn-danger btn-cancel-rfq" data-rfq-id="' . $row->id . '" 
                                data-folio="' . $row->folio . '"
                                data-bs-toggle="tooltip" 
@@ -511,88 +517,38 @@ class RfqController extends Controller
      * @param Rfq $rfq
      * @return JsonResponse
      */
-    /**
-     * Cancela y ELIMINA PERMANENTEMENTE una RFQ y todos sus registros asociados.
-     */
     public function cancelRfq(Request $request, $id)
     {
-        // 1. Validar el motivo de cancelación
         $validated = $request->validate([
             'reason' => 'required|string|min:10|max:500',
         ]);
-
         try {
-            DB::beginTransaction();
-
-            // 2. Cargar el RFQ con todas sus relaciones para poder notificar antes de borrar
-            $rfq = Rfq::with(['requisition.requester', 'suppliers.user', 'rfqResponses'])
+            $rfq = Rfq::with(['requisition.requester', 'suppliers.user', 'rfqResponses', 'quotationGroup'])
                 ->findOrFail($id);
-
-            // Verificación de seguridad: No borrar si ya está completada (opcional)
             if ($rfq->status === 'COMPLETED') {
-                return response()->json(['success' => false, 'message' => 'No se puede eliminar una solicitud completada.'], 422);
+                return response()->json(['success' => false, 'message' => 'No se puede cancelar una solicitud completada.'], 422);
             }
-
-            // --- SECCIÓN DE NOTIFICACIONES ---
-
-            // 📧 Notificar al Requisitor
-            if ($rfq->requisition && $rfq->requisition->requester) {
-                $rfq->requisition->requester->notify(
-                    new RfqCancelledForRequesterNotification($rfq, $validated['reason'])
-                );
-            }
-
-            // 📧 Notificar a los Proveedores (Solo si ya se había enviado)
-            if ($rfq->status !== 'DRAFT') {
-                foreach ($rfq->suppliers as $supplier) {
-                    if ($supplier->user) {
-                        $supplier->user->notify(
-                            new RfqCancelledForSupplierNotification($rfq, $validated['reason'])
-                        );
-                    }
-                }
-            }
-
-            // --- SECCIÓN DE ELIMINACIÓN PERMANENTE (HARD DELETE) ---
-            // El orden es vital por las restricciones de SQL Server
-
-            // 3. Borrar Respuestas de proveedores (Físicamente)
-            if ($rfq->rfqResponses()->count() > 0) {
-                $rfq->rfqResponses()->forceDelete();
-            }
-
-            // 4. Borrar relación con Proveedores (Tabla rfq_suppliers)
-            // Detach elimina los registros de la tabla pivote inmediatamente
-            $rfq->suppliers()->detach();
-
-            // 5. Borrar el registro del RFQ (Físicamente)
-            // forceDelete() ignora el SoftDelete y lo borra de la tabla 'rfqs'
-            $rfq->forceDelete();
-
-            DB::commit();
-
-            Log::info("🗑️ RFQ Eliminada Permanentemente", [
+            $this->quotationRejectionWorkflowService->cancelRejectedRfq($rfq, Auth::id(), $validated['reason']);
+            Log::info('RFQ cancelada sin borrado', [
                 'folio' => $rfq->folio,
                 'user_id' => Auth::id(),
                 'reason' => $validated['reason']
             ]);
-
             return response()->json([
                 'success' => true,
-                'message' => "La solicitud {$rfq->folio} y todos sus registros asociados han sido eliminados permanentemente del sistema."
+                'message' => "La solicitud {$rfq->folio} fue cancelada y el expediente quedo resguardado."
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('❌ Error al eliminar físicamente la RFQ: ' . $e->getMessage(), [
+            Log::error('Error al cancelar la RFQ: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
-
             return response()->json([
                 'success' => false,
-                'message' => 'Error al procesar la eliminación: ' . $e->getMessage()
+                'message' => 'Error al procesar la cancelacion: ' . $e->getMessage()
             ], 500);
         }
     }
+
 
     /**
      * Vista para seleccionar proveedores por grupo/partida.
@@ -1043,3 +999,4 @@ class RfqController extends Controller
         }
     }
 }
+

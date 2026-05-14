@@ -527,6 +527,8 @@ Route::middleware(['auth', 'lock'])->group(function () {
 Route::middleware(['auth', 'lock', 'role:superadmin|buyer|staff'])->group(function () {
     // RFQ Selection
     Route::post('/rfq/{rfq}/select', [RfqComparisonController::class, 'select'])->name('rfq.comparison.select');
+    Route::post('/rfq/{rfq}/reaward', [RfqComparisonController::class, 'reaward'])->name('rfq.comparison.reaward');
+    Route::post('/rfq/{rfq}/cancel-rejected', [RfqComparisonController::class, 'cancelRejected'])->name('rfq.comparison.cancel-rejected');
 
     // Direct Purchase Orders
     Route::get('/direct-purchase-orders/create', [DirectPurchaseOrderController::class, 'create'])->name('direct-purchase-orders.create');
@@ -579,3 +581,4 @@ Route::delete('/dev/logs', [LogViewerController::class, 'clear'])->name('dev.log
 //  Autenticación
 // ============================================================================
 require __DIR__.'/auth.php';
+

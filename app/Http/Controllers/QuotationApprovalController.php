@@ -10,6 +10,7 @@ use App\Models\RfqResponse;
 use App\Notifications\QuotationApprovalApprovedNotification;
 use App\Notifications\QuotationApprovalRejectedNotification;
 use App\Services\BudgetAllocationService;
+use App\Services\QuotationRejectionWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,8 @@ use Illuminate\Support\Facades\Log;
 class QuotationApprovalController extends Controller
 {
     public function __construct(
-        private BudgetAllocationService $budgetAllocationService
+        private BudgetAllocationService $budgetAllocationService,
+        private QuotationRejectionWorkflowService $quotationRejectionWorkflowService,
     ) {}
 
     public function index()
@@ -81,15 +83,13 @@ class QuotationApprovalController extends Controller
                     $purchaseOrder = $this->generatePurchaseOrder($summary);
                     $this->budgetAllocationService->transferQuotationSummaryToPurchaseOrder($summary, $purchaseOrder);
 
-                    $this->refreshRequisitionStatus($summary->requisition_id);
+                    $this->quotationRejectionWorkflowService->refreshRequisitionStatus($summary->requisition_id);
                 } else {
-                    $summary->reject(Auth::id(), $request->string('reason')->toString());
-                    $this->budgetAllocationService->releaseQuotationSummary($summary);
-
-                    $rfq->update(['status' => 'RECEIVED']);
-                    $rfq->rfqResponses()->update(['status' => 'SUBMITTED']);
-
-                    $summary->requisition->update(['status' => RequisitionStatus::IN_QUOTATION->value]);
+                    $this->quotationRejectionWorkflowService->handleApprovalRejection(
+                        $summary,
+                        Auth::id(),
+                        $request->string('reason')->toString()
+                    );
                 }
             });
 
@@ -105,7 +105,7 @@ class QuotationApprovalController extends Controller
 
             return redirect()
                 ->route('approvals.quotations.index')
-                ->with('status', 'Adjudicación rechazada y devuelta a evaluación.');
+                ->with('status', 'Adjudicación rechazada. Compras puede re-adjudicar, cancelar la cotización o cancelar la requisición.');
         } catch (\Throwable $exception) {
             Log::error('Error en flujo de aprobación de cotización: '.$exception->getMessage());
 
@@ -149,32 +149,6 @@ class QuotationApprovalController extends Controller
         }
 
         return $purchaseOrder;
-    }
-
-    private function refreshRequisitionStatus(int $requisitionId): void
-    {
-        $requisition = \App\Models\Requisition::with(['rfqs.quotationSummary'])->findOrFail($requisitionId);
-        $activeRfqs = $requisition->rfqs->where('status', '!=', 'CANCELLED');
-
-        if ($activeRfqs->isEmpty()) {
-            $requisition->update(['status' => RequisitionStatus::IN_QUOTATION->value]);
-
-            return;
-        }
-
-        if ($activeRfqs->every(fn ($rfq) => $rfq->status === 'COMPLETED')) {
-            $requisition->update(['status' => RequisitionStatus::COMPLETED->value]);
-
-            return;
-        }
-
-        if ($activeRfqs->contains(fn ($rfq) => $rfq->quotationSummary && $rfq->quotationSummary->approval_status === 'pending')) {
-            $requisition->update(['status' => RequisitionStatus::QUOTED->value]);
-
-            return;
-        }
-
-        $requisition->update(['status' => RequisitionStatus::IN_QUOTATION->value]);
     }
 
     private function notifyApprovalOutcome(QuotationSummary $summary, bool $approved): void

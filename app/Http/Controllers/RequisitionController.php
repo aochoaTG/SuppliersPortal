@@ -155,16 +155,6 @@ class RequisitionController extends Controller
                 if ($canEdit) {
                     $html .= '<a class="btn btn-sm btn-outline-primary" href="' . $editUrl . '" title="Editar"><i class="ti ti-pencil"></i></a>';
                 }
-
-                // Eliminar (solo DRAFT)
-                if ($canDelete) {
-                    $html .= '<form action="' . $deleteUrl . '" method="POST" class="js-delete-form d-inline">'
-                        . '<input type="hidden" name="_token" value="' . $csrfToken . '">'
-                        . '<input type="hidden" name="_method" value="DELETE">'
-                        . '<button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-folio="' . $r->folio . '" title="Eliminar"><i class="ti ti-trash"></i></button>'
-                        . '</form>';
-                }
-
                 // Cancelar (PENDING, PAUSED, IN_QUOTATION)
                 if ($canCancel) {
                     $html .= '<button type="button" class="btn btn-sm btn-outline-warning js-cancel-btn" data-folio="' . $r->folio . '" data-url="' . $cancelUrl . '" title="Cancelar"><i class="ti ti-ban"></i></button>';
@@ -275,34 +265,12 @@ class RequisitionController extends Controller
      * Soft delete de la requisición (solo BORRADOR).
      * Elimina físicamente la requisición y sus partidas.
      */
+    /**
+     * Las requisiciones ya no se eliminan para conservar expediente.
+     */
     public function destroy(Requisition $requisition): RedirectResponse
     {
-        // Solo se pueden eliminar requisiciones en BORRADOR
-        if (!$requisition->canBeDeleted()) {
-            return back()->with(
-                'error',
-                'Solo se pueden eliminar requisiciones en estado BORRADOR. Estado actual: ' . $requisition->status->label()
-            );
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $folio = $requisition->folio;
-
-            // Soft delete de la requisición (también elimina las partidas por cascade)
-            $requisition->delete();
-
-            DB::commit();
-
-            return redirect()
-                ->route('requisitions.index')
-                ->with('success', "Requisición {$folio} eliminada correctamente.");
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return back()->with('error', 'Error al eliminar la requisición: ' . $e->getMessage());
-        }
+        return back()->with('error', 'Las requisiciones ya no se eliminan. Usa la cancelacion para conservar el expediente.');
     }
 
     /**
@@ -788,3 +756,5 @@ class RequisitionController extends Controller
             ->with('success', 'Requisición duplicada exitosamente');
     }
 }
+
+

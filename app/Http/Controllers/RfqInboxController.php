@@ -91,6 +91,12 @@ class RfqInboxController extends Controller
                         'color' => 'success',
                         'icon'  => 'ti-circle-check'
                     ],
+                    'EVALUATED' => [
+                        'label' => 'En Aprobacion',
+                        'desc'  => 'La cotizacion ya fue adjudicada por Compras y esta en aprobacion.',
+                        'color' => 'primary',
+                        'icon'  => 'ti-scale'
+                    ],
                     'DRAFT' => [
                         'label' => 'Borrador',
                         'desc'  => 'Solicitud en preparación. Aún no se ha disparado a los proveedores.',
@@ -140,7 +146,7 @@ class RfqInboxController extends Controller
                 }
             ])
             ->where('requisition_id', $requisition->id) // 🎯 FILTRO CRUCIAL
-            ->where('status', '!=', 'CANCELLED'); // No mostrar basura
+            ->whereNotIn('status', ['CANCELLED', 'REJECTED']); // No mostrar basura
 
         return DataTables::of($query)
             ->addColumn('progress', function ($rfq) {
@@ -171,6 +177,7 @@ class RfqInboxController extends Controller
                     'SENT' => ['label' => 'Enviada', 'color' => 'info', 'icon' => 'ti-send'],
                     'RECEIVED' => ['label' => 'Con Respuestas', 'color' => 'success', 'icon' => 'ti-circle-check'],
                     'DRAFT' => ['label' => 'Borrador', 'color' => 'secondary', 'icon' => 'ti-file-pencil'],
+                    'EVALUATED' => ['label' => 'En Aprobaci?n', 'color' => 'primary', 'icon' => 'ti-scale'],
                 ];
                 $info = $statusMap[$rfq->status] ?? ['label' => $rfq->status, 'color' => 'dark', 'icon' => 'ti-help'];
                 return $info;
@@ -210,3 +217,4 @@ class RfqInboxController extends Controller
         return view('rfq.inbox.partials.req_info', compact('requisition'));
     }
 }
+
