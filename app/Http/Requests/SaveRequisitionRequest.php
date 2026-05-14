@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Enum\PurchaseType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
 
 class SaveRequisitionRequest extends FormRequest
 {
@@ -27,14 +29,26 @@ class SaveRequisitionRequest extends FormRequest
         $companyId = $isUpdate
             ? $requisition->company_id
             : $this->company_id;
+        $purchaseType = $this->purchase_type
+            ?: ($requisition?->costCenter?->purchase_type?->value ?? $requisition?->costCenter?->purchase_type);
 
         $rules = [
             // ======= Datos de la Requisición =======
+            'purchase_type' => [
+                'required',
+                new Enum(PurchaseType::class),
+            ],
+
             'cost_center_id' => [
                 $isUpdate ? 'sometimes' : 'required',
                 'required',
                 'exists:cost_centers,id',
-                Rule::exists('cost_centers', 'id')->where('company_id', $companyId),
+                Rule::exists('cost_centers', 'id')->where(function ($query) use ($companyId, $purchaseType) {
+                    $query->where('company_id', $companyId)
+                        ->where('purchase_type', $purchaseType)
+                        ->where('status', 'ACTIVO')
+                        ->whereNull('deleted_at');
+                }),
             ],
 
             'department_id' => [
@@ -165,6 +179,7 @@ class SaveRequisitionRequest extends FormRequest
             'company_id.required' => 'La compañía es obligatoria.',
             'company_id.exists' => 'La compañía seleccionada no existe.',
 
+            'purchase_type.required' => 'El tipo de compra es obligatorio.',
             'cost_center_id.required' => 'El centro de costos es obligatorio.',
             'cost_center_id.exists' => 'El centro de costos no pertenece a la compañía seleccionada.',
 
@@ -221,6 +236,25 @@ class SaveRequisitionRequest extends FormRequest
             // Validar que el centro de costos tenga presupuesto (RN-004)
             if ($this->cost_center_id) {
                 $costCenter = \App\Models\CostCenter::find($this->cost_center_id);
+                $purchaseType = $this->purchase_type
+                    ?: ($requisition?->costCenter?->purchase_type?->value ?? $requisition?->costCenter?->purchase_type);
+
+                if (! $this->user()->costCenters()
+                    ->where('cost_centers.id', $this->cost_center_id)
+                    ->where('cost_center_user.is_active', true)
+                    ->exists()) {
+                    $validator->errors()->add(
+                        'cost_center_id',
+                        'El centro de costos seleccionado no esta asignado a tu usuario.'
+                    );
+                }
+
+                if ($costCenter && $purchaseType && ($costCenter->purchase_type?->value ?? $costCenter->purchase_type) !== $purchaseType) {
+                    $validator->errors()->add(
+                        'cost_center_id',
+                        'El centro de costos no coincide con el tipo de compra seleccionado.'
+                    );
+                }
 
                 $fiscalYear = ($isUpdate && $requisition)
                     ? ($requisition->fiscal_year ?? $requisition->created_at->year)

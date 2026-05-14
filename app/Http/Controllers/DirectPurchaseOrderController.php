@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enum\PurchaseType;
 use App\Models\DirectPurchaseOrder;
 use App\Models\DirectPurchaseOrderItem;
 use App\Models\DirectPurchaseOrderDocument;
@@ -74,7 +75,9 @@ class DirectPurchaseOrderController extends Controller
             'suppliers',
             'expenseCategories',
             'receivingLocations'
-        ));
+        ))->with([
+            'purchaseTypes' => PurchaseType::values(),
+        ]);
     }
 
     /**
@@ -448,7 +451,9 @@ class DirectPurchaseOrderController extends Controller
             'costCenters',
             'expenseCategories',
             'receivingLocations'
-        ));
+        ))->with([
+            'purchaseTypes' => PurchaseType::values(),
+        ]);
     }
 
     /**

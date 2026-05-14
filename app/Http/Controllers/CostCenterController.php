@@ -159,14 +159,19 @@ class CostCenterController extends Controller
             ->with('success', 'Centro de costo eliminado correctamente.');
     }
 
-    public function byCompany(Company $company)
+    public function byCompany(Request $request, Company $company)
     {
-        $centers = CostCenter::query()
-            ->where('company_id', $company->id)
-            ->where('status', 'ACTIVO')
-            ->notDeleted()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+        $purchaseType = $request->query('purchase_type');
+
+        $centers = $request->user()
+            ->costCenters()
+            ->where('cost_centers.company_id', $company->id)
+            ->where('cost_centers.status', 'ACTIVO')
+            ->whereNull('cost_centers.deleted_at')
+            ->wherePivot('is_active', true)
+            ->when($purchaseType, fn ($query) => $query->where('cost_centers.purchase_type', $purchaseType))
+            ->orderBy('cost_centers.name')
+            ->get(['cost_centers.id', 'cost_centers.name', 'cost_centers.code', 'cost_centers.purchase_type']);
 
         return response()->json($centers);
     }

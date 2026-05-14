@@ -84,6 +84,30 @@
                         @enderror
                     </div>
 
+                    {{-- Tipo de compra --}}
+                    <div class="col-md-3">
+                        <label for="purchase_type" class="form-label">Tipo de compra <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="ti ti-filter"></i>
+                            </span>
+                            <select id="purchase_type"
+                                    name="purchase_type"
+                                    class="form-select @error('purchase_type') is-invalid @enderror"
+                                    required>
+                                <option value="">Seleccionar...</option>
+                                @foreach ($purchaseTypes as $purchaseType)
+                                    <option value="{{ $purchaseType }}" {{ $selectedPurchaseType === $purchaseType ? 'selected' : '' }}>
+                                        {{ $purchaseType }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @error('purchase_type')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     {{-- Centro de costo --}}
                     <div class="col-md-3">
                         <label for="cost_center_id" class="form-label">Centro de costo <span class="text-danger">*</span></label>
@@ -94,8 +118,9 @@
                             <select id="cost_center_id" 
                                     name="cost_center_id"
                                     class="form-select @error('cost_center_id') is-invalid @enderror" 
-                                    required>
-                                <option value="">Seleccionar compañía primero</option>
+                                    required
+                                    disabled>
+                                <option value="">Seleccionar compañía y tipo de compra primero</option>
                             </select>
                         </div>
                         @error('cost_center_id')
@@ -395,11 +420,14 @@
         // 1. GESTIÓN DE COMPAÑÍA Y CENTROS DE COSTO
         // =====================================================
         const $company = $('#company_id');
+        const $purchaseType = $('#purchase_type');
         const $cc = $('#cost_center_id');
 
-        function loadCostCenters(companyId) {
-            if (!companyId) {
-                $cc.empty().append('<option value="">Seleccionar compañía primero</option>');
+        function loadCostCenters(companyId, purchaseType) {
+            if (!companyId || !purchaseType) {
+                $cc.prop('disabled', true)
+                    .empty()
+                    .append('<option value="">Seleccionar compañía y tipo de compra primero</option>');
                 return;
             }
 
@@ -407,7 +435,7 @@
 
             const url = $company.data('url-costcenters').replace('__CID__', companyId);
 
-            $.getJSON(url)
+            $.getJSON(url, { purchase_type: purchaseType })
                 .done(function(data) {
                     $cc.empty().append('<option value="">Seleccionar centro de costo</option>');
 
@@ -429,13 +457,19 @@
 
         $company.on('change', function() {
             $company.data('selected-cc', '');
-            loadCostCenters($(this).val());
+            loadCostCenters($(this).val(), $purchaseType.val());
+        });
+
+        $purchaseType.on('change', function() {
+            $company.data('selected-cc', '');
+            loadCostCenters($company.val(), $(this).val());
         });
 
         // Cargar centros de costo iniciales
         const initialCompany = $company.val();
-        if (initialCompany) {
-            loadCostCenters(initialCompany);
+        const initialPurchaseType = $purchaseType.val();
+        if (initialCompany && initialPurchaseType) {
+            loadCostCenters(initialCompany, initialPurchaseType);
         }
 
         // =====================================================

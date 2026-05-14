@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enum\PurchaseType;
 use App\Enum\RequisitionStatus;
 use App\Events\RequisitionUpdated;
 use App\Http\Requests\SaveRequisitionRequest;
@@ -351,12 +352,17 @@ class RequisitionController extends Controller
         return view($view, [
             'requisition' => $requisition,
             'companies' => Company::orderBy('name')->get(['id', 'name']),
-            'costCenters' => $this->getCostCenters($selectedCompanyId),
+            'costCenters' => $this->getCostCenters(
+                $selectedCompanyId,
+                old('purchase_type', $requisition->costCenter?->purchase_type?->value ?? $requisition->costCenter?->purchase_type)
+            ),
             'departments' => Department::active()->orderBy('name')->get(['id', 'name']),
             'statusOptions' => RequisitionStatus::options(),
             'expenseCategories' => ExpenseCategory::active()->orderBy('name')->get(['id', 'name']),
             'receivingLocations' => ReceivingLocation::active()->where('portal_blocked', false)->orderBy('name')->get(['id', 'code', 'name', 'city']),
             'selectedCompanyId' => $selectedCompanyId,
+            'purchaseTypes' => PurchaseType::values(),
+            'selectedPurchaseType' => old('purchase_type', $requisition->costCenter?->purchase_type?->value ?? $requisition->costCenter?->purchase_type),
             'currentMonth' => (int) date('n'),
             'months' => $this->getMonthsOptions(),
         ]);
@@ -503,15 +509,22 @@ class RequisitionController extends Controller
     /**
      * Get cost centers for the specified company.
      */
-    protected function getCostCenters(?int $companyId)
+    protected function getCostCenters(?int $companyId, ?string $purchaseType = null)
     {
-        $query = CostCenter::active()->orderBy('name');
+        $user = Auth::user();
 
-        if ($companyId) {
-            $query->where('company_id', $companyId);
+        if (! $user || ! $companyId) {
+            return collect();
         }
 
-        return $query->get(['id', 'name', 'code', 'company_id']);
+        return $user->costCenters()
+            ->where('cost_centers.company_id', $companyId)
+            ->where('cost_centers.status', 'ACTIVO')
+            ->whereNull('cost_centers.deleted_at')
+            ->wherePivot('is_active', true)
+            ->when($purchaseType, fn ($query) => $query->where('cost_centers.purchase_type', $purchaseType))
+            ->orderBy('cost_centers.name')
+            ->get(['cost_centers.id', 'cost_centers.name', 'cost_centers.code', 'cost_centers.company_id', 'cost_centers.purchase_type']);
     }
 
     /**
