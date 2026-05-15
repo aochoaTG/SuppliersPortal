@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enum\PurchaseType;
 use App\Enum\RequisitionStatus;
 use App\Events\RequisitionUpdated;
 use App\Http\Requests\SaveRequisitionRequest;
@@ -155,16 +156,6 @@ class RequisitionController extends Controller
                 if ($canEdit) {
                     $html .= '<a class="btn btn-sm btn-outline-primary" href="' . $editUrl . '" title="Editar"><i class="ti ti-pencil"></i></a>';
                 }
-
-                // Eliminar (solo DRAFT)
-                if ($canDelete) {
-                    $html .= '<form action="' . $deleteUrl . '" method="POST" class="js-delete-form d-inline">'
-                        . '<input type="hidden" name="_token" value="' . $csrfToken . '">'
-                        . '<input type="hidden" name="_method" value="DELETE">'
-                        . '<button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-folio="' . $r->folio . '" title="Eliminar"><i class="ti ti-trash"></i></button>'
-                        . '</form>';
-                }
-
                 // Cancelar (PENDING, PAUSED, IN_QUOTATION)
                 if ($canCancel) {
                     $html .= '<button type="button" class="btn btn-sm btn-outline-warning js-cancel-btn" data-folio="' . $r->folio . '" data-url="' . $cancelUrl . '" title="Cancelar"><i class="ti ti-ban"></i></button>';
@@ -275,34 +266,12 @@ class RequisitionController extends Controller
      * Soft delete de la requisición (solo BORRADOR).
      * Elimina físicamente la requisición y sus partidas.
      */
+    /**
+     * Las requisiciones ya no se eliminan para conservar expediente.
+     */
     public function destroy(Requisition $requisition): RedirectResponse
     {
-        // Solo se pueden eliminar requisiciones en BORRADOR
-        if (!$requisition->canBeDeleted()) {
-            return back()->with(
-                'error',
-                'Solo se pueden eliminar requisiciones en estado BORRADOR. Estado actual: ' . $requisition->status->label()
-            );
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $folio = $requisition->folio;
-
-            // Soft delete de la requisición (también elimina las partidas por cascade)
-            $requisition->delete();
-
-            DB::commit();
-
-            return redirect()
-                ->route('requisitions.index')
-                ->with('success', "Requisición {$folio} eliminada correctamente.");
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return back()->with('error', 'Error al eliminar la requisición: ' . $e->getMessage());
-        }
+        return back()->with('error', 'Las requisiciones ya no se eliminan. Usa la cancelacion para conservar el expediente.');
     }
 
     /**
@@ -383,12 +352,17 @@ class RequisitionController extends Controller
         return view($view, [
             'requisition' => $requisition,
             'companies' => Company::orderBy('name')->get(['id', 'name']),
-            'costCenters' => $this->getCostCenters($selectedCompanyId),
+            'costCenters' => $this->getCostCenters(
+                $selectedCompanyId,
+                old('purchase_type', $requisition->costCenter?->purchase_type?->value ?? $requisition->costCenter?->purchase_type)
+            ),
             'departments' => Department::active()->orderBy('name')->get(['id', 'name']),
             'statusOptions' => RequisitionStatus::options(),
             'expenseCategories' => ExpenseCategory::active()->orderBy('name')->get(['id', 'name']),
             'receivingLocations' => ReceivingLocation::active()->where('portal_blocked', false)->orderBy('name')->get(['id', 'code', 'name', 'city']),
             'selectedCompanyId' => $selectedCompanyId,
+            'purchaseTypes' => PurchaseType::values(),
+            'selectedPurchaseType' => old('purchase_type', $requisition->costCenter?->purchase_type?->value ?? $requisition->costCenter?->purchase_type),
             'currentMonth' => (int) date('n'),
             'months' => $this->getMonthsOptions(),
         ]);
@@ -535,15 +509,22 @@ class RequisitionController extends Controller
     /**
      * Get cost centers for the specified company.
      */
-    protected function getCostCenters(?int $companyId)
+    protected function getCostCenters(?int $companyId, ?string $purchaseType = null)
     {
-        $query = CostCenter::active()->orderBy('name');
+        $user = Auth::user();
 
-        if ($companyId) {
-            $query->where('company_id', $companyId);
+        if (! $user || ! $companyId) {
+            return collect();
         }
 
-        return $query->get(['id', 'name', 'code', 'company_id']);
+        return $user->costCenters()
+            ->where('cost_centers.company_id', $companyId)
+            ->where('cost_centers.status', 'ACTIVO')
+            ->whereNull('cost_centers.deleted_at')
+            ->wherePivot('is_active', true)
+            ->when($purchaseType, fn ($query) => $query->where('cost_centers.purchase_type', $purchaseType))
+            ->orderBy('cost_centers.name')
+            ->get(['cost_centers.id', 'cost_centers.name', 'cost_centers.code', 'cost_centers.company_id', 'cost_centers.purchase_type']);
     }
 
     /**
@@ -788,3 +769,5 @@ class RequisitionController extends Controller
             ->with('success', 'Requisición duplicada exitosamente');
     }
 }
+
+

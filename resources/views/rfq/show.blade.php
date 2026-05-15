@@ -45,6 +45,7 @@
         'RECEIVED'           => ['class' => 'primary',   'icon' => 'ti-inbox',        'label' => 'Recibida'],
         'RESPONSES_RECEIVED' => ['class' => 'success',   'icon' => 'ti-check',        'label' => 'Con Respuestas'],
         'EVALUATED'          => ['class' => 'primary',   'icon' => 'ti-check-circle', 'label' => 'Evaluada'],
+        'REJECTED'           => ['class' => 'warning',   'icon' => 'ti-alert-circle', 'label' => 'Rechazada'],
         'CANCELLED'          => ['class' => 'danger',    'icon' => 'ti-ban',          'label' => 'Cancelada'],
     ];
     $status = $statusConfig[$rfq->status] ?? ['class' => 'secondary', 'icon' => 'ti-help', 'label' => $rfq->status];
@@ -91,7 +92,7 @@
                 <i class="ti ti-send me-1"></i>Enviar a Proveedores
             </button>
         @endif
-        @if($rfq->status !== 'CANCELLED')
+        @if(!in_array($rfq->status, ['CANCELLED', 'REJECTED'], true))
             <button type="button" class="btn btn-outline-danger" id="cancelRfqBtn">
                 <i class="ti ti-ban me-1"></i>Cancelar RFQ
             </button>

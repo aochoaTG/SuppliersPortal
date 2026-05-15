@@ -51,8 +51,30 @@
                         @enderror
                     </div>
 
-                    {{-- Centro de costo --}}
+                    {{-- Tipo de compra --}}
                     <div class="col-md-2">
+                        <label for="purchase_type" class="form-label">Tipo de compra <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="ti ti-filter"></i>
+                            </span>
+                            <select wire:model.live="purchase_type"
+                                    id="purchase_type"
+                                    class="form-select @error('purchase_type') is-invalid @enderror"
+                                    required>
+                                <option value="">Seleccionar...</option>
+                                @foreach ($purchaseTypes as $purchaseTypeOption)
+                                    <option value="{{ $purchaseTypeOption }}">{{ $purchaseTypeOption }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @error('purchase_type')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    {{-- Centro de costo --}}
+                    <div class="col-md-3">
                         <label for="cost_center_id" class="form-label">Centro de costo <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">
@@ -62,9 +84,9 @@
                                     id="cost_center_id"
                                     class="form-select @error('cost_center_id') is-invalid @enderror" 
                                     required
-                                    {{ empty($company_id) ? 'disabled' : '' }}>
+                                    {{ empty($company_id) || empty($purchase_type) ? 'disabled' : '' }}>
                                 <option value="">
-                                    {{ empty($company_id) ? 'Seleccionar compañía primero' : 'Seleccionar centro de costo...' }}
+                                    {{ empty($company_id) || empty($purchase_type) ? 'Seleccionar compañía y tipo de compra primero' : 'Seleccionar centro de costo...' }}
                                 </option>
                                 @foreach ($costCenters as $cc)
                                     <option value="{{ $cc->id }}">
@@ -78,7 +100,7 @@
                         @enderror
                         
                         {{-- Loading indicator --}}
-                        <div wire:loading wire:target="company_id" class="mt-1">
+                        <div wire:loading wire:target="company_id,purchase_type" class="mt-1">
                             <small class="text-muted">
                                 <i class="ti ti-loader rotating"></i> Cargando centros de costo...
                             </small>

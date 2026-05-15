@@ -3,8 +3,8 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use App\Enum\PurchaseType;
 use App\Models\Company;
-use App\Models\CostCenter;
 use App\Models\ReceivingLocation;
 use App\Models\Requisition;
 use App\Models\RequisitionItem;
@@ -22,12 +22,14 @@ class RequisitionForm extends Component
 
     // ===== PROPIEDADES DEL FORMULARIO =====
     public $company_id;
+    public $purchase_type;
     public $cost_center_id;
     public $required_date;
     public $description = '';
 
     // ===== COLECCIONES =====
     public $companies = [];
+    public $purchaseTypes = [];
     public $costCenters = [];
     public $receivingLocations = [];
 
@@ -50,6 +52,7 @@ class RequisitionForm extends Component
     {
         // Cargar solo las compañías del usuario autenticado
         $this->companies = Auth::user()->companies()->orderBy('name')->get();
+        $this->purchaseTypes = PurchaseType::values();
 
         // Cargar ubicaciones de recepción activas
         $this->receivingLocations = ReceivingLocation::active()->orderBy('name')->get();
@@ -68,13 +71,14 @@ class RequisitionForm extends Component
 
             // Cargar datos del formulario
             $this->company_id = $requisition->company_id;
+            $this->purchase_type = $requisition->costCenter?->purchase_type?->value ?? $requisition->costCenter?->purchase_type;
             $this->description = $requisition->description;
             $this->required_date = $requisition->required_date
                 ? $requisition->required_date->format('Y-m-d')
                 : null;
 
             // Cargar centros de costo de la compañía
-            $this->loadCostCenters($this->company_id);
+            $this->loadCostCenters($this->company_id, $this->purchase_type);
             $this->cost_center_id = $requisition->cost_center_id;
 
             // Cargar ubicación de recepción de la cabecera
@@ -132,16 +136,32 @@ class RequisitionForm extends Component
         // Validar campos obligatorios
         $this->validate([
             'company_id' => 'required|exists:companies,id',
+            'purchase_type' => 'required|in:' . implode(',', PurchaseType::values()),
             'cost_center_id' => 'required|exists:cost_centers,id',
             'receiving_location_id' => 'required|exists:receiving_locations,id',
             'required_date' => 'nullable|date|after_or_equal:today',
             'description' => 'nullable|string|max:500',
         ], [
             'company_id.required' => 'La compañía es obligatoria.',
+            'purchase_type.required' => 'El tipo de compra es obligatorio.',
             'cost_center_id.required' => 'El centro de costos es obligatorio.',
             'receiving_location_id.required' => 'La ubicación de recepción es obligatoria.',
             'required_date.after_or_equal' => 'La fecha requerida no puede ser anterior a hoy.',
         ]);
+
+        $validCostCenter = Auth::user()->costCenters()
+            ->where('cost_centers.id', $this->cost_center_id)
+            ->where('cost_centers.company_id', $this->company_id)
+            ->where('cost_centers.purchase_type', $this->purchase_type)
+            ->where('cost_centers.status', 'ACTIVO')
+            ->whereNull('cost_centers.deleted_at')
+            ->where('cost_center_user.is_active', true)
+            ->exists();
+
+        if (! $validCostCenter) {
+            $this->addError('cost_center_id', 'El centro de costos no coincide con la empresa, el tipo de compra o tus asignaciones.');
+            return;
+        }
 
         // Validar que tenga al menos una partida (RN-003)
         if (empty($this->items)) {
@@ -278,8 +298,27 @@ class RequisitionForm extends Component
 
         $this->cost_center_id = null;
 
-        if ($value) {
-            $this->loadCostCenters($value);
+        if ($value && $this->purchase_type) {
+            $this->loadCostCenters($value, $this->purchase_type);
+        } else {
+            $this->costCenters = [];
+        }
+    }
+
+    public function updatedPurchaseType($value)
+    {
+        if ($value && ! in_array($value, PurchaseType::values(), true)) {
+            $this->addError('purchase_type', 'Tipo de compra no vÃ¡lido.');
+            $this->purchase_type = null;
+            $this->cost_center_id = null;
+            $this->costCenters = [];
+            return;
+        }
+
+        $this->cost_center_id = null;
+
+        if ($this->company_id && $value) {
+            $this->loadCostCenters($this->company_id, $value);
         } else {
             $this->costCenters = [];
         }
@@ -288,10 +327,13 @@ class RequisitionForm extends Component
     /**
      * Cargar centros de costo del usuario para una compañía.
      */
-    private function loadCostCenters($companyId)
+    private function loadCostCenters($companyId, $purchaseType)
     {
         $this->costCenters = Auth::user()->costCenters()
             ->where('cost_centers.company_id', $companyId)
+            ->where('cost_centers.purchase_type', $purchaseType)
+            ->where('cost_centers.status', 'ACTIVO')
+            ->whereNull('cost_centers.deleted_at')
             ->where('cost_center_user.is_active', true)
             ->orderBy('cost_centers.code')
             ->get();

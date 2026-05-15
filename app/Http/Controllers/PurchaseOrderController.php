@@ -189,6 +189,7 @@ class PurchaseOrderController extends Controller
             'costCenter',
             'receivingLocation',
             'assignedApprover',
+            'authorizerRole',
             'approver',
             'rejector',
             'approvals.approver',

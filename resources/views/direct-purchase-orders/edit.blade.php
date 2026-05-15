@@ -62,7 +62,7 @@
                             </div>
                             @error('supplier_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small fw-bold">Condiciones de Pago</label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-receipt"></i></span>
@@ -87,7 +87,22 @@
 
                     {{-- FILA 2: EMPRESA, CENTRO DE COSTO Y UBICACIÓN DE RECEPCIÓN --}}
                     <div class="row g-2 mb-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Tipo de Compra <span class="text-danger">*</span></label>
+                            <div class="input-group input-group-sm input-group-select2">
+                                <span class="input-group-text"><i class="ti ti-filter"></i></span>
+                                <select name="purchase_type" id="purchase_type" class="form-select form-select-sm @error('purchase_type') is-invalid @enderror" required>
+                                    <option value="">Seleccione...</option>
+                                    @foreach($purchaseTypes as $purchaseType)
+                                        <option value="{{ $purchaseType }}" {{ old('purchase_type', $directPurchaseOrder->costCenter?->purchase_type?->value ?? $directPurchaseOrder->costCenter?->purchase_type) === $purchaseType ? 'selected' : '' }}>
+                                            {{ $purchaseType }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('purchase_type') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label small fw-bold">Empresa <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-building-store"></i></span>
@@ -103,15 +118,16 @@
                             </div>
                             @error('company_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small fw-bold">Centro de Costo <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-chart-pie"></i></span>
                                 <select name="cost_center_id" id="cost_center_id" class="form-select form-select-sm @error('cost_center_id') is-invalid @enderror" required>
-                                    <option value="">Seleccione empresa primero...</option>
+                                    <option value="">Seleccione empresa y tipo primero...</option>
                                     @foreach($costCenters as $cc)
                                         <option value="{{ $cc->id }}"
                                                 data-company-id="{{ $cc->company_id }}"
+                                                data-purchase-type="{{ $cc->purchase_type?->value ?? $cc->purchase_type }}"
                                                 {{ old('cost_center_id', $directPurchaseOrder->cost_center_id) == $cc->id ? 'selected' : '' }}>
                                             {{ $cc->name }}
                                         </option>
@@ -120,7 +136,7 @@
                             </div>
                             @error('cost_center_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small fw-bold">Ubicación de Recepción <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm input-group-select2">
                                 <span class="input-group-text"><i class="ti ti-map-pin"></i></span>
@@ -319,7 +335,7 @@
                 </div>
                 <div class="card-footer p-2 bg-transparent border-top-0">
                     <button type="submit" class="btn btn-primary btn-sm w-100 mb-1">
-                        <i class="ti ti-device-floppy me-1"></i>Guardar Cambios
+                        <i class="ti ti-device-floppy me-1"></i>{{ $directPurchaseOrder->isReturned() ? 'Guardar y reenviar a aprobación' : 'Guardar cambios' }}
                     </button>
                     <a href="{{ route('direct-purchase-orders.show', $directPurchaseOrder->id) }}" class="btn btn-outline-secondary btn-sm w-100">
                         <i class="ti ti-x me-1"></i>Cancelar
@@ -435,7 +451,7 @@ $(document).ready(function() {
     // INICIALIZACIÓN SELECT2
     // ============================================
 
-    $('#supplier_id, #cost_center_id, #company_id, #receiving_location_id').select2({
+    $('#supplier_id, #cost_center_id, #company_id, #purchase_type, #receiving_location_id').select2({
         theme: 'bootstrap-5',
         width: '100%',
         placeholder: 'Seleccione...',
@@ -561,16 +577,18 @@ $(document).ready(function() {
 
     $('#company_id').on('change', function() {
         const selectedCompanyId = $(this).val();
+        const selectedPurchaseType = $('#purchase_type').val();
         const selectedCompanyName = $(this).find('option:selected').text();
         const $costCenterSelect = $('#cost_center_id');
 
         $costCenterSelect.prop('disabled', true).html('<option value="">Cargando...</option>').trigger('change');
         resetCategorySelects();
 
-        if (selectedCompanyId) {
+        if (selectedCompanyId && selectedPurchaseType) {
             const filteredOptions = allCostCenterOptions.filter(function() {
                 const companyId = $(this).data('company-id');
-                return !companyId || companyId == selectedCompanyId || $(this).val() === '';
+                const purchaseType = $(this).data('purchase-type');
+                return !companyId || ((companyId == selectedCompanyId) && (purchaseType == selectedPurchaseType)) || $(this).val() === '';
             });
 
             $costCenterSelect.html(filteredOptions.clone());
@@ -588,7 +606,7 @@ $(document).ready(function() {
                 });
             }
         } else {
-            $costCenterSelect.html('<option value="">Seleccione empresa primero...</option>');
+            $costCenterSelect.html('<option value="">Seleccione empresa y tipo primero...</option>');
         }
 
         $costCenterSelect.trigger('change');
@@ -598,19 +616,25 @@ $(document).ready(function() {
         loadCategoriesForCostCenter($(this).val());
     });
 
+    $('#purchase_type').on('change', function() {
+        $('#company_id').trigger('change');
+    });
+
     // ============================================
     // CARGA INICIAL (datos existentes de la OCD)
     // ============================================
 
     const initialCompanyId  = '{{ old('company_id', $directPurchaseOrder->costCenter->company_id ?? '') }}';
+    const initialPurchaseType = @json(old('purchase_type', $directPurchaseOrder->costCenter?->purchase_type?->value ?? $directPurchaseOrder->costCenter?->purchase_type));
     const initialCCId       = '{{ old('cost_center_id', $directPurchaseOrder->cost_center_id) }}';
 
-    if (initialCompanyId) {
+    if (initialCompanyId && initialPurchaseType) {
         // Filtrar la lista de CC sin disparar el evento change completo
         const $costCenterSelect = $('#cost_center_id');
         const filteredOptions = allCostCenterOptions.filter(function() {
             const companyId = $(this).data('company-id');
-            return !companyId || companyId == initialCompanyId || $(this).val() === '';
+            const purchaseType = $(this).data('purchase-type');
+            return !companyId || ((companyId == initialCompanyId) && (purchaseType == initialPurchaseType)) || $(this).val() === '';
         });
         $costCenterSelect.html(filteredOptions.clone()).prop('disabled', false);
         $costCenterSelect.find('option:first').text('Seleccione...');

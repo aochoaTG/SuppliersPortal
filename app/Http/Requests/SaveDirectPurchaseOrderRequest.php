@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Enum\PurchaseType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rules\Enum;
 
 class SaveDirectPurchaseOrderRequest extends FormRequest
 {
@@ -31,6 +33,8 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
         return [
             // ✅ AGREGADOS: Proveedor y Mes de aplicación
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'company_id' => ['required', 'integer', 'exists:companies,id'],
+            'purchase_type' => ['required', new Enum(PurchaseType::class)],
 
             // Datos Presupuestales
             'cost_center_id' => ['required', 'integer', 'exists:cost_centers,id'],
@@ -73,6 +77,9 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
             'supplier_id.exists' => 'El proveedor seleccionado no existe.',
 
             // Datos Presupuestales
+            'company_id.required' => 'Debe seleccionar una empresa.',
+            'company_id.exists' => 'La empresa seleccionada no existe.',
+            'purchase_type.required' => 'Debe seleccionar un tipo de compra.',
             'cost_center_id.required' => 'Debe seleccionar un centro de costo.',
             'cost_center_id.exists' => 'El centro de costo seleccionado no existe.',
 
@@ -117,6 +124,8 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
     {
         return [
             'supplier_id' => 'proveedor',
+            'company_id' => 'empresa',
+            'purchase_type' => 'tipo de compra',
             'cost_center_id' => 'centro de costo',
             'justification' => 'justificación',
             'quotation_file' => 'cotización',
@@ -149,6 +158,45 @@ class SaveDirectPurchaseOrderRequest extends FormRequest
                     $validator->errors()->add(
                         'total',
                         'El total de la OCD debe ser mayor a $0.00'
+                    );
+                }
+            }
+
+            if ($this->filled('cost_center_id')) {
+                $costCenter = \App\Models\CostCenter::find($this->cost_center_id);
+
+                if (! $costCenter) {
+                    return;
+                }
+
+                if (! $this->user()->costCenters()
+                    ->where('cost_centers.id', $costCenter->id)
+                    ->where('cost_center_user.is_active', true)
+                    ->exists()) {
+                    $validator->errors()->add(
+                        'cost_center_id',
+                        'El centro de costo seleccionado no esta asignado a tu usuario.'
+                    );
+                }
+
+                if ((int) $costCenter->company_id !== (int) $this->company_id) {
+                    $validator->errors()->add(
+                        'cost_center_id',
+                        'El centro de costo no pertenece a la empresa seleccionada.'
+                    );
+                }
+
+                if (($costCenter->purchase_type?->value ?? $costCenter->purchase_type) !== $this->purchase_type) {
+                    $validator->errors()->add(
+                        'cost_center_id',
+                        'El centro de costo no coincide con el tipo de compra seleccionado.'
+                    );
+                }
+
+                if ($costCenter->status !== 'ACTIVO' || $costCenter->deleted_at !== null) {
+                    $validator->errors()->add(
+                        'cost_center_id',
+                        'El centro de costo seleccionado no esta disponible.'
                     );
                 }
             }

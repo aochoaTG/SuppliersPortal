@@ -283,9 +283,14 @@
 
             {{-- Botones de Acción --}}
             <div class="d-flex justify-content-between mt-4 mb-5">
-                <button type="button" class="btn btn-danger" onclick="confirmReject()">
-                    <i class="ti ti-arrow-back-up me-1"></i> Devolver al Usuario
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-danger" onclick="confirmReject()">
+                        <i class="ti ti-arrow-back-up me-1"></i> Devolver al Usuario
+                    </button>
+                    <button type="button" class="btn btn-outline-warning" onclick="confirmCancelRequisition()">
+                        <i class="ti ti-ban me-1"></i> Cancelar RequisiciÃ³n
+                    </button>
+                </div>
 
                 <div class="d-flex gap-2">
                     <a href="{{ route('requisitions.inbox.validation') }}" class="btn btn-light">
@@ -449,6 +454,74 @@ $(function() {
 /**
  * Confirmar rechazo/devolución de requisición
  */
+function confirmCancelRequisition() {
+    Swal.fire({
+        title: 'Â¿Cancelar requisiciÃ³n {{ $requisition->folio }}?',
+        html: `
+            <div class="text-start">
+                <p class="mb-3"><strong>La requisiciÃ³n se conservarÃ¡ como expediente.</strong></p>
+                <ul class="text-muted small">
+                    <li class="mb-2"><i class="ti ti-ban text-warning"></i> CambiarÃ¡ a estado <span class="badge bg-dark">CANCELADA</span></li>
+                    <li class="mb-2"><i class="ti ti-archive text-info"></i> No se borrarÃ¡n registros, grupos ni RFQs ligadas</li>
+                </ul>
+                <div class="mt-3">
+                    <label for="cancel_reason" class="form-label fw-bold">Motivo de cancelaciÃ³n <span class="text-danger">*</span></label>
+                    <textarea id="cancel_reason" class="form-control" rows="4" placeholder="Explica por quÃ© Compras cancela la requisiciÃ³n completa..." maxlength="1000" required></textarea>
+                </div>
+            </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '<i class="ti ti-ban me-1"></i> SÃ­, cancelar',
+        cancelButtonText: '<i class="ti ti-x me-1"></i> Volver',
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#6c757d',
+        reverseButtons: true,
+        customClass: {
+            confirmButton: 'btn btn-warning',
+            cancelButton: 'btn btn-outline-secondary'
+        },
+        buttonsStyling: false,
+        preConfirm: () => {
+            const reason = document.getElementById('cancel_reason').value.trim();
+
+            if (!reason) {
+                Swal.showValidationMessage('Debes proporcionar un motivo de cancelaciÃ³n');
+                return false;
+            }
+
+            if (reason.length < 10) {
+                Swal.showValidationMessage('El motivo debe tener al menos 10 caracteres');
+                return false;
+            }
+
+            return reason;
+        }
+    }).then((result) => {
+        if (result.isConfirmed && result.value) {
+            const form = $('<form>', {
+                method: 'POST',
+                action: '{{ route('requisitions.workflow.cancel', $requisition->id) }}'
+            });
+
+            form.append($('<input>', {
+                type: 'hidden',
+                name: '_token',
+                value: '{{ csrf_token() }}'
+            }));
+
+            form.append($('<input>', {
+                type: 'hidden',
+                name: 'reason',
+                value: result.value
+            }));
+
+            $('body').append(form);
+            form.submit();
+        }
+    });
+}
+
 function confirmReject() {
     Swal.fire({
         title: '¿Devolver requisición {{ $requisition->folio }}?',

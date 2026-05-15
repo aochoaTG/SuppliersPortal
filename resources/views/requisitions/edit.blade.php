@@ -77,6 +77,20 @@
                             </div>
                         </div>
 
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de compra</label>
+                            <input type="hidden" name="purchase_type" value="{{ old('purchase_type', $selectedPurchaseType) }}">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="ti ti-filter"></i>
+                                </span>
+                                <input type="text" class="form-control bg-light" value="{{ old('purchase_type', $selectedPurchaseType) }}" readonly>
+                            </div>
+                            @error('purchase_type')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                         {{-- Centro de costo --}}
                         <div class="col-md-3">
                             <label for="cost_center_id" class="form-label">

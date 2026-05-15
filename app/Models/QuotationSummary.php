@@ -41,6 +41,16 @@ class QuotationSummary extends Model
     ];
 
     protected $casts = [
+        'requisition_id' => 'integer',
+        'rfq_id' => 'integer',
+        'approval_level_id' => 'integer',
+        'selected_supplier_id' => 'integer',
+        'requested_by_user_id' => 'integer',
+        'selected_by_user_id' => 'integer',
+        'current_approver_user_id' => 'integer',
+        'authorizer_role_id' => 'integer',
+        'approved_by' => 'integer',
+        'rejected_by' => 'integer',
         'subtotal' => 'decimal:2',
         'iva_amount' => 'decimal:2',
         'total' => 'decimal:2',

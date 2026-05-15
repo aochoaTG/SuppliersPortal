@@ -49,7 +49,10 @@ class NewDirectPurchaseOrderNotification extends Notification
             ->line('• **Proveedor:** ' . ($this->ocd->supplier->company_name ?? 'N/A'))
             ->line('• **Centro de Costo:** ' . ($this->ocd->costCenter->name ?? 'N/A'))
             ->line('• **Monto Total:** $' . number_format($this->ocd->total, 2) . ' ' . $this->ocd->currency)
-            ->line('• **Nivel de Aprobación:** ' . $this->ocd->required_approval_level)
+            ->line('• **Rol Autorizador Aplicado:** ' . ($this->ocd->authorizerRole->name ?? 'Sin rol asignado'))
+            ->line('• **Límite Aplicado:** ' . ($this->ocd->effective_authorization_limit !== null
+                ? '$' . number_format((float) $this->ocd->effective_authorization_limit, 2) . ' MXN'
+                : 'Sin límite'))
             ->line('• **Solicitante:** ' . ($this->ocd->creator->name ?? 'N/A'))
             ->line('')
             ->line('**Justificación:** ' . ($this->ocd->justification ?: 'Sin justificación'))
