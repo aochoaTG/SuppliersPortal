@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuthorizerRole;
+use App\Models\DirectPurchaseOrder;
 use App\Models\QuotationSummary;
 use App\Models\UserAuthorizerRole;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ class AuthorizerRoleController extends Controller
     public function index()
     {
         $roles = AuthorizerRole::query()
-            ->withCount(['assignments', 'quotationSummaries'])
+            ->withCount(['assignments', 'quotationSummaries', 'directPurchaseOrders'])
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->get();
@@ -69,6 +70,7 @@ class AuthorizerRoleController extends Controller
     {
         $assignmentsCount = $authorizerRole->assignments()->count();
         $summariesCount = $authorizerRole->quotationSummaries()->count();
+        $directOrdersCount = $authorizerRole->directPurchaseOrders()->count();
         $forceDelete = (bool) $request->boolean('force_delete');
 
         if ($assignmentsCount > 0 && ! $forceDelete) {
@@ -85,13 +87,17 @@ class AuthorizerRoleController extends Controller
                 ->where('authorizer_role_id', $authorizerRole->id)
                 ->update(['authorizer_role_id' => null]);
 
+            DirectPurchaseOrder::query()
+                ->where('authorizer_role_id', $authorizerRole->id)
+                ->update(['authorizer_role_id' => null]);
+
             $authorizerRole->delete();
         });
 
         $message = 'Rol autorizador eliminado correctamente.';
 
-        if ($assignmentsCount > 0 || $summariesCount > 0) {
-            $message .= " Se limpiaron {$assignmentsCount} asignación(es) de usuario y {$summariesCount} referencia(s) en aprobaciones.";
+        if ($assignmentsCount > 0 || $summariesCount > 0 || $directOrdersCount > 0) {
+            $message .= " Se limpiaron {$assignmentsCount} asignacion(es) de usuario, {$summariesCount} referencia(s) en cotizaciones y {$directOrdersCount} referencia(s) en ordenes directas.";
         }
 
         return redirect()->route('authorizer-roles.index')->with('success', $message);

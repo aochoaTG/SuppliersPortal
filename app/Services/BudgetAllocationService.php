@@ -131,6 +131,20 @@ class BudgetAllocationService
         });
     }
 
+    public function reserveDirectPurchaseOrder(DirectPurchaseOrder $directPurchaseOrder): void
+    {
+        DB::transaction(function () use ($directPurchaseOrder) {
+            foreach ($this->getOrderBudgetLines($directPurchaseOrder) as $line) {
+                $this->commitLine($directPurchaseOrder, $line);
+            }
+
+            $directPurchaseOrder->forceFill([
+                'budget_reserved_at' => now(),
+                'budget_released_at' => null,
+            ])->save();
+        });
+    }
+
     public function releaseQuotationSummary(QuotationSummary $summary): void
     {
         DB::transaction(function () use ($summary) {
@@ -139,6 +153,19 @@ class BudgetAllocationService
             }
 
             $summary->forceFill([
+                'budget_released_at' => now(),
+            ])->save();
+        });
+    }
+
+    public function releaseDirectPurchaseOrder(DirectPurchaseOrder $directPurchaseOrder): void
+    {
+        DB::transaction(function () use ($directPurchaseOrder) {
+            foreach ($this->getOrderBudgetLines($directPurchaseOrder) as $line) {
+                $this->releaseLine($directPurchaseOrder, $line);
+            }
+
+            $directPurchaseOrder->forceFill([
                 'budget_released_at' => now(),
             ])->save();
         });

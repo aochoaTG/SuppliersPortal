@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DirectPurchaseOrder;
 use App\Models\Employee;
 use App\Models\QuotationSummary;
 use App\Models\Requisition;
@@ -28,6 +29,15 @@ class AuthorizerResolutionService
         }
 
         return $this->resolveForRequester($requisition->requester, $amount);
+    }
+
+    public function resolveForDirectPurchaseOrder(DirectPurchaseOrder $directPurchaseOrder): array
+    {
+        if (! $directPurchaseOrder->creator) {
+            throw new RuntimeException('La orden directa no tiene usuario creador asignado.');
+        }
+
+        return $this->resolveForRequester($directPurchaseOrder->creator, (float) $directPurchaseOrder->total);
     }
 
     public function resolveForRequester(User $requester, float $amount): array

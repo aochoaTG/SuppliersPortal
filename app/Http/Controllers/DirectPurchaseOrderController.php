@@ -3,47 +3,44 @@
 namespace App\Http\Controllers;
 
 use App\Enum\PurchaseType;
-use App\Models\DirectPurchaseOrder;
-use App\Models\DirectPurchaseOrderItem;
-use App\Models\DirectPurchaseOrderDocument;
-use App\Models\BudgetCommitment;
-use App\Models\Supplier;
+use App\Http\Requests\SaveDirectPurchaseOrderRequest;
 use App\Models\CostCenter;
+use App\Models\DirectPurchaseOrder;
+use App\Models\DirectPurchaseOrderDocument;
+use App\Models\DirectPurchaseOrderItem;
 use App\Models\ExpenseCategory;
 use App\Models\ReceivingLocation;
+use App\Models\Supplier;
 use App\Models\User;
+use App\Notifications\DirectPurchaseOrderApprovedNotification;
+use App\Notifications\DirectPurchaseOrderRejectedNotification;
+use App\Notifications\DirectPurchaseOrderReturnedNotification;
 use App\Notifications\NewDirectPurchaseOrderNotification;
-use App\Http\Requests\SaveDirectPurchaseOrderRequest;
-use App\Services\ApprovalService;
+use App\Services\AuthorizerResolutionService;
 use App\Services\BudgetAllocationService;
 use App\Services\PricingService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DirectPurchaseOrderController extends Controller
 {
     public function __construct(
-        private ApprovalService $approvalService,
         private PricingService $pricingService,
-        private BudgetAllocationService $budgetAllocationService
+        private BudgetAllocationService $budgetAllocationService,
+        private AuthorizerResolutionService $authorizerResolutionService
     ) {
     }
 
-    /**
-     * Mostrar formulario para crear nueva OCD
-     */
     public function create()
     {
-        // Obtener empresas a las que el usuario tiene acceso
         $companies = Auth::user()->companies()
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        // Obtener centros de costo a los que el usuario tiene acceso (con relación a empresa)
         $costCenters = Auth::user()->costCenters()
             ->with('company')
             ->whereHas('company', function ($query) {
@@ -53,17 +50,14 @@ class DirectPurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Proveedores activos
         $suppliers = Supplier::active()
             ->orderBy('company_name')
             ->get();
 
-        // Categorías de gasto activas
         $expenseCategories = ExpenseCategory::active()
             ->orderBy('name')
             ->get();
 
-        // Ubicaciones de recepción activas
         $receivingLocations = ReceivingLocation::active()
             ->where('portal_blocked', false)
             ->orderBy('name')
@@ -80,36 +74,18 @@ class DirectPurchaseOrderController extends Controller
         ]);
     }
 
-    /**
-     * Guardar nueva OCD
-     */
     public function store(SaveDirectPurchaseOrderRequest $request)
     {
         try {
             DB::beginTransaction();
 
-            // 1. Calcular totales iniciales
             $totals = $this->pricingService->calculateTotals($request->items);
-
-            // 2. Obtener datos del proveedor para heredar condiciones
-            $supplier = Supplier::active()->find($request->supplier_id);
-
-            // ✅ NUEVO: Calcular días de entrega y el mes de aplicación dinámico
+            $supplier = Supplier::active()->findOrFail($request->supplier_id);
             $estimatedDays = (int) ($request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30);
             $applicationMonth = now()->addDays($estimatedDays)->format('Y-m');
 
-            // Determinar nivel de aprobación según el total (desde cache)
-            $totalAmount = $totals['total'];
-            $approvalLevel = $this->approvalService->getLevelForAmount($totalAmount);
-            $levelNumber = $approvalLevel ? $approvalLevel->level_number : 1;
-
-            // Obtener aprobador por rol (authorizer)
-            $approver = User::role('authorizer')->first();
-            $approverId = $approver?->id ?? 1;
-
-            // 3. Crear la OCD
             $ocd = DirectPurchaseOrder::create([
-                'folio' => DirectPurchaseOrder::generateNextFolio(), // ✅ CORREGIDO: Generar folio de inmediato
+                'folio' => DirectPurchaseOrder::generateNextFolio(),
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
                 'receiving_location_id' => $request->receiving_location_id,
@@ -121,158 +97,131 @@ class DirectPurchaseOrderController extends Controller
                 'currency' => 'MXN',
                 'payment_terms' => $request->payment_terms ?? $supplier->default_payment_terms ?? 'Contado',
                 'estimated_delivery_days' => $estimatedDays,
-                'status' => 'PENDING_APPROVAL', // ✅ CAMBIO: Directo a pendiente de aprobación
-                'required_approval_level' => $levelNumber, // ✅ NUEVO
-                'assigned_approver_id' => $approverId, // ✅ Basado en rol, con fallback a 1
+                'required_approval_level' => null,
+                'status' => 'PENDING_APPROVAL',
                 'created_by' => Auth::id(),
                 'submitted_at' => now(),
             ]);
 
-            // 4. Crear los items (Camino B: la categoría va por partida)
-            foreach ($request->items as $itemData) {
-                DirectPurchaseOrderItem::create([
-                    'direct_purchase_order_id' => $ocd->id,
-                    'expense_category_id' => $itemData['expense_category_id'],
-                    'description' => $itemData['description'],
-                    'quantity' => $itemData['quantity'],
-                    'unit_price' => $itemData['unit_price'],
-                    'iva_rate' => $itemData['iva_rate'],
-                    // ✅ NUEVOS: Campos opcionales de la partida
-                    'unit_of_measure' => $itemData['unit_of_measure'] ?? null,
-                    'sku' => $itemData['sku'] ?? null,
-                    'notes' => $itemData['notes'] ?? null,
-                ]);
-            }
+            $this->syncItems($ocd, $request->items);
+            $this->syncDocuments($ocd, $request, false);
 
-            // 5. Guardar documentos
-            // Cotización (obligatoria)
-            if ($request->hasFile('quotation_file')) {
-                $this->uploadDocument($ocd, $request->file('quotation_file'), 'quotation');
-            }
-
-            // Documentos de soporte (opcionales)
-            if ($request->hasFile('support_documents')) {
-                foreach ($request->file('support_documents') as $file) {
-                    $this->uploadDocument($ocd, $file, 'support_document');
-                }
-            }
-
-            // ✅ Notificar al aprobador asignado
-            $approver = User::find($ocd->assigned_approver_id);
-            if ($approver) {
-                $approver->notify(new NewDirectPurchaseOrderNotification($ocd));
-            }
+            $this->prepareApprovalFlow($ocd);
 
             DB::commit();
 
+            $ocd->refresh()->loadMissing('assignedApprover', 'supplier', 'costCenter', 'creator', 'authorizerRole');
+            $this->notifyAssignedApprover($ocd);
+
             return redirect()
                 ->route('purchase-orders.index')
-                ->with('success', 'Orden de Compra Directa creada y enviada a aprobación exitosamente bajo el folio: ' . $ocd->folio);
+                ->with('success', 'Orden de Compra Directa creada y enviada a aprobación bajo el folio: '.$ocd->folio);
         } catch (\Exception $e) {
             DB::rollBack();
 
-            // ✅ NUEVO: Guardar el error en los logs de Laravel para diagnóstico rápido
-            \Illuminate\Support\Facades\Log::error('Error al crear OCD: ' . $e->getMessage(), [
+            Log::error('Error al crear OCD: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
-                'request_data' => $request->except(['quotation_file', 'support_documents'])
+                'request_data' => $request->except(['quotation_file', 'support_documents']),
             ]);
 
             return back()
                 ->withInput()
-                ->withErrors(['error' => 'Error al crear la OCD: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Error al crear la OCD: '.$e->getMessage()]);
         }
     }
 
-    /**
-     * Envía la OCD a aprobación
-     */
     public function submit(DirectPurchaseOrder $directPurchaseOrder)
     {
-        // 1. Verificar permisos y estado
-        if ($directPurchaseOrder->created_by !== Auth::id()) {
+        if ((int) $directPurchaseOrder->created_by !== (int) Auth::id()) {
             return back()->withErrors(['error' => 'Solo el creador puede enviar la OCD a aprobación.']);
         }
 
-        if (!$directPurchaseOrder->isDraft() && !$directPurchaseOrder->isReturned()) {
-            return back()->withErrors(['error' => 'Solo se pueden enviar OCD en estado Borrador o Devueltas.']);
-        }
-
-        // 2. Ejecutar envío (esto genera folio y nivel de aprobación en el modelo)
-        if ($directPurchaseOrder->submit()) {
-            return redirect()
-                ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
-                ->with('success', 'OCD enviada a aprobación exitosamente bajo el folio: ' . $directPurchaseOrder->folio);
-        }
-
-        return back()->withErrors(['error' => 'No se pudo enviar la OCD. Asegúrese de que tenga al menos un item.']);
-    }
-
-    /**
-     * Acción de Aprobar OCD
-     */
-    public function approve(Request $request, DirectPurchaseOrder $directPurchaseOrder)
-    {
-        if (!$directPurchaseOrder->canBeApproved()) {
-            return back()->withErrors(['error' => 'Esta OCD no puede ser aprobada. Estado actual: ' . $directPurchaseOrder->getStatusLabel()]);
+        if (! $directPurchaseOrder->canBeSubmitted()) {
+            return back()->withErrors(['error' => 'Solo se pueden enviar OCD en estado Borrador o Devueltas con al menos una partida.']);
         }
 
         try {
             DB::beginTransaction();
 
-            // 1. Re-validar disponibilidad presupuestal por cada categoría de los items
-            $itemsByCategory = $directPurchaseOrder->items->groupBy('expense_category_id');
-            $costCenterId = $directPurchaseOrder->cost_center_id;
-            $monthStr = $directPurchaseOrder->application_month;
+            $directPurchaseOrder->forceFill([
+                'folio' => $directPurchaseOrder->folio ?? DirectPurchaseOrder::generateNextFolio(),
+                'status' => 'PENDING_APPROVAL',
+                'submitted_at' => now(),
+            ])->save();
 
-            foreach ($itemsByCategory as $categoryId => $items) {
-                $requiredAmount = $items->sum('total');
-                $budgetCheck = $this->validateBudgetAvailability($costCenterId, $monthStr, $categoryId, $requiredAmount);
+            $this->prepareApprovalFlow($directPurchaseOrder);
 
-                if (!$budgetCheck['available']) {
-                    throw new \Exception('Presupuesto insuficiente: ' . $budgetCheck['message']);
-                }
+            DB::commit();
+
+            $directPurchaseOrder->refresh()->loadMissing('assignedApprover', 'supplier', 'costCenter', 'creator', 'authorizerRole');
+            $this->notifyAssignedApprover($directPurchaseOrder);
+
+            return redirect()
+                ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
+                ->with('success', 'OCD enviada a aprobación exitosamente bajo el folio: '.$directPurchaseOrder->folio);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return back()->withErrors(['error' => 'No se pudo enviar la OCD: '.$e->getMessage()]);
+        }
+    }
+
+    public function approve(Request $request, DirectPurchaseOrder $directPurchaseOrder)
+    {
+        abort_unless($directPurchaseOrder->isApproverFor(Auth::user()), 403);
+
+        if (! $directPurchaseOrder->canBeApproved()) {
+            return back()->withErrors(['error' => 'Esta OCD no puede ser aprobada. Estado actual: '.$directPurchaseOrder->getStatusLabel()]);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            if (! $this->hasActiveBudgetReservation($directPurchaseOrder)) {
+                $this->ensureBudgetAvailability($directPurchaseOrder);
+                $this->budgetAllocationService->reserveDirectPurchaseOrder($directPurchaseOrder);
             }
 
-            // 2. Cambiar estatus a Emitida (aprobada y lista para recepción)
             $directPurchaseOrder->update([
                 'status' => 'ISSUED',
                 'approved_by' => Auth::id(),
                 'approved_at' => now(),
             ]);
 
-            // 3. Comprometer presupuesto respetando la distribución por cédula.
             $this->budgetAllocationService->commitOrder($directPurchaseOrder);
 
-            // 4. Registrar en el historial
             $directPurchaseOrder->approvals()->create([
-                'approval_level' => $directPurchaseOrder->required_approval_level,
+                'approval_level' => $directPurchaseOrder->required_approval_level ?? 0,
                 'approver_user_id' => Auth::id(),
                 'action' => 'APPROVED',
-                'comments' => $request->comments,
+                'comments' => $request->input('comments'),
                 'approved_at' => now(),
             ]);
 
-            // 5. Notificar al proveedor (Correo + Portal/Base de datos)
             if ($directPurchaseOrder->supplier) {
-                $directPurchaseOrder->supplier->notify(new \App\Notifications\DirectPurchaseOrderApprovedNotification($directPurchaseOrder));
+                $directPurchaseOrder->supplier->notify(new DirectPurchaseOrderApprovedNotification($directPurchaseOrder));
             }
 
             DB::commit();
 
             return redirect()
                 ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
-                ->with('success', 'La Orden de Compra ha sido aprobada, el presupuesto comprometido y el proveedor notificado.');
+                ->with('success', 'La Orden de Compra fue aprobada, la reserva quedó confirmada y el proveedor fue notificado.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Error al aprobar la OCD: ' . $e->getMessage()]);
+
+            return back()->withErrors(['error' => 'Error al aprobar la OCD: '.$e->getMessage()]);
         }
     }
 
-    /**
-     * Acción de Rechazar OCD
-     */
     public function reject(Request $request, DirectPurchaseOrder $directPurchaseOrder)
     {
+        abort_unless($directPurchaseOrder->isApproverFor(Auth::user()), 403);
+
+        if (! $directPurchaseOrder->isPendingApproval()) {
+            return back()->withErrors(['error' => 'Solo se pueden rechazar OCD pendientes de aprobación.']);
+        }
+
         $request->validate([
             'comments' => 'required|string|min:50|max:500',
         ]);
@@ -280,37 +229,32 @@ class DirectPurchaseOrderController extends Controller
         try {
             DB::beginTransaction();
 
+            $this->budgetAllocationService->releaseDirectPurchaseOrder($directPurchaseOrder);
+
             $directPurchaseOrder->update([
-                'status'      => 'REJECTED',
+                'status' => 'REJECTED',
+                'assigned_approver_id' => null,
                 'rejected_by' => Auth::id(),
                 'rejected_at' => now(),
             ]);
 
             $directPurchaseOrder->approvals()->create([
-                'approval_level'  => $directPurchaseOrder->required_approval_level,
+                'approval_level' => $directPurchaseOrder->required_approval_level ?? 0,
                 'approver_user_id' => Auth::id(),
-                'action'          => 'REJECTED',
-                'comments'        => $request->comments,
-                'approved_at'     => now(),
+                'action' => 'REJECTED',
+                'comments' => $request->comments,
+                'approved_at' => now(),
             ]);
 
-            // Notificar al solicitante (creador) con el motivo de rechazo
             $creator = $directPurchaseOrder->creator;
             if ($creator) {
-                $creator->notify(new \App\Notifications\DirectPurchaseOrderRejectedNotification(
-                    $directPurchaseOrder,
-                    $request->comments
-                ));
+                $creator->notify(new DirectPurchaseOrderRejectedNotification($directPurchaseOrder, $request->comments));
             }
 
-            // Notificar al equipo de Compras (buyers), excepto el aprobador actual
             $buyers = User::role('buyer')->get();
             foreach ($buyers as $buyer) {
                 if ($buyer->id !== Auth::id()) {
-                    $buyer->notify(new \App\Notifications\DirectPurchaseOrderRejectedNotification(
-                        $directPurchaseOrder,
-                        $request->comments
-                    ));
+                    $buyer->notify(new DirectPurchaseOrderRejectedNotification($directPurchaseOrder, $request->comments));
                 }
             }
 
@@ -319,64 +263,65 @@ class DirectPurchaseOrderController extends Controller
             return redirect()
                 ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
                 ->with('rejection_data', [
-                    'folio'        => $directPurchaseOrder->folio,
-                    'total'        => $directPurchaseOrder->total,
-                    'currency'     => $directPurchaseOrder->currency,
-                    'comments'     => $request->comments,
+                    'folio' => $directPurchaseOrder->folio,
+                    'total' => $directPurchaseOrder->total,
+                    'currency' => $directPurchaseOrder->currency,
+                    'comments' => $request->comments,
                     'creator_name' => $creator?->name ?? 'el solicitante',
                 ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Error al rechazar la OCD: ' . $e->getMessage()]);
+
+            return back()->withErrors(['error' => 'Error al rechazar la OCD: '.$e->getMessage()]);
         }
     }
 
-    /**
-     * Acción de Devolver OCD para corrección
-     */
     public function return(Request $request, DirectPurchaseOrder $directPurchaseOrder)
     {
         $request->validate(['comments' => 'required|string|max:500']);
 
         $comingFromIssued = $directPurchaseOrder->status === 'ISSUED';
 
-        if ($comingFromIssued && !$directPurchaseOrder->canBeReturnedToRevision()) {
+        if ($comingFromIssued) {
+            abort_unless(
+                Auth::user()->hasRole('superadmin') || (int) $directPurchaseOrder->approved_by === (int) Auth::id(),
+                403
+            );
+        } else {
+            abort_unless($directPurchaseOrder->isApproverFor(Auth::user()), 403);
+        }
+
+        if ($comingFromIssued && ! $directPurchaseOrder->canBeReturnedToRevision()) {
             return back()->withErrors(['error' => 'No se puede devolver a revisión una OCD que ya tiene recepciones registradas.']);
         }
 
-        if (!$comingFromIssued && $directPurchaseOrder->status !== 'PENDING_APPROVAL') {
+        if (! $comingFromIssued && ! $directPurchaseOrder->isPendingApproval()) {
             return back()->withErrors(['error' => 'Esta OCD no puede ser devuelta en su estado actual.']);
         }
 
         try {
             DB::beginTransaction();
 
-            // Si viene de ISSUED, liberar el presupuesto comprometido
-            if ($comingFromIssued) {
-                $this->budgetAllocationService->releaseOrder($directPurchaseOrder);
-            }
+            $this->budgetAllocationService->releaseDirectPurchaseOrder($directPurchaseOrder);
 
             $directPurchaseOrder->update([
-                'status'      => 'RETURNED',
+                'status' => 'RETURNED',
+                'assigned_approver_id' => null,
                 'returned_by' => Auth::id(),
                 'returned_at' => now(),
             ]);
 
             $directPurchaseOrder->approvals()->create([
-                'approval_level'   => $directPurchaseOrder->required_approval_level,
+                'approval_level' => $directPurchaseOrder->required_approval_level ?? 0,
                 'approver_user_id' => Auth::id(),
-                'action'           => 'RETURNED',
-                'comments'         => $request->comments,
-                'approved_at'      => now(),
+                'action' => 'RETURNED',
+                'comments' => $request->comments,
+                'approved_at' => now(),
             ]);
 
-            // Notificar al solicitante con las instrucciones de corrección
             $creator = $directPurchaseOrder->creator;
             if ($creator) {
-                $creator->notify(new \App\Notifications\DirectPurchaseOrderReturnedNotification(
-                    $directPurchaseOrder,
-                    $request->comments
-                ));
+                $creator->notify(new DirectPurchaseOrderReturnedNotification($directPurchaseOrder, $request->comments));
             }
 
             DB::commit();
@@ -384,39 +329,33 @@ class DirectPurchaseOrderController extends Controller
             return redirect()
                 ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
                 ->with('return_data', [
-                    'folio'        => $directPurchaseOrder->folio,
+                    'folio' => $directPurchaseOrder->folio,
                     'creator_name' => $creator?->name ?? 'el solicitante',
-                    'comments'     => $request->comments,
+                    'comments' => $request->comments,
                 ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Error al devolver la OCD: ' . $e->getMessage()]);
+
+            return back()->withErrors(['error' => 'Error al devolver la OCD: '.$e->getMessage()]);
         }
     }
 
-    /**
-     * Mostrar formulario para editar OCD existente
-     */
     public function edit(DirectPurchaseOrder $directPurchaseOrder)
     {
-        // Verificar que se puede editar
-        if (!$directPurchaseOrder->canBeEdited()) {
+        if (! $directPurchaseOrder->canBeEdited()) {
             return redirect()
                 ->route('purchase-orders.index')
                 ->withErrors(['error' => 'Solo se pueden editar OCD en estado Borrador o Devueltas.']);
         }
 
-        // Verificar que es el creador
         if ((int) $directPurchaseOrder->created_by !== (int) Auth::id()) {
             return redirect()
                 ->route('purchase-orders.index')
                 ->withErrors(['error' => 'Solo puede editar sus propias OCD.']);
         }
 
-        // Cargar relaciones
         $directPurchaseOrder->load(['items', 'documents', 'costCenter.company']);
 
-        // Cargar datos para el formulario
         $companies = Auth::user()->companies()
             ->where('is_active', true)
             ->orderBy('name')
@@ -456,36 +395,17 @@ class DirectPurchaseOrderController extends Controller
         ]);
     }
 
-    /**
-     * Actualizar OCD existente
-     */
     public function update(SaveDirectPurchaseOrderRequest $request, DirectPurchaseOrder $directPurchaseOrder)
     {
         try {
             DB::beginTransaction();
 
             $wasReturned = $directPurchaseOrder->isReturned();
-
-            // 1. Calcular nuevos totales
             $totals = $this->pricingService->calculateTotals($request->items);
-
-            // 2. Obtener datos del proveedor para heredar condiciones
-            $supplier = Supplier::active()->find($request->supplier_id);
-
-            // Calcular días de entrega y el mes de aplicación dinámico
+            $supplier = Supplier::active()->findOrFail($request->supplier_id);
             $estimatedDays = (int) ($request->estimated_delivery_days ?? $supplier->avg_delivery_time ?? 30);
             $applicationMonth = now()->addDays($estimatedDays)->format('Y-m');
 
-            // 3. Si venía de RETURNED, recalcular nivel de aprobación y enviar a PENDING_APPROVAL
-            $newStatus = 'DRAFT';
-            $approvalLevel = null;
-            if ($wasReturned) {
-                $totalAmount = $totals['total'];
-                $approvalLevel = $this->approvalService->getLevelForAmount($totalAmount);
-                $newStatus = 'PENDING_APPROVAL';
-            }
-
-            // 4. Actualizar la OCD
             $updateData = [
                 'supplier_id' => $request->supplier_id,
                 'cost_center_id' => $request->cost_center_id,
@@ -498,59 +418,28 @@ class DirectPurchaseOrderController extends Controller
                 'currency' => 'MXN',
                 'payment_terms' => $request->payment_terms ?? $supplier->default_payment_terms ?? 'Contado',
                 'estimated_delivery_days' => $estimatedDays,
-                'status' => $newStatus,
+                'status' => $wasReturned ? 'PENDING_APPROVAL' : 'DRAFT',
                 'created_by' => Auth::id(),
             ];
 
             if ($wasReturned) {
-                $updateData['required_approval_level'] = $approvalLevel ? $approvalLevel->level_number : 1;
                 $updateData['submitted_at'] = now();
             }
 
             $directPurchaseOrder->update($updateData);
 
-            // 4. Eliminar items anteriores y crear nuevos
-            $directPurchaseOrder->items()->delete();
+            $this->syncItems($directPurchaseOrder, $request->items);
+            $this->syncDocuments($directPurchaseOrder, $request, true);
 
-            foreach ($request->items as $itemData) {
-                DirectPurchaseOrderItem::create([
-                    'direct_purchase_order_id' => $directPurchaseOrder->id,
-                    'expense_category_id' => $itemData['expense_category_id'],
-                    'description' => $itemData['description'],
-                    'quantity' => $itemData['quantity'],
-                    'unit_price' => $itemData['unit_price'],
-                    'iva_rate' => $itemData['iva_rate'],
-                ]);
-            }
-
-            // 6. Guardar nuevos documentos si se adjuntaron
-            if ($request->hasFile('quotation_file')) {
-                // Eliminar cotización anterior
-                $oldQuotation = $directPurchaseOrder->documents()
-                    ->where('document_type', 'quotation')
-                    ->first();
-                if ($oldQuotation) {
-                    $oldQuotation->delete(); // El evento del modelo elimina el archivo
-                }
-
-                $this->uploadDocument($directPurchaseOrder, $request->file('quotation_file'), 'quotation');
-            }
-
-            if ($request->hasFile('support_documents')) {
-                foreach ($request->file('support_documents') as $file) {
-                    $this->uploadDocument($directPurchaseOrder, $file, 'support_document');
-                }
+            if ($wasReturned) {
+                $this->prepareApprovalFlow($directPurchaseOrder);
             }
 
             DB::commit();
 
-            // Si venía de RETURNED, notificar al aprobador asignado
             if ($wasReturned) {
-                $directPurchaseOrder->refresh();
-                $approver = User::find($directPurchaseOrder->assigned_approver_id);
-                if ($approver) {
-                    $approver->notify(new NewDirectPurchaseOrderNotification($directPurchaseOrder));
-                }
+                $directPurchaseOrder->refresh()->loadMissing('assignedApprover', 'supplier', 'costCenter', 'creator', 'authorizerRole');
+                $this->notifyAssignedApprover($directPurchaseOrder);
 
                 return redirect()
                     ->route('direct-purchase-orders.show', $directPurchaseOrder->id)
@@ -565,50 +454,10 @@ class DirectPurchaseOrderController extends Controller
 
             return back()
                 ->withInput()
-                ->withErrors(['error' => 'Error al actualizar la OCD: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Error al actualizar la OCD: '.$e->getMessage()]);
         }
     }
 
-    /**
-     * Validar disponibilidad presupuestal
-     */
-    private function validateBudgetAvailability($costCenterId, $monthStr, $categoryId, $requiredAmount): array
-    {
-        try {
-            // 0. Si el CC es de consumo libre, no requiere validación presupuestal
-            $costCenter = \App\Models\CostCenter::find($costCenterId);
-            if ($costCenter && $costCenter->budget_type === 'FREE_CONSUMPTION') {
-                return ['available' => true, 'message' => 'Centro de costo de consumo libre.'];
-            }
-
-            // 1. Parsear el mes (YYYY-MM a Year y Month numeric)
-            $date = \Carbon\Carbon::parse($monthStr . '-01');
-            $year = $date->year;
-            $month = $date->month;
-
-            // 2. Buscar el presupuesto anual para este CC y Año
-            return $this->budgetAllocationService->checkAvailability(
-                (int) $costCenterId,
-                (int) $year,
-                (int) $month,
-                (int) $categoryId,
-                (float) $requiredAmount
-            );
-        } catch (\Exception $e) {
-            return [
-                'available' => false,
-                'message' => 'Error al validar presupuesto: ' . $e->getMessage(),
-            ];
-        }
-    }
-
-    /**
-     * Obtener categorías de gasto disponibles para un Centro de Costo.
-     *
-     * - CC con presupuesto anual aprobado → solo categorías presentes en la
-     *   distribución mensual del año en curso (independientemente del saldo).
-     * - CC de consumo libre (sin presupuesto anual) → todas las categorías activas.
-     */
     public function getAvailableCategories(Request $request)
     {
         $request->validate([
@@ -618,14 +467,12 @@ class DirectPurchaseOrderController extends Controller
         try {
             $year = now()->year;
 
-            // Buscar presupuesto anual aprobado para el CC y año actual
             $budget = \App\Models\AnnualBudget::where('cost_center_id', $request->cost_center_id)
                 ->where('fiscal_year', $year)
                 ->where('status', 'APROBADO')
                 ->first();
 
             if ($budget) {
-                // CC con presupuesto: solo categorías configuradas en la distribución mensual
                 $categoryIds = \App\Models\BudgetMonthlyDistribution::where('annual_budget_id', $budget->id)
                     ->distinct()
                     ->pluck('expense_category_id');
@@ -635,7 +482,6 @@ class DirectPurchaseOrderController extends Controller
                     ->orderBy('name')
                     ->get(['id', 'name']);
             } else {
-                // CC de consumo libre: todas las categorías activas
                 $categories = ExpenseCategory::active()
                     ->orderBy('name')
                     ->get(['id', 'name']);
@@ -643,43 +489,171 @@ class DirectPurchaseOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'is_free_consumption' => !$budget,
+                'is_free_consumption' => ! $budget,
                 'categories' => $categories,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al obtener categorías: ' . $e->getMessage(),
-                'categories' => []
+                'message' => 'Error al obtener categorías: '.$e->getMessage(),
+                'categories' => [],
             ], 500);
         }
     }
 
-    /**
-     * Subir y registrar documento
-     */
+    private function prepareApprovalFlow(DirectPurchaseOrder $directPurchaseOrder): void
+    {
+        $directPurchaseOrder->loadMissing('creator.employee', 'items', 'costCenter');
+
+        if ($this->hasActiveBudgetReservation($directPurchaseOrder)) {
+            $this->budgetAllocationService->releaseDirectPurchaseOrder($directPurchaseOrder);
+        }
+
+        $this->ensureBudgetAvailability($directPurchaseOrder);
+
+        $resolution = $this->authorizerResolutionService->resolveForDirectPurchaseOrder($directPurchaseOrder);
+
+        $this->budgetAllocationService->reserveDirectPurchaseOrder($directPurchaseOrder);
+
+        $directPurchaseOrder->forceFill([
+            'status' => 'PENDING_APPROVAL',
+            'required_approval_level' => null,
+            'assigned_approver_id' => $resolution['approver_user']->id,
+            'authorizer_role_id' => $resolution['authorizer_role']->id,
+            'effective_authorization_limit' => $resolution['effective_limit'],
+            'approval_chain_snapshot' => $resolution['chain'],
+            'resolution_notes' => $resolution['resolution_notes'],
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+            'returned_by' => null,
+            'returned_at' => null,
+        ])->save();
+    }
+
+    private function ensureBudgetAvailability(DirectPurchaseOrder $directPurchaseOrder): void
+    {
+        $directPurchaseOrder->loadMissing('items');
+        $itemsByCategory = $directPurchaseOrder->items->groupBy('expense_category_id');
+
+        foreach ($itemsByCategory as $categoryId => $items) {
+            $requiredAmount = (float) $items->sum('total');
+            $budgetCheck = $this->validateBudgetAvailability(
+                $directPurchaseOrder->cost_center_id,
+                $directPurchaseOrder->application_month,
+                (int) $categoryId,
+                $requiredAmount
+            );
+
+            if (! ($budgetCheck['available'] ?? false)) {
+                throw new \RuntimeException('Presupuesto insuficiente: '.$budgetCheck['message']);
+            }
+        }
+    }
+
+    private function hasActiveBudgetReservation(DirectPurchaseOrder $directPurchaseOrder): bool
+    {
+        return $directPurchaseOrder->budgetCommitments()
+            ->where('status', 'COMMITTED')
+            ->exists();
+    }
+
+    private function notifyAssignedApprover(DirectPurchaseOrder $directPurchaseOrder): void
+    {
+        $approver = $directPurchaseOrder->assignedApprover;
+
+        if ($approver) {
+            $approver->notify(new NewDirectPurchaseOrderNotification($directPurchaseOrder));
+        }
+    }
+
+    private function syncItems(DirectPurchaseOrder $directPurchaseOrder, array $items): void
+    {
+        $directPurchaseOrder->items()->delete();
+
+        foreach ($items as $itemData) {
+            DirectPurchaseOrderItem::create([
+                'direct_purchase_order_id' => $directPurchaseOrder->id,
+                'expense_category_id' => $itemData['expense_category_id'],
+                'description' => $itemData['description'],
+                'quantity' => $itemData['quantity'],
+                'unit_price' => $itemData['unit_price'],
+                'iva_rate' => $itemData['iva_rate'],
+                'unit_of_measure' => $itemData['unit_of_measure'] ?? null,
+                'sku' => $itemData['sku'] ?? null,
+                'notes' => $itemData['notes'] ?? null,
+            ]);
+        }
+    }
+
+    private function syncDocuments(DirectPurchaseOrder $directPurchaseOrder, SaveDirectPurchaseOrderRequest $request, bool $isUpdate): void
+    {
+        if ($request->hasFile('quotation_file')) {
+            if ($isUpdate) {
+                $oldQuotation = $directPurchaseOrder->documents()
+                    ->where('document_type', 'quotation')
+                    ->first();
+
+                if ($oldQuotation) {
+                    $oldQuotation->delete();
+                }
+            }
+
+            $this->uploadDocument($directPurchaseOrder, $request->file('quotation_file'), 'quotation');
+        }
+
+        if ($request->hasFile('support_documents')) {
+            foreach ($request->file('support_documents') as $file) {
+                $this->uploadDocument($directPurchaseOrder, $file, 'support_document');
+            }
+        }
+    }
+
+    private function validateBudgetAvailability($costCenterId, $monthStr, $categoryId, $requiredAmount): array
+    {
+        try {
+            $costCenter = CostCenter::find($costCenterId);
+            if ($costCenter && $costCenter->budget_type === 'FREE_CONSUMPTION') {
+                return ['available' => true, 'message' => 'Centro de costo de consumo libre.'];
+            }
+
+            $date = Carbon::parse($monthStr.'-01');
+
+            return $this->budgetAllocationService->checkAvailability(
+                (int) $costCenterId,
+                (int) $date->year,
+                (int) $date->month,
+                (int) $categoryId,
+                (float) $requiredAmount
+            );
+        } catch (\Exception $e) {
+            return [
+                'available' => false,
+                'message' => 'Error al validar presupuesto: '.$e->getMessage(),
+            ];
+        }
+    }
+
     private function uploadDocument(DirectPurchaseOrder $ocd, $file, $type): DirectPurchaseOrderDocument
     {
-        // Generar nombre único para el archivo
         $year = now()->year;
         $month = now()->format('m');
         $originalName = $file->getClientOriginalName();
         $extension = $file->getClientOriginalExtension();
-        $fileName = uniqid('ocd_' . $ocd->id . '_') . '.' . $extension;
+        $fileName = uniqid('ocd_'.$ocd->id.'_').'.'.$extension;
 
-        // Guardar en storage
         $path = $file->storeAs(
             "ocd_documents/{$year}/{$month}",
             $fileName,
             'local'
         );
 
-        // Registrar en base de datos
         return DirectPurchaseOrderDocument::create([
             'direct_purchase_order_id' => $ocd->id,
             'document_type' => $type,
-            'file_path' => $path,
             'original_filename' => $originalName,
+            'file_path' => $path,
             'uploaded_by' => Auth::id(),
         ]);
     }

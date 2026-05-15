@@ -29,4 +29,9 @@ class AuthorizerRole extends Model
     {
         return $this->hasMany(QuotationSummary::class);
     }
+
+    public function directPurchaseOrders(): HasMany
+    {
+        return $this->hasMany(DirectPurchaseOrder::class);
+    }
 }

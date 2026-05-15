@@ -39,6 +39,9 @@
     $lastRejection = $ocd->approvals->where('action', 'rejected')->sortByDesc('created_at')->first();
     $lastReturn    = $ocd->approvals->where('action', 'returned')->sortByDesc('created_at')->first();
     $autoCloseIn   = $ocd->getDaysUntilAutoClose();
+    $canApproveOcd = $ocd->isPendingApproval() && $ocd->isApproverFor(Auth::user());
+    $canReturnIssuedOcd = $ocd->canBeReturnedToRevision()
+        && (Auth::user()->hasRole('superadmin') || (int) $ocd->approved_by === (int) Auth::id());
 @endphp
 
 <div class="row">
@@ -131,20 +134,18 @@
                             </form>
                         @endif
                     @endif
-                    @if($ocd->status === 'PENDING_APPROVAL' || $ocd->status === 'RETURNED')
+                    @if($canApproveOcd)
                         <button type="button" class="btn btn-sm btn-success" onclick="confirmApproval()">
                             <i class="ti ti-check me-1"></i>Aprobar OC
                         </button>
-                        @if($ocd->status === 'PENDING_APPROVAL')
                         <button type="button" class="btn btn-sm btn-info" onclick="confirmReturn()">
                             <i class="ti ti-arrow-back-up me-1"></i>Devolver
                         </button>
-                        @endif
                         <button type="button" class="btn btn-sm btn-danger" onclick="confirmReject()">
                             <i class="ti ti-x me-1"></i>Rechazar OC
                         </button>
                     @endif
-                    @if($ocd->canBeReturnedToRevision())
+                    @if($canReturnIssuedOcd)
                         <button type="button" class="btn btn-sm btn-warning" onclick="confirmReturn()">
                             <i class="ti ti-arrow-back-up me-1"></i>Devolver a Revisión
                         </button>
@@ -236,20 +237,30 @@
                             <div class="info-value">{{ $ocd->application_month }}</div>
                         </div>
                         <div class="mb-1">
-                            <span class="info-label">Nivel de Aprobación Requerido</span>
-                            <div class="info-value">
-                                <span class="badge bg-soft-primary text-primary border border-primary border-opacity-25">
-                                    Nivel {{ $ocd->required_approval_level ?? '—' }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="mb-1">
                             <span class="info-label">Solicitado por</span>
                             <div class="info-value">{{ $ocd->creator->name }}</div>
                         </div>
+                        @if($ocd->authorizerRole)
+                        <div class="mb-1">
+                            <span class="info-label">Rol autorizador aplicado</span>
+                            <div class="info-value fw-semibold">{{ $ocd->authorizerRole->name }}</div>
+                        </div>
+                        @endif
+                        <div class="mb-1">
+                            <span class="info-label">Límite aplicado</span>
+                            <div class="info-value">
+                                {{ $ocd->effective_authorization_limit !== null ? '$'.number_format((float) $ocd->effective_authorization_limit, 2).' MXN' : 'Sin límite' }}
+                            </div>
+                        </div>
+                        @if($ocd->budget_reserved_at)
+                        <div class="mb-1">
+                            <span class="info-label">Reserva presupuestal</span>
+                            <div class="info-value">{{ $ocd->budget_reserved_at->format('d/m/Y H:i') }}</div>
+                        </div>
+                        @endif
                         @if($ocd->assignedApprover)
                         <div class="mb-1">
-                            <span class="info-label">Aprobador Asignado</span>
+                            <span class="info-label">{{ $ocd->isPendingApproval() ? 'Aprobador actual' : 'Aprobador asignado' }}</span>
                             <div class="info-value fw-semibold text-primary">
                                 <i class="ti ti-user-check me-1"></i>{{ $ocd->assignedApprover->name }}
                             </div>
@@ -500,13 +511,13 @@
 </div>
 
 {{-- ─── Modales de Aprobación ─── --}}
-@if($ocd->status === 'PENDING_APPROVAL' || $ocd->canBeReturnedToRevision())
+@if($canApproveOcd || $canReturnIssuedOcd)
     <form id="form-return" action="{{ route('direct-purchase-orders.return', $ocd->id) }}" method="POST" style="display:none">
         @csrf
         <input type="hidden" name="comments" id="return-comments-input">
     </form>
 @endif
-@if($ocd->status === 'PENDING_APPROVAL' || $ocd->status === 'RETURNED')
+@if($canApproveOcd)
     <form id="form-reject" action="{{ route('direct-purchase-orders.reject', $ocd->id) }}" method="POST" style="display:none">
         @csrf
         <input type="hidden" name="comments" id="reject-comments-input">
@@ -558,7 +569,7 @@
             icon: 'question',
             html: `<div class="text-start mt-3 p-3 bg-light rounded border">
                 <p class="mb-3 fw-bold text-dark">Al aprobar esta Orden de Compra:</p>
-                <div class="mb-2"><i class="ti ti-check text-success me-2"></i>Se comprometerá el presupuesto del centro de costos</div>
+                <div class="mb-2"><i class="ti ti-check text-success me-2"></i>Se confirmará la reserva presupuestal del centro de costos</div>
                 <div class="mb-2"><i class="ti ti-check text-success me-2"></i>Se generará el folio único de OC</div>
                 <div class="mb-0"><i class="ti ti-check text-success me-2"></i>Se notificará al proveedor vía correo y portal</div>
             </div>
@@ -582,7 +593,7 @@
                 commentsInput.type = 'hidden'; commentsInput.name = 'comments'; commentsInput.value = result.value;
                 form.appendChild(csrf); form.appendChild(commentsInput);
                 document.body.appendChild(form);
-                Swal.fire({ title: 'Procesando...', text: 'Validando presupuesto y notificando al proveedor',
+                Swal.fire({ title: 'Procesando...', text: 'Confirmando reserva y notificando al proveedor',
                     allowOutsideClick: false, didOpen: () => { Swal.showLoading(); form.submit(); } });
             }
         });

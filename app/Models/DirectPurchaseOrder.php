@@ -35,6 +35,10 @@ class DirectPurchaseOrder extends Model
         'estimated_delivery_days',
         'required_approval_level',
         'assigned_approver_id',
+        'authorizer_role_id',
+        'effective_authorization_limit',
+        'approval_chain_snapshot',
+        'resolution_notes',
         'status',
         'pdf_path',
         'reception_notes',
@@ -47,6 +51,8 @@ class DirectPurchaseOrder extends Model
         'approved_at',
         'rejected_at',
         'returned_at',
+        'budget_reserved_at',
+        'budget_released_at',
         'issued_at',
         'received_at',
         'closed_at',
@@ -61,10 +67,14 @@ class DirectPurchaseOrder extends Model
         'subtotal' => 'decimal:2',
         'iva_amount' => 'decimal:2',
         'total' => 'decimal:2',
+        'effective_authorization_limit' => 'decimal:2',
+        'approval_chain_snapshot' => 'array',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
         'returned_at' => 'datetime',
+        'budget_reserved_at' => 'datetime',
+        'budget_released_at' => 'datetime',
         'issued_at' => 'datetime',
         'received_at' => 'datetime',
         'closed_at' => 'datetime',
@@ -131,6 +141,11 @@ class DirectPurchaseOrder extends Model
     public function assignedApprover(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_approver_id');
+    }
+
+    public function authorizerRole(): BelongsTo
+    {
+        return $this->belongsTo(AuthorizerRole::class);
     }
 
     public function rejector(): BelongsTo
@@ -229,7 +244,7 @@ class DirectPurchaseOrder extends Model
             return $this->update([
                 'folio' => $this->folio ?? self::generateNextFolio(),
                 'status' => 'PENDING_APPROVAL',
-                'required_approval_level' => $this->determineRequiredApprovalLevel(),
+                'required_approval_level' => null,
                 'submitted_at' => now(),
             ]);
         });
@@ -333,12 +348,12 @@ class DirectPurchaseOrder extends Model
 
     public function canBeSubmitted(): bool
     {
-        return $this->status === 'DRAFT' && $this->items()->count() > 0;
+        return in_array($this->status, ['DRAFT', 'RETURNED']) && $this->items()->count() > 0;
     }
 
     public function canBeApproved(): bool
     {
-        return in_array($this->status, ['PENDING_APPROVAL', 'RETURNED']);
+        return $this->status === 'PENDING_APPROVAL';
     }
 
     public function canBeReceived(): bool

@@ -335,7 +335,7 @@
                 </div>
                 <div class="card-footer p-2 bg-transparent border-top-0">
                     <button type="submit" class="btn btn-primary btn-sm w-100 mb-1">
-                        <i class="ti ti-device-floppy me-1"></i>Guardar Cambios
+                        <i class="ti ti-device-floppy me-1"></i>{{ $directPurchaseOrder->isReturned() ? 'Guardar y reenviar a aprobación' : 'Guardar cambios' }}
                     </button>
                     <a href="{{ route('direct-purchase-orders.show', $directPurchaseOrder->id) }}" class="btn btn-outline-secondary btn-sm w-100">
                         <i class="ti ti-x me-1"></i>Cancelar
