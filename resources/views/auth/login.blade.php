@@ -521,16 +521,6 @@
                     </a>
                 @endif
 
-                <!-- Errores generales -->
-                @if ($errors->any())
-                    <div style="margin-top: 20px;">
-                        @foreach ($errors->all() as $error)
-                            <div class="error-message">
-                                {{ $error }}
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
             </div>
         </div>
     </div>

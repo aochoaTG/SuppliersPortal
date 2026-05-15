@@ -58,7 +58,8 @@ class SendDeliveryAlertDay0Job implements ShouldQueue
 
         // Destinatarios: usuarios con rol buyer (Departamento de Compras) - CACHEADO
         $buyers = AlertRecipientService::getBuyers();
-        $recipients = array_unique(array_merge($recipients, $buyers));
+        $finanzas = AlertRecipientService::getSuperadmins();
+        $recipients = array_unique(array_merge($recipients, $buyers, $finanzas));
 
         if (empty($recipients)) {
             Log::warning("SendDeliveryAlertDay0Job: Sin destinatarios para OC {$order->folio}");

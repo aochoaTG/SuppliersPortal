@@ -58,17 +58,20 @@ class ReceptionService
             $itemIds = collect($itemsData)->pluck('receivable_item_id')->all();
             $loadedItems = $itemClass::whereIn('id', $itemIds)->get()->keyBy('id');
 
+            $this->validateReceptionQuantities($order, $itemsData, $loadedItems);
+
             foreach ($itemsData as $lineData) {
                 $item = $loadedItems[$lineData['receivable_item_id']]
                     ?? throw new \RuntimeException("Ítem {$lineData['receivable_item_id']} no encontrado.");
                 $quantityReceived = max(0, (float) ($lineData['quantity_received'] ?? 0));
+                $conformity = $lineData['conformity'] ?? ReceptionItem::CONFORMITY_OK;
 
                 ReceptionItem::create([
                     'reception_id'         => $reception->id,
                     'receivable_item_type' => get_class($item),
                     'receivable_item_id'   => $item->id,
                     'quantity_received'    => $quantityReceived,
-                    'conformity'           => $lineData['conformity'] ?? ReceptionItem::CONFORMITY_OK,
+                    'conformity'           => $conformity,
                     'nonconformity_type'   => $lineData['nonconformity_type'] ?? null,
                     'nonconformity_notes'  => $lineData['nonconformity_notes'] ?? null,
                     'photos'               => $lineData['photos'] ?? null,
@@ -78,7 +81,7 @@ class ReceptionService
                 // Si el ítem es NO_CONFORME, queda pendiente para que el proveedor
                 // lo reponga — la orden no avanzará a RECEIVED hasta que esas unidades
                 // sean recibidas conformes en una recepción posterior.
-                if ($quantityReceived > 0) {
+                if ($quantityReceived > 0 && $conformity === ReceptionItem::CONFORMITY_OK) {
                     $item->increment('quantity_received', $quantityReceived);
                 }
             }
@@ -250,6 +253,48 @@ class ReceptionService
      *
      * @param  PurchaseOrder|DirectPurchaseOrder  $order
      */
+    private function validateReceptionQuantities(Model $order, array $itemsData, \Illuminate\Support\Collection $loadedItems): void
+    {
+        $totalsByItem = [];
+
+        foreach ($itemsData as $lineData) {
+            $itemId = (int) ($lineData['receivable_item_id'] ?? 0);
+            $item = $loadedItems[$itemId] ?? null;
+
+            if (! $item) {
+                throw new \RuntimeException("Item {$itemId} no encontrado.");
+            }
+
+            if (! $this->itemBelongsToOrder($order, $item)) {
+                throw new \RuntimeException("El item {$itemId} no pertenece a la orden {$order->folio}.");
+            }
+
+            $totalsByItem[$itemId] = ($totalsByItem[$itemId] ?? 0.0)
+                + max(0, (float) ($lineData['quantity_received'] ?? 0));
+        }
+
+        foreach ($totalsByItem as $itemId => $requestedQuantity) {
+            $pending = (float) $loadedItems[$itemId]->quantity_pending;
+
+            if ($requestedQuantity > $pending + 0.0005) {
+                throw new \RuntimeException(
+                    "La cantidad recibida del item {$itemId} ({$requestedQuantity}) supera la cantidad pendiente ({$pending})."
+                );
+            }
+        }
+    }
+
+    private function itemBelongsToOrder(Model $order, Model $item): bool
+    {
+        return match (true) {
+            $order instanceof PurchaseOrder && $item instanceof PurchaseOrderItem =>
+                (int) $item->purchase_order_id === (int) $order->id,
+            $order instanceof DirectPurchaseOrder && $item instanceof DirectPurchaseOrderItem =>
+                (int) $item->direct_purchase_order_id === (int) $order->id,
+            default => false,
+        };
+    }
+
     public function getElapsedDaysBadge(Model $order): string
     {
         if (! $order->issued_at) {

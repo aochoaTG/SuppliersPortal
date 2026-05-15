@@ -162,12 +162,14 @@ class PurchaseOrder extends Model
     }
 
     /**
-     * Una OC puede recibirse si fue emitida al proveedor (ISSUED)
-     * o si ya tiene una recepción parcial previa (PARTIALLY_RECEIVED).
+     * Una OC puede recibirse si fue emitida al proveedor (ISSUED),
+     * si ya tiene una recepción parcial previa (PARTIALLY_RECEIVED),
+     * o si el proveedor registró la entrega física y queda pendiente
+     * la captura formal de la recepción.
      */
     public function canBeReceived(): bool
     {
-        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
+        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION']);
     }
 
     /**

@@ -156,12 +156,13 @@ class SupplierDeliveryController extends Controller
             ]);
 
             // 3. Calcular fecha límite: 3 días hábiles desde hoy
-            $deadline = self::addBusinessDays(now(), 3);
+            $deliveredAt = Carbon::parse($request->delivered_at);
+            $deadline = self::addBusinessDays($deliveredAt, 3);
 
             // 4. Actualizar la OC
             $order->update([
                 'status'                 => 'DELIVERED_PENDING_RECEPTION',
-                'supplier_delivered_at'  => Carbon::parse($request->delivered_at),
+                'supplier_delivered_at'  => $deliveredAt,
                 'reception_deadline_at'  => $deadline,
                 'physical_receiver_name' => $request->physical_receiver_name,
                 'delivery_observations'  => $request->delivery_observations,
@@ -176,7 +177,7 @@ class SupplierDeliveryController extends Controller
             SendDeliveryAlertDay0Job::dispatch($orderType, $order->id, $evidenceUrl);
 
             // Día 2 — 2 días hábiles después (1 día antes del vencimiento)
-            $day2 = self::addBusinessDays(now(), 2);
+            $day2 = self::addBusinessDays($deliveredAt, 2);
             SendDeliveryAlertDay2Job::dispatch($orderType, $order->id)
                 ->delay($day2->startOfDay()->addHours(9)); // Enviar a las 9 AM
 

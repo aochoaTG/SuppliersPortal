@@ -343,7 +343,7 @@ class DirectPurchaseOrder extends Model
 
     public function canBeReceived(): bool
     {
-        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED']);
+        return in_array($this->status, ['ISSUED', 'PARTIALLY_RECEIVED', 'DELIVERED_PENDING_RECEPTION']);
     }
 
     /**

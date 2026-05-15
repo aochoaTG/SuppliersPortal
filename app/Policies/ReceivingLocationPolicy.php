@@ -102,6 +102,10 @@ class ReceivingLocationPolicy
      */
     public function create(User $user): Response
     {
+        if ($user->hasRole('superadmin')) {
+            return Response::allow();
+        }
+
         if ($user->hasRole('buyer')) {
             return Response::allow();
         }
@@ -238,6 +242,10 @@ class ReceivingLocationPolicy
         }
 
         // Authorizer puede asignar receptores (tiene nivel jerárquico para ello)
+        if ($user->hasRole('superadmin')) {
+            return Response::allow();
+        }
+
         if ($user->hasRole('authorizer')) {
             return Response::allow();
         }
@@ -260,6 +268,10 @@ class ReceivingLocationPolicy
      */
     public function useMassReception(User $user, ReceivingLocation $receivingLocation): Response
     {
+        if ($user->hasRole('superadmin')) {
+            return Response::allow();
+        }
+
         // Buyer puede usar recepción masiva en cualquier ubicación
         if ($user->hasRole('buyer')) {
             return Response::allow();

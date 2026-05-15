@@ -22,7 +22,7 @@
     @endif
 
     @if(session('error'))
-        <div class="col-12">
+        <div class="col-12">    
             <div class="alert alert-danger alert-dismissible fade show">
                 <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>

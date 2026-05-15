@@ -80,6 +80,7 @@ class RolePermissionSeeder extends Seeder
             $supplierRole = Role::findOrCreate('supplier', 'web');
             $authorizerRole = Role::findOrCreate('authorizer', 'web');
             $staffRole = Role::findOrCreate('staff', 'web');
+            $receiverRole = Role::findOrCreate('receiver', 'web');
             $generalDirectorRole = Role::findOrCreate('general_director', 'web');
             $catalogAdminRole = Role::findOrCreate('catalog_admin', 'web');
 
@@ -141,6 +142,12 @@ class RolePermissionSeeder extends Seeder
                 'view_orders',
                 'view_invoices',
                 'view_quotes',
+                'edit_own_profile',
+                'view_own_orders',
+            ]);
+
+            $receiverRole->syncPermissions([
+                'view_orders',
                 'edit_own_profile',
                 'view_own_orders',
             ]);

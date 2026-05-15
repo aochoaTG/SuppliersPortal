@@ -524,7 +524,7 @@ Route::middleware(['auth', 'lock'])->group(function () {
 // ============================================================================
 //  Purchase Orders & RFQ Selection (superadmin | buyer)
 // ============================================================================
-Route::middleware(['auth', 'lock', 'role:superadmin|buyer|staff'])->group(function () {
+Route::middleware(['auth', 'lock', 'role:superadmin|buyer|staff|receiver'])->group(function () {
     // RFQ Selection
     Route::post('/rfq/{rfq}/select', [RfqComparisonController::class, 'select'])->name('rfq.comparison.select');
 

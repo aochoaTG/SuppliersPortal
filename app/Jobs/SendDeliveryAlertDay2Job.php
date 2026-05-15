@@ -50,8 +50,9 @@ class SendDeliveryAlertDay2Job implements ShouldQueue
         $recipients = $order->receivingLocation->users->pluck('email')->filter()->toArray();
 
         // Destinatarios: usuarios con rol superadmin (Finanzas / Dirección) - CACHEADO
+        $buyers = AlertRecipientService::getBuyers();
         $finanzas = AlertRecipientService::getSuperadmins();
-        $recipients = array_unique(array_merge($recipients, $finanzas));
+        $recipients = array_unique(array_merge($recipients, $buyers, $finanzas));
 
         if (empty($recipients)) {
             Log::warning("SendDeliveryAlertDay2Job: Sin destinatarios para OC {$order->folio}");
