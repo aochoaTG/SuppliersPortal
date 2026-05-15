@@ -64,6 +64,17 @@ class DirectPurchaseOrder extends Model
     ];
 
     protected $casts = [
+        'supplier_id' => 'integer',
+        'cost_center_id' => 'integer',
+        'receiving_location_id' => 'integer',
+        'required_approval_level' => 'integer',
+        'assigned_approver_id' => 'integer',
+        'authorizer_role_id' => 'integer',
+        'created_by' => 'integer',
+        'approved_by' => 'integer',
+        'rejected_by' => 'integer',
+        'returned_by' => 'integer',
+        'received_by' => 'integer',
         'subtotal' => 'decimal:2',
         'iva_amount' => 'decimal:2',
         'total' => 'decimal:2',
