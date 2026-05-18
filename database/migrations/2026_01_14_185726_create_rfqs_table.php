@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -17,21 +18,15 @@ return new class extends Migration
             $table->foreignId('quotation_group_id')->nullable()->constrained()->noActionOnDelete();
             $table->foreignId('requisition_item_id')->nullable()->constrained()->noActionOnDelete();
             $table->foreignId('supplier_id')->nullable()->constrained()->noActionOnDelete();
+            $table->foreignId('supersedes_rfq_id')->nullable()->constrained('rfqs')->noActionOnDelete();
 
             // Origen
             $table->enum('source', ['portal', 'external'])->default('portal');
             $table->string('external_contact_method')->nullable();
             $table->text('external_notes')->nullable();
 
-            // Estado y fechas
-            $table->enum('status', [
-                'DRAFT',               // Borrador (aún no enviado)
-                'SENT',                // Enviado al proveedor
-                'RECEIVED',            // Proveedor(es) respondieron
-                'EVALUATED',           // Cotizaciones evaluadas
-                'COMPLETED',           // Completada
-                'CANCELLED'            // Cancelada
-            ])->default('DRAFT');
+            // Estado y fechas (string en lugar de enum para soportar valores extendidos)
+            $table->string('status', 40)->default('DRAFT');
 
             $table->timestamp('sent_at')->nullable();
             $table->timestamp('response_deadline')->nullable();
@@ -40,6 +35,11 @@ return new class extends Migration
             $table->timestamp('cancelled_at')->nullable();
             $table->foreignId('cancelled_by')->nullable()->constrained('users')->noActionOnDelete();
             $table->text('cancellation_reason')->nullable();
+
+            // Rechazo
+            $table->timestamp('rejected_at')->nullable();
+            $table->foreignId('rejected_by')->nullable()->constrained('users')->noActionOnDelete();
+            $table->text('rejection_reason')->nullable();
 
             // Contenido
             $table->text('message')->nullable();
@@ -58,6 +58,11 @@ return new class extends Migration
             $table->index('sent_at');
             $table->index('response_deadline');
         });
+
+        // SQL Server: CHECK constraint explícito para el campo status (string no genera uno automático)
+        if (DB::getDriverName() === 'sqlsrv') {
+            DB::statement("ALTER TABLE rfqs ADD CONSTRAINT CK_rfqs_status_allowed CHECK ([status] IN (N'DRAFT', N'SENT', N'RECEIVED', N'EVALUATED', N'COMPLETED', N'CANCELLED', N'REJECTED'))");
+        }
     }
 
     public function down(): void

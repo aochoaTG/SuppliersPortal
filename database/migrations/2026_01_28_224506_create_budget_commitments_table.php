@@ -25,10 +25,22 @@ return new class extends Migration
                 ->constrained('purchase_orders')
                 ->noActionOnDelete();
 
+            $table->foreignId('quotation_summary_id')
+                ->nullable()
+                ->constrained('quotation_summaries')
+                ->noActionOnDelete();
+
             // Datos presupuestales (desnormalizados para consultas rápidas)
             $table->foreignId('cost_center_id')->constrained()->noActionOnDelete();
             $table->string('application_month', 7); // YYYY-MM
             $table->foreignId('expense_category_id')->constrained()->noActionOnDelete();
+
+            $table->foreignId('budget_cedula_id')
+                ->nullable()
+                ->constrained('budget_cedulas')
+                ->onDelete('no action')
+                ->onUpdate('no action');
+
 
             // Monto comprometido
             $table->decimal('committed_amount', 12, 2);
@@ -53,6 +65,7 @@ return new class extends Migration
                 'odc_budget_lookup_idx'
             );
             $table->index('status');
+            $table->index(['budget_cedula_id', 'status'], 'idx_budget_commitments_cedula_status');
 
             // Constraint: debe tener relación con OCD o OC, pero no ambas
             // (esto se validará en el modelo, SQL Server no soporta CHECK constraints complejos bien)

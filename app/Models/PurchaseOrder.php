@@ -114,6 +114,16 @@ class PurchaseOrder extends Model
         return $this->hasMany(BudgetCommitment::class);
     }
 
+    public function financialProvisions(): MorphMany
+    {
+        return $this->morphMany(FinancialProvision::class, 'receivable');
+    }
+
+    public function supplierInvoices(): MorphMany
+    {
+        return $this->morphMany(SupplierInvoice::class, 'receivable');
+    }
+
     public function quotationSummary()
     {
         return $this->belongsTo(QuotationSummary::class);
@@ -195,7 +205,7 @@ class PurchaseOrder extends Model
             'OPEN' => 'Abierta',
             'ISSUED' => 'Emitida',
             'PARTIALLY_RECEIVED' => 'Parcialmente Recibida',
-            'RECEIVED' => 'Recibida',
+            'RECEIVED' => 'Recibida Completa',
             'CANCELLED' => 'Cancelada',
             'PAID' => 'Pagada',
             'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',

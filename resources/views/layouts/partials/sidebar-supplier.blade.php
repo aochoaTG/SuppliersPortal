@@ -118,7 +118,6 @@
          Uncomment and implement routes when the invoice upload feature is built.
          Required routes: supplier.invoices.create, supplier.invoices.index
     --}}
-    {{--
     @php $openFacturacion = request()->routeIs('supplier.invoices.*'); @endphp
     <li class="side-nav-item">
         <a class="side-nav-link {{ $openFacturacion ? '' : 'collapsed' }}"
@@ -146,6 +145,5 @@
             </ul>
         </div>
     </li>
-    --}}
 
 @endif

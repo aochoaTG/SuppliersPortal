@@ -74,6 +74,16 @@ class Supplier extends Model
         return $this->hasMany(SupplierDocument::class);
     }
 
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(SupplierInvoice::class);
+    }
+
+    public function financialProvisions(): HasMany
+    {
+        return $this->hasMany(FinancialProvision::class);
+    }
+
     // Helper para estado de “completitud” (simple)
     public function missingRequiredDocuments(): array
     {

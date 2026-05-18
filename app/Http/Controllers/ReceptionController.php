@@ -268,6 +268,11 @@ class ReceptionController extends Controller
         ]);
 
         // Validación manual de campos NO_CONFORME (required_if no funciona con wildcards anidados)
+        $quantityErrors = $this->validateAtLeastOneReceivedQuantity($validated['items']);
+        if (! empty($quantityErrors)) {
+            return back()->withErrors($quantityErrors)->withInput();
+        }
+
         $conformityErrors = $this->validateConformityFields($request, $validated['items']);
         if (! empty($conformityErrors)) {
             return back()->withErrors($conformityErrors)->withInput();
@@ -351,6 +356,11 @@ class ReceptionController extends Controller
             'items.*.photos.*'               => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
         ]);
 
+        $quantityErrors = $this->validateAtLeastOneReceivedQuantity($validated['items']);
+        if (! empty($quantityErrors)) {
+            return back()->withErrors($quantityErrors)->withInput();
+        }
+
         $conformityErrors = $this->validateConformityFields($request, $validated['items']);
         if (! empty($conformityErrors)) {
             return back()->withErrors($conformityErrors)->withInput();
@@ -385,7 +395,21 @@ class ReceptionController extends Controller
     // ─── Helpers privados ─────────────────────────────────────────────────────
 
     /**
-     * Valida que los ítems NO_CONFORME tengan tipo, notas (min 100 chars) y al menos 1 foto.
+     * Valida que al menos una partida tenga cantidad recibida mayor a cero.
+     */
+    private function validateAtLeastOneReceivedQuantity(array $items): array
+    {
+        $hasReceivedQuantity = collect($items)->contains(
+            fn(array $itemData) => (float) ($itemData['quantity_received'] ?? 0) > 0
+        );
+
+        return $hasReceivedQuantity
+            ? []
+            : ['items' => 'Debes registrar al menos una partida con cantidad a recibir mayor a cero.'];
+    }
+
+    /**
+     * Valida que los items NO_CONFORME tengan tipo, notas (min 100 chars) y al menos 1 foto.
      * Devuelve array de errores con claves en formato "items.N.campo".
      */
     private function validateConformityFields(Request $request, array $items): array

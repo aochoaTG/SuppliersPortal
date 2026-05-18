@@ -16,6 +16,8 @@ use App\Http\Controllers\DirectPurchaseOrderController;
 use App\Http\Controllers\DocumentReviewController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ExpenseCategoryController;
+use App\Http\Controllers\FinanceInvoiceController;
+use App\Http\Controllers\FinancialProvisionController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\LockScreenController;
 use App\Http\Controllers\LogViewerController;
@@ -39,6 +41,7 @@ use App\Http\Controllers\SupplierBankController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierDeliveryController;
 use App\Http\Controllers\SupplierDocumentController;
+use App\Http\Controllers\SupplierInvoiceController;
 use App\Http\Controllers\SupplierPortalController;
 use App\Http\Controllers\SupplierSirocController;
 use App\Http\Controllers\TaxController;
@@ -494,6 +497,12 @@ Route::middleware(['auth', 'role:supplier'])->prefix('supplier')->name('supplier
         Route::get('/create', [SupplierDeliveryController::class, 'create'])->name('create'); // supplier.deliveries.create
         Route::post('/', [SupplierDeliveryController::class, 'store'])->name('store');  // supplier.deliveries.store
     });
+
+    Route::prefix('invoices')->name('invoices.')->group(function () {
+        Route::get('/', [SupplierInvoiceController::class, 'index'])->name('index');
+        Route::get('/create', [SupplierInvoiceController::class, 'create'])->name('create');
+        Route::post('/', [SupplierInvoiceController::class, 'store'])->name('store');
+    });
 });
 
 // ============================================================================
@@ -519,6 +528,23 @@ Route::middleware(['auth', 'lock', 'role:superadmin'])->group(function () {
 Route::middleware(['auth', 'lock'])->group(function () {
     Route::get('/approvals/quotations', [QuotationApprovalController::class, 'index'])->name('approvals.quotations.index');
     Route::post('/approvals/quotations/{summary}/handle', [QuotationApprovalController::class, 'handle'])->name('approvals.quotations.handle');
+});
+
+Route::middleware(['auth', 'lock', 'role:superadmin|accounting|general_director'])->group(function () {
+    Route::get('/invoices', [FinanceInvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('/invoices/create', [FinanceInvoiceController::class, 'create'])->name('invoices.create');
+    Route::post('/invoices', [FinanceInvoiceController::class, 'store'])->name('invoices.store');
+    Route::get('/invoices/{invoice}', [FinanceInvoiceController::class, 'show'])->name('invoices.show');
+    Route::post('/invoices/{invoice}/reject', [FinanceInvoiceController::class, 'reject'])->name('invoices.reject');
+
+    Route::get('/financial-provisions', [FinancialProvisionController::class, 'index'])->name('financial-provisions.index');
+    Route::get('/financial-provisions/{financialProvision}', [FinancialProvisionController::class, 'show'])->name('financial-provisions.show');
+    Route::post('/financial-provisions/{financialProvision}/link-invoice', [FinancialProvisionController::class, 'linkInvoice'])
+        ->middleware('role:superadmin|accounting')
+        ->name('financial-provisions.link-invoice');
+    Route::post('/financial-provisions/{financialProvision}/adjustments', [FinancialProvisionController::class, 'authorizeAdjustment'])
+        ->middleware('role:superadmin|accounting')
+        ->name('financial-provisions.adjustments.store');
 });
 
 // ============================================================================
@@ -581,4 +607,3 @@ Route::delete('/dev/logs', [LogViewerController::class, 'clear'])->name('dev.log
 //  Autenticación
 // ============================================================================
 require __DIR__.'/auth.php';
-

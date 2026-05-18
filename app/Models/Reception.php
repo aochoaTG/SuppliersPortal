@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -62,6 +63,11 @@ class Reception extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ReceptionItem::class);
+    }
+
+    public function financialProvision(): HasOne
+    {
+        return $this->hasOne(FinancialProvision::class);
     }
 
     /**

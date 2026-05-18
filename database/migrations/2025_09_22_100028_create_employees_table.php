@@ -44,6 +44,7 @@ return new class extends Migration {
             $table->string('company', 255)->nullable();
             $table->string('responsible', 150)->nullable();
             $table->string('leader', 150)->nullable();
+            $table->unsignedBigInteger('leader_id')->nullable();
 
             // Campos financieros
             $table->decimal('vacation_balance', 10, 4)->nullable();
@@ -59,6 +60,9 @@ return new class extends Migration {
 
             $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();
         });
+
+        // FK auto-referencial con NO ACTION (SQL Server no permite SET NULL en ciclos)
+        DB::statement('ALTER TABLE employees ADD CONSTRAINT employees_leader_id_foreign FOREIGN KEY (leader_id) REFERENCES employees (id) ON DELETE NO ACTION ON UPDATE NO ACTION');
 
         // Índices únicos filtrados: SQL Server no permite múltiples (NULL, NULL)
         // en índices únicos normales, así que se filtra para que solo aplique

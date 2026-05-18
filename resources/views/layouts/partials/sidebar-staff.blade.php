@@ -247,6 +247,7 @@ $openPresupuesto =
 $openPagos =
     request()->routeIs('invoices.*') ||
     request()->routeIs('payments.*') ||
+    request()->routeIs('financial-provisions.*') ||
     request()->routeIs('finance-reports.*');
 @endphp
 <li class="side-nav-item">
@@ -260,9 +261,15 @@ $openPagos =
     <div class="{{ $openPagos ? 'show' : '' }} collapse" id="sidebarPagos">
         <ul class="sub-menu">
             <li class="side-nav-item">
-                <a href="javascript: void(0);"
+                <a href="{{ route('invoices.index') }}"
                     class="side-nav-link {{ request()->routeIs('invoices.*') ? 'active' : '' }}">
                     <span class="menu-text">Facturas</span>
+                </a>
+            </li>
+            <li class="side-nav-item">
+                <a href="{{ route('financial-provisions.index') }}"
+                    class="side-nav-link {{ request()->routeIs('financial-provisions.*') ? 'active' : '' }}">
+                    <span class="menu-text">Provisiones</span>
                 </a>
             </li>
             <li class="side-nav-item">

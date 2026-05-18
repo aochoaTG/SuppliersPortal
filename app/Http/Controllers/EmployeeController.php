@@ -279,6 +279,9 @@ class EmployeeController extends Controller
             $this->parsearNombre($this->str($data, 'Nombre'));
 
         $rawLider = $this->str($data, 'Lider');
+        $liderLimpio = $this->limpiarLider($rawLider);
+        $liderNumero = $this->resolverLider($liderLimpio, $rawLider);
+        $liderId = $liderNumero ? $this->resolverLiderId($liderNumero) : null;
 
         $employee->fill([
             'archivo_origen'     => $this->str($data, 'archivo_origen'),
@@ -302,7 +305,8 @@ class EmployeeController extends Controller
             'email'              => $this->str($data, 'Correo'),
             'education'          => $this->str($data, 'Estudios'),
             'responsible'        => $this->str($data, 'Responsable'),
-            'leader'             => $this->resolverLider($this->limpiarLider($rawLider), $rawLider),
+            'leader'             => $liderNumero,
+            'leader_id'          => $liderId,
             'vacation_balance'   => $this->decimal($data, 'SaldoVacaciones'),
             'savings_fund'       => $this->decimal($data, 'FondoAhorro'),
             'daily_salary'       => $this->decimal($data, 'SalarioDiario'),
@@ -355,9 +359,15 @@ class EmployeeController extends Controller
             $numero = $this->resolverLider($nombre, $nombre);
 
             if ($numero !== $nombre) {
-                Employee::where('leader', $nombre)->update(['leader' => $numero]);
+                $liderId = $this->resolverLiderId($numero);
+                Employee::where('leader', $nombre)->update(['leader' => $numero, 'leader_id' => $liderId]);
                 $resueltos++;
             } else {
+                // Intentar poblar leader_id aunque el número ya esté resuelto
+                $liderId = $this->resolverLiderId($nombre);
+                if ($liderId !== null) {
+                    Employee::where('leader', $nombre)->whereNull('leader_id')->update(['leader_id' => $liderId]);
+                }
                 $sinResolver++;
             }
         }
@@ -705,6 +715,22 @@ class EmployeeController extends Controller
         }
 
         return $nombreLimpio;
+    }
+
+    /**
+     * Dado un número de empleado ya resuelto, devuelve el id del registro.
+     * Solo aplica si el valor es puramente numérico (employee_number resuelto).
+     */
+    private function resolverLiderId(?string $numeroEmpleado): ?int
+    {
+        if ($numeroEmpleado === null || !ctype_digit($numeroEmpleado)) {
+            return null;
+        }
+
+        return Employee::where('employee_number', $numeroEmpleado)
+            ->where('is_active', 'SI')
+            ->value('id')
+            ?? Employee::where('employee_number', $numeroEmpleado)->value('id');
     }
 
     private function str(array $data, string $key): ?string

@@ -108,6 +108,8 @@ class ReceptionService
 
         // Notificar al creador de la orden y al equipo de Compras (fuera de la transacción
         // para garantizar que el commit ya ocurrió antes de despachar el trabajo).
+        app(BudgetAllocationService::class)->consumeOrder($order);
+        app(FinancialProvisionService::class)->createForReception($reception);
         $this->notifyReception($reception, $order);
 
         return $reception;

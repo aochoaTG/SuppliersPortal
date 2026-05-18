@@ -1,0 +1,41 @@
+<?php
+
+namespace App\Notifications;
+
+use App\Models\FinancialProvision;
+use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
+
+class FinancialProvisionPendingInvoiceNotification extends Notification
+{
+    use Queueable;
+
+    public function __construct(public FinancialProvision $provision)
+    {
+    }
+
+    public function via(object $notifiable): array
+    {
+        return ['mail', 'database'];
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject('Provisión pendiente de factura')
+            ->line("Se generó una provisión por recepción {$this->provision->reception?->folio}.")
+            ->line('Monto provisionado: $' . number_format((float) $this->provision->provision_amount, 2) . ' ' . $this->provision->currency)
+            ->action('Ver provisiones', route('financial-provisions.index'));
+    }
+
+    public function toArray(object $notifiable): array
+    {
+        return [
+            'financial_provision_id' => $this->provision->id,
+            'reception_id' => $this->provision->reception_id,
+            'status' => $this->provision->status,
+            'amount' => (float) $this->provision->provision_amount,
+        ];
+    }
+}

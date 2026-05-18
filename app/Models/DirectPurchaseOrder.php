@@ -194,6 +194,16 @@ class DirectPurchaseOrder extends Model
         return $this->hasMany(BudgetCommitment::class);
     }
 
+    public function financialProvisions(): MorphMany
+    {
+        return $this->morphMany(FinancialProvision::class, 'receivable');
+    }
+
+    public function supplierInvoices(): MorphMany
+    {
+        return $this->morphMany(SupplierInvoice::class, 'receivable');
+    }
+
     // Historial de recepciones registradas contra esta OCD
     public function receptions(): MorphMany
     {
@@ -426,7 +436,7 @@ class DirectPurchaseOrder extends Model
             'RETURNED'           => 'Devuelta para Corrección',
             'ISSUED'             => 'Emitida',
             'PARTIALLY_RECEIVED' => 'Parcialmente Recibida',
-            'RECEIVED'           => 'Recibida',
+            'RECEIVED'           => 'Recibida Completa',
             'CANCELLED'          => 'Cancelada',
             'CLOSED_BY_INACTIVITY' => 'Cerrada por Inactividad',
             'DELIVERED_PENDING_RECEPTION' => 'Entregada — Pendiente de Captura',

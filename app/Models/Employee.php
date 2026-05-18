@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Employee extends Model
 {
@@ -36,6 +37,7 @@ class Employee extends Model
         'company',
         'responsible',
         'leader',
+        'leader_id',
         'vacation_balance',
         'savings_fund',
         'daily_salary',
@@ -68,5 +70,15 @@ class Employee extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function leaderEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'leader_id');
+    }
+
+    public function subordinates(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'leader_id');
     }
 }

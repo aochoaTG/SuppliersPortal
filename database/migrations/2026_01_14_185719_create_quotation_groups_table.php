@@ -32,6 +32,17 @@ return new class extends Migration
             $table->text('notes')->nullable(); // Notas del comprador sobre el grupo
 
             // ===================================================
+            // ESTADO Y CANCELACIÓN / RECHAZO
+            // ===================================================
+            $table->string('status', 20)->default('ACTIVE');
+            $table->timestamp('cancelled_at')->nullable();
+            $table->foreignId('cancelled_by')->nullable()->constrained('users')->noActionOnDelete();
+            $table->text('cancellation_reason')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->foreignId('rejected_by')->nullable()->constrained('users')->noActionOnDelete();
+            $table->text('rejection_reason')->nullable();
+
+            // ===================================================
             // AUDITORÍA
             // ===================================================
             $table->foreignId('created_by')
@@ -51,6 +62,7 @@ return new class extends Migration
             // ÍNDICES
             // ===================================================
             $table->index('requisition_id');
+            $table->index('status');
         });
     }
 

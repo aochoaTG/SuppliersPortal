@@ -36,9 +36,15 @@ return new class extends Migration
             $table->string('payment_terms')->nullable(); // Ej: "30 días neto"
             $table->integer('estimated_delivery_days')->nullable();
 
-            // Control de aprobación (UN SOLO NIVEL)
+            // Control de aprobación
             $table->integer('required_approval_level')->nullable(); // 1, 2, 3, 4
             $table->foreignId('assigned_approver_id')->nullable()->constrained('users')->noActionOnDelete();
+            $table->foreignId('authorizer_role_id')->nullable()->constrained('authorizer_roles')->noActionOnDelete();
+            $table->decimal('effective_authorization_limit', 14, 2)->nullable();
+            $table->longText('approval_chain_snapshot')->nullable();
+            $table->text('resolution_notes')->nullable();
+            $table->timestamp('budget_reserved_at')->nullable();
+            $table->timestamp('budget_released_at')->nullable();
 
             // Estados del ciclo de vida
             $table->enum('status', [

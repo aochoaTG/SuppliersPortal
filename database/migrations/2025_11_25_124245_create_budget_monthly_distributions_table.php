@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -20,6 +21,13 @@ return new class extends Migration {
                 ->onDelete('cascade')
                 ->onUpdate('cascade')
                 ->comment('Presupuesto anual al que pertenece esta distribución');
+
+            // Cédula presupuestal (opcional)
+            $table->foreignId('budget_cedula_id')
+                ->nullable()
+                ->constrained('budget_cedulas')
+                ->onDelete('no action')
+                ->onUpdate('no action');
 
             // Categoría de gasto
             $table->foreignId('expense_category_id')
@@ -68,17 +76,21 @@ return new class extends Migration {
             $table->timestamps();
 
             // ===== ÍNDICES =====
-            // Único: un registro por presupuesto anual + mes + categoría
-            $table->unique(
-                ['annual_budget_id', 'month', 'expense_category_id'],
-                'UX_monthly_dist_budget_month_cat'
-            );
-
             // Índices de búsqueda
             $table->index('month');
             $table->index('expense_category_id');
+            $table->index('budget_cedula_id', 'idx_bmd_budget_cedula_id');
             $table->index('deleted_at');
         });
+
+        // Índice único filtrado: por cédula cuando existe (SQL Server no permite NULL en unique normal)
+        if (DB::getDriverName() === 'sqlsrv') {
+            DB::statement('CREATE UNIQUE INDEX ux_bmd_budget_month_cedula ON budget_monthly_distributions (annual_budget_id, month, budget_cedula_id) WHERE budget_cedula_id IS NOT NULL');
+        } else {
+            Schema::table('budget_monthly_distributions', function (Blueprint $table) {
+                $table->unique(['annual_budget_id', 'month', 'budget_cedula_id'], 'ux_bmd_budget_month_cedula');
+            });
+        }
     }
 
     public function down(): void
