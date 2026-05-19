@@ -1,39 +1,81 @@
-{{--
-    sidebar-staff.blade.php
-    =======================
-    Sidebar for all TotalGas internal staff roles.
+@php
+    $moduleAccess = app(\App\Services\ModuleAccessService::class);
+    $user = auth()->user();
 
-    ROLES HANDLED:
-      - superadmin     : full access to all sections
-      - staff          : Compras + Proveedores
-      - accounting     : Finanzas only
-      - general_director : Compras + Finanzas
-      - authorizer     : Compras → Aprobar cotización only
-      - catalog_admin  : Compras → Productos/Servicios only
-      - requester      : Compras → Requisiciones + Órdenes de Compra
+    $showPurchasingSection = collect([
+        'requisitions',
+        'quotations',
+        'purchase_orders',
+        'receptions',
+        'products_services',
+    ])->contains(fn ($module) => $moduleAccess->userCanAccessModule($user, $module));
 
-    HOW TO ADD A NEW SECTION:
-      1. Add a new section block wrapped with @hasanyrole('role1|role2|...')
-      2. Add a plain comment above the block listing the allowed roles.
-      3. Update the ROLES HANDLED list above if a new role is introduced.
+    $showFinanceSection = collect([
+        'budget_control',
+        'payments_billing',
+    ])->contains(fn ($module) => $moduleAccess->userCanAccessModule($user, $module));
 
-    HOW TO ADD AN ITEM INSIDE AN EXISTING SECTION:
-      1. Add the <li> block in the correct section.
-      2. If it has different role restrictions than the parent section,
-         wrap it with its own @hasanyrole directive and add an inline comment.
+    $showSuppliersSection = collect([
+        'document_review',
+        'communicator',
+    ])->contains(fn ($module) => $moduleAccess->userCanAccessModule($user, $module));
 
-    SECTIONS:
-      - INICIO          → all roles
-      - COMPRAS         → superadmin, staff, requester, general_director, authorizer, catalog_admin
-      - FINANZAS        → superadmin, accounting, general_director
-      - PROVEEDORES     → superadmin, staff
-      - CONFIGURACIÓN   → superadmin only
---}}
+    $showConfigSection = collect([
+        'staff_users',
+        'employees',
+        'catalogs_config',
+        'reported_incidents',
+    ])->contains(fn ($module) => $moduleAccess->userCanAccessModule($user, $module));
 
-{{-- ═══════════════════════════════════════════════════
-     INICIO — visible to: all staff roles
-     ═══════════════════════════════════════════════════ --}}
+    $openRfq = request()->routeIs('rfq.*') || request()->routeIs('quotes.*') || request()->routeIs('approvals.quotations.*');
+    $openBudget = request()->routeIs('annual_budgets.*')
+        || request()->routeIs('budget_monthly_distributions.*')
+        || request()->routeIs('budget_movements.*')
+        || request()->routeIs('cost-centers.*')
+        || request()->routeIs('categories.*');
+    $openPayments = request()->routeIs('invoices.*')
+        || request()->routeIs('payments.*')
+        || request()->routeIs('financial-provisions.*')
+        || request()->routeIs('finance-reports.*');
+    $openSuppliers = request()->routeIs('cat-suppliers.*')
+        || request()->routeIs('sat_efos_69b.*')
+        || request()->routeIs('sirocs.*')
+        || request()->routeIs('documents.suppliers.*')
+        || request()->routeIs('admin.review.*');
+    $openConfiguration = request()->routeIs('companies.*')
+        || request()->routeIs('stations.*')
+        || request()->routeIs('departments.*')
+        || request()->routeIs('receiving-locations.*')
+        || request()->routeIs('taxes.*')
+        || request()->routeIs('authorizer-roles.*')
+        || request()->routeIs('approval-levels.*')
+        || request()->routeIs('sat-retenciones.*');
+
+    try {
+        $activeRequisitionsCount = \App\Models\Requisition::whereNotIn('status', ['DRAFT', 'CANCELLED', 'COMPLETED'])->count();
+    } catch (\Throwable $e) {
+        $activeRequisitionsCount = 0;
+    }
+
+    try {
+        $pendingApprovalsCount = auth()->check()
+            ? \App\Models\QuotationSummary::where('approval_status', 'pending')
+                ->where('current_approver_user_id', auth()->id())
+                ->count()
+            : 0;
+    } catch (\Throwable $e) {
+        $pendingApprovalsCount = 0;
+    }
+
+    try {
+        $poCount = \App\Models\PurchaseOrder::where('status', 'OPEN')->count();
+    } catch (\Throwable $e) {
+        $poCount = 0;
+    }
+@endphp
+
 <li class="side-nav-title">INICIO</li>
+@moduleAccess('dashboard')
 <li class="side-nav-item">
     <a class="side-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}"
         href="{{ route('dashboard') }}">
@@ -41,15 +83,12 @@
         <span class="menu-text">Dashboard</span>
     </a>
 </li>
+@endmoduleAccess
 
-{{-- ═══════════════════════════════════════════════════
-     COMPRAS — visible to: superadmin, staff, requester, general_director, authorizer, catalog_admin
-     ═══════════════════════════════════════════════════ --}}
-@hasanyrole('superadmin|staff|requester|general_director|authorizer|catalog_admin')
+@if ($showPurchasingSection)
 <li class="side-nav-title">COMPRAS</li>
 
-{{-- Requisiciones — visible to: superadmin, staff, requester, general_director --}}
-@hasanyrole('superadmin|staff|requester|general_director')
+@moduleAccess('requisitions')
 <li class="side-nav-item">
     <a href="{{ route('requisitions.index') }}"
         class="side-nav-link {{ request()->routeIs('requisitions.*') || request()->routeIs('requisition-items.*') ? 'active' : '' }}">
@@ -57,11 +96,9 @@
         <span class="menu-text">Requisiciones</span>
     </a>
 </li>
-@endhasanyrole
+@endmoduleAccess
 
-{{-- Cotizaciones (RFQ) accordion — visible to: superadmin, staff, authorizer, general_director --}}
-@hasanyrole('superadmin|staff|authorizer|general_director')
-@php $openRfq = request()->routeIs('rfq.*') || request()->routeIs('quotes.*') || request()->routeIs('approvals.quotations.*'); @endphp
+@moduleAccess('quotations')
 <li class="side-nav-item">
     <a class="side-nav-link {{ $openRfq ? '' : 'collapsed' }}" data-bs-toggle="collapse"
         href="#sidebarComprasRfq" role="button"
@@ -72,95 +109,62 @@
     </a>
     <div class="{{ $openRfq ? 'show' : '' }} collapse" id="sidebarComprasRfq">
         <ul class="sub-menu">
-            {{-- Cotizar — visible to: superadmin, staff --}}
-            @hasanyrole('superadmin|staff')
-            @php
-                try {
-                    $activeRequisitionsCount = \App\Models\Requisition::whereNotIn('status', ['DRAFT', 'CANCELLED', 'COMPLETED'])->count();
-                } catch (\Exception $e) {
-                    $activeRequisitionsCount = 0;
-                }
-            @endphp
+            @if ($moduleAccess->userCanAccessModule($user, 'quotations') && $user?->hasRole('buyer'))
             <li class="side-nav-item">
                 <a href="{{ route('quotes.index') }}"
                     class="side-nav-link {{ request()->routeIs('quotes.index') ? 'active' : '' }}">
                     <span class="menu-text">Cotizar</span>
-                    @if($activeRequisitionsCount > 0)
+                    @if ($activeRequisitionsCount > 0)
                         <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ $activeRequisitionsCount }}</span>
                     @endif
                 </a>
             </li>
-            @endhasanyrole
+            @endif
 
-            {{-- Aprobar cotización — visible to: superadmin, staff, authorizer, general_director --}}
-            @php
-                try {
-                    $pendingApprovalsCount = auth()->check()
-                        ? \App\Models\QuotationSummary::where('approval_status', 'pending')
-                            ->where('current_approver_user_id', auth()->id())
-                            ->count()
-                        : 0;
-                } catch (\Exception $e) {
-                    $pendingApprovalsCount = 0;
-                }
-            @endphp
             <li class="side-nav-item">
                 <a href="{{ route('approvals.quotations.index') }}"
                     class="side-nav-link {{ request()->routeIs('approvals.quotations.*') ? 'active' : '' }}">
-                    <span class="menu-text">Aprobar cotización</span>
-                    @if($pendingApprovalsCount > 0)
+                    <span class="menu-text">Aprobar cotizacion</span>
+                    @if ($pendingApprovalsCount > 0)
                         <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingApprovalsCount }}</span>
                     @endif
                 </a>
             </li>
 
-            {{-- Listado de RFQs — visible to: superadmin, staff, general_director --}}
-            @hasanyrole('superadmin|staff|general_director')
             <li class="side-nav-item">
                 <a href="{{ route('rfq.index') }}"
                     class="side-nav-link {{ request()->routeIs('rfq.index') ? 'active' : '' }}">
                     <span class="menu-text">Listado de RFQs</span>
                 </a>
             </li>
-            @endhasanyrole
 
-            {{-- Pendientes de Respuesta — visible to: superadmin, staff --}}
-            @hasanyrole('superadmin|staff')
+            @if ($user?->hasRole('buyer'))
             <li class="side-nav-item">
                 <a href="{{ route('rfq.inbox.pending') }}"
                     class="side-nav-link {{ request()->routeIs('rfq.inbox.pending') ? 'active' : '' }}">
                     <span class="menu-text">Pendientes de Respuesta</span>
                 </a>
             </li>
-            @endhasanyrole
+            @endif
         </ul>
     </div>
 </li>
-@endhasanyrole {{-- end Cotizaciones accordion --}}
+@endmoduleAccess
 
-{{-- Órdenes de Compra — visible to: superadmin, staff, requester, general_director --}}
-@hasanyrole('superadmin|staff|requester|general_director')
+@moduleAccess('purchase_orders')
 <li class="side-nav-item">
     <a href="{{ route('purchase-orders.index') }}"
-        class="side-nav-link {{ request()->routeIs('purchase-orders.*') ? 'active' : '' }}">
+        class="side-nav-link {{ request()->routeIs('purchase-orders.*') || request()->routeIs('direct-purchase-orders.*') ? 'active' : '' }}">
         <span class="menu-icon"><i class="ti ti-shopping-cart"></i></span>
-        <span class="menu-text">Órdenes de Compra</span>
-        @php
-            try {
-                $poCount = \App\Models\PurchaseOrder::where('status', 'OPEN')->count();
-            } catch (\Exception $e) {
-                $poCount = 0;
-            }
-        @endphp
-        @if($poCount > 0)
+        <span class="menu-text">Ordenes de Compra</span>
+        @if ($poCount > 0)
             <span class="badge bg-info rounded-pill ms-auto">{{ $poCount }}</span>
         @endif
     </a>
 </li>
-@endhasanyrole
+@endmoduleAccess
 
-{{-- Recepciones — visible to: superadmin, staff --}}
-@hasanyrole('superadmin|staff')
+@moduleAccess('receptions')
 <li class="side-nav-item">
     <a href="{{ route('receptions.overview') }}"
         class="side-nav-link {{ request()->routeIs('receptions.*') ? 'active' : '' }}">
@@ -168,10 +172,9 @@
         <span class="menu-text">Recepciones</span>
     </a>
 </li>
-@endhasanyrole
+@endmoduleAccess
 
-{{-- Productos/Servicios — visible to: superadmin, staff, catalog_admin --}}
-@hasanyrole('superadmin|staff|catalog_admin')
+@moduleAccess('products_services')
 <li class="side-nav-item">
     <a href="{{ route('products-services.index') }}"
         class="side-nav-link {{ request()->routeIs('products-services.*') ? 'active' : '' }}">
@@ -179,34 +182,22 @@
         <span class="menu-text">Productos/Servicios</span>
     </a>
 </li>
-@endhasanyrole
+@endmoduleAccess
+@endif
 
-@endhasanyrole {{-- end COMPRAS --}}
-
-{{-- ═══════════════════════════════════════════════════
-     FINANZAS — visible to: superadmin, accounting, general_director
-     ═══════════════════════════════════════════════════ --}}
-@hasanyrole('superadmin|accounting|general_director')
+@if ($showFinanceSection)
 <li class="side-nav-title">FINANZAS</li>
 
-{{-- Control Presupuestal accordion — visible to: superadmin, accounting, general_director --}}
-@php
-$openPresupuesto =
-    request()->routeIs('annual_budgets.*') ||
-    request()->routeIs('budget_monthly_distributions.*') ||
-    request()->routeIs('budget_movements.*') ||
-    request()->routeIs('cost-centers.*') ||
-    request()->routeIs('categories.*');
-@endphp
+@moduleAccess('budget_control')
 <li class="side-nav-item">
-    <a class="side-nav-link {{ $openPresupuesto ? '' : 'collapsed' }}" data-bs-toggle="collapse"
+    <a class="side-nav-link {{ $openBudget ? '' : 'collapsed' }}" data-bs-toggle="collapse"
         href="#sidebarPresupuesto" role="button"
-        aria-expanded="{{ $openPresupuesto ? 'true' : 'false' }}" aria-controls="sidebarPresupuesto">
+        aria-expanded="{{ $openBudget ? 'true' : 'false' }}" aria-controls="sidebarPresupuesto">
         <span class="menu-icon"><i class="ti ti-chart-bar"></i></span>
         <span class="menu-text">Control Presupuestal</span>
         <span class="menu-arrow"></span>
     </a>
-    <div class="{{ $openPresupuesto ? 'show' : '' }} collapse" id="sidebarPresupuesto">
+    <div class="{{ $openBudget ? 'show' : '' }} collapse" id="sidebarPresupuesto">
         <ul class="sub-menu">
             <li class="side-nav-item">
                 <a href="{{ route('cost-centers.index') }}"
@@ -235,30 +226,24 @@ $openPresupuesto =
             <li class="side-nav-item">
                 <a href="{{ route('categories.index') }}"
                     class="side-nav-link {{ request()->routeIs('categories.*') ? 'active' : '' }}">
-                    <span class="menu-text">Categorías</span>
+                    <span class="menu-text">Categorias</span>
                 </a>
             </li>
         </ul>
     </div>
 </li>
+@endmoduleAccess
 
-{{-- Pagos y Facturación accordion — visible to: superadmin, accounting, general_director --}}
-@php
-$openPagos =
-    request()->routeIs('invoices.*') ||
-    request()->routeIs('payments.*') ||
-    request()->routeIs('financial-provisions.*') ||
-    request()->routeIs('finance-reports.*');
-@endphp
+@moduleAccess('payments_billing')
 <li class="side-nav-item">
-    <a class="side-nav-link {{ $openPagos ? '' : 'collapsed' }}" data-bs-toggle="collapse"
-        href="#sidebarPagos" role="button" aria-expanded="{{ $openPagos ? 'true' : 'false' }}"
+    <a class="side-nav-link {{ $openPayments ? '' : 'collapsed' }}" data-bs-toggle="collapse"
+        href="#sidebarPagos" role="button" aria-expanded="{{ $openPayments ? 'true' : 'false' }}"
         aria-controls="sidebarPagos">
         <span class="menu-icon"><i class="ti ti-cash"></i></span>
-        <span class="menu-text">Pagos y Facturación</span>
+        <span class="menu-text">Pagos y Facturacion</span>
         <span class="menu-arrow"></span>
     </a>
-    <div class="{{ $openPagos ? 'show' : '' }} collapse" id="sidebarPagos">
+    <div class="{{ $openPayments ? 'show' : '' }} collapse" id="sidebarPagos">
         <ul class="sub-menu">
             <li class="side-nav-item">
                 <a href="{{ route('invoices.index') }}"
@@ -272,108 +257,74 @@ $openPagos =
                     <span class="menu-text">Provisiones</span>
                 </a>
             </li>
-            <li class="side-nav-item">
-                <a href="javascript: void(0);"
-                    class="side-nav-link {{ request()->routeIs('payments.*') ? 'active' : '' }}">
-                    <span class="menu-text">Pagos</span>
-                </a>
-            </li>
-            <li class="side-nav-item">
-                <a href="javascript: void(0);"
-                    class="side-nav-link {{ request()->routeIs('finance-reports.*') ? 'active' : '' }}">
-                    <span class="menu-text">Reportes Financieros</span>
-                </a>
-            </li>
         </ul>
     </div>
 </li>
-@endhasanyrole {{-- end FINANZAS --}}
+@endmoduleAccess
+@endif
 
-{{-- ═══════════════════════════════════════════════════
-     PROVEEDORES — visible to: superadmin, staff
-     ═══════════════════════════════════════════════════ --}}
-@hasanyrole('superadmin|staff')
+@if ($showSuppliersSection)
 <li class="side-nav-title">PROVEEDORES</li>
 
-{{-- Gestión de Proveedores accordion — visible to: superadmin, staff --}}
-@php
-$openGestionProv = request()->routeIs('cat-suppliers.*')
-    || request()->routeIs('users.suppliers.*')
-    || request()->routeIs('sat_efos_69b.*')
-    || request()->routeIs('sirocs.*');
-@endphp
+@moduleAccess('document_review')
 <li class="side-nav-item">
-    <a class="side-nav-link {{ $openGestionProv ? '' : 'collapsed' }}" data-bs-toggle="collapse"
+    <a class="side-nav-link {{ $openSuppliers ? '' : 'collapsed' }}" data-bs-toggle="collapse"
         href="#sidebarGestionProveedores" role="button"
-        aria-expanded="{{ $openGestionProv ? 'true' : 'false' }}"
+        aria-expanded="{{ $openSuppliers ? 'true' : 'false' }}"
         aria-controls="sidebarGestionProveedores">
         <span class="menu-icon"><i class="ti ti-building-store"></i></span>
-        <span class="menu-text">Gestión de Proveedores</span>
+        <span class="menu-text">Gestion de Proveedores</span>
         <span class="menu-arrow"></span>
     </a>
-    <div class="{{ $openGestionProv ? 'show' : '' }} collapse" id="sidebarGestionProveedores">
+    <div class="{{ $openSuppliers ? 'show' : '' }} collapse" id="sidebarGestionProveedores">
         <ul class="sub-menu">
-            {{-- Lista de Proveedores --}}
             <li class="side-nav-item">
                 <a href="{{ route('cat-suppliers.index') }}"
                     class="side-nav-link {{ request()->routeIs('cat-suppliers.*') ? 'active' : '' }}">
                     <span class="menu-text">Lista de Proveedores</span>
                 </a>
             </li>
-            {{-- Usuarios Proveedor --}}
-            <li class="side-nav-item">
-                <a href="{{ route('users.suppliers.index') }}"
-                    class="side-nav-link {{ request()->routeIs('users.suppliers.*') ? 'active' : '' }}">
-                    <span class="menu-text">Usuarios Proveedor</span>
-                </a>
-            </li>
-            {{-- EFOS (SAT) — lista negra del SAT art. 69-B --}}
             <li class="side-nav-item">
                 <a href="{{ route('sat_efos_69b.index') }}"
                     class="side-nav-link {{ request()->routeIs('sat_efos_69b.*') ? 'active' : '' }}">
                     <span class="menu-text">EFOS (SAT)</span>
                 </a>
             </li>
-            {{-- SIROC (IMSS) — Sistema de Información para la Relación con Contratistas --}}
             <li class="side-nav-item">
                 <a href="{{ route('sirocs.index') }}"
                     class="side-nav-link {{ request()->routeIs('sirocs.*') ? 'active' : '' }}">
                     <span class="menu-text">SIROC (IMSS)</span>
                 </a>
             </li>
+            <li class="side-nav-item">
+                <a href="{{ route('admin.review.index') }}"
+                    class="side-nav-link {{ request()->routeIs('admin.review.*') ? 'active' : '' }}">
+                    <span class="menu-text">Rev. de documentos</span>
+                    @if (!empty($pendingReviewCount) && $pendingReviewCount > 0)
+                        <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingReviewCount }}</span>
+                    @endif
+                </a>
+            </li>
         </ul>
     </div>
 </li>
+@endmoduleAccess
 
-{{-- Rev. de documentos — visible to: superadmin, staff --}}
-<li class="side-nav-item">
-    <a href="{{ route('admin.review.index') }}"
-        class="side-nav-link {{ request()->routeIs('admin.review.*') ? 'active' : '' }}">
-        <span class="menu-icon"><i class="ti ti-checklist"></i></span>
-        <span class="menu-text">Rev. de documentos</span>
-        @if (!empty($pendingReviewCount) && $pendingReviewCount > 0)
-            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingReviewCount }}</span>
-        @endif
-    </a>
-</li>
-
-{{-- Comunicados — visible to: superadmin, staff --}}
+@moduleAccess('communicator')
 <li class="side-nav-item">
     <a href="{{ route('admin.announcements.index') }}"
-        class="side-nav-link {{ request()->routeIs('admin.announcements.index') ? 'active' : '' }}">
+        class="side-nav-link {{ request()->routeIs('admin.announcements.*') ? 'active' : '' }}">
         <span class="menu-icon"><i class="ti ti-speakerphone"></i></span>
         <span class="menu-text">Comunicados</span>
     </a>
 </li>
-@endhasanyrole {{-- end PROVEEDORES --}}
+@endmoduleAccess
+@endif
 
-{{-- ═══════════════════════════════════════════════════
-     CONFIGURACIÓN — visible to: superadmin only
-     ═══════════════════════════════════════════════════ --}}
-@hasrole('superadmin')
-<li class="side-nav-title">CONFIGURACIÓN</li>
+@if ($showConfigSection)
+<li class="side-nav-title">CONFIGURACION</li>
 
-{{-- Usuarios Staff — visible to: superadmin --}}
+@moduleAccess('staff_users')
 <li class="side-nav-item">
     <a class="side-nav-link {{ request()->routeIs('users.staff.index') ? 'active' : '' }}"
         href="{{ route('users.staff.index') }}">
@@ -381,8 +332,9 @@ $openGestionProv = request()->routeIs('cat-suppliers.*')
         <span class="menu-text">Usuarios Staff</span>
     </a>
 </li>
+@endmoduleAccess
 
-{{-- Empleados — visible to: superadmin --}}
+@moduleAccess('employees')
 <li class="side-nav-item">
     <a class="side-nav-link {{ request()->routeIs('employees.index') ? 'active' : '' }}"
         href="{{ route('employees.index') }}">
@@ -390,26 +342,16 @@ $openGestionProv = request()->routeIs('cat-suppliers.*')
         <span class="menu-text">Empleados</span>
     </a>
 </li>
+@endmoduleAccess
 
-{{-- Catálogos del sistema accordion — visible to: superadmin --}}
-@php
-$openConfiguration =
-    request()->routeIs('companies.*') ||
-    request()->routeIs('stations.*') ||
-    request()->routeIs('departments.*') ||
-    request()->routeIs('receiving-locations.*') ||
-    request()->routeIs('taxes.*') ||
-    request()->routeIs('authorizer-roles.*') ||
-    request()->routeIs('approval-levels.*') ||
-    request()->routeIs('sat-retenciones.*');
-@endphp
+@moduleAccess('catalogs_config')
 <li class="side-nav-item">
     <a class="side-nav-link {{ $openConfiguration ? '' : 'collapsed' }}" data-bs-toggle="collapse"
         href="#sidebarConfigurations" role="button"
         aria-expanded="{{ $openConfiguration ? 'true' : 'false' }}"
         aria-controls="sidebarConfigurations">
         <span class="menu-icon"><i class="ti ti-settings"></i></span>
-        <span class="menu-text">Catálogos</span>
+        <span class="menu-text">Catalogos</span>
         <span class="menu-arrow"></span>
     </a>
     <div class="{{ $openConfiguration ? 'show' : '' }} collapse" id="sidebarConfigurations">
@@ -435,7 +377,7 @@ $openConfiguration =
             <li class="side-nav-item">
                 <a href="{{ route('receiving-locations.index') }}"
                     class="side-nav-link {{ request()->routeIs('receiving-locations.*') ? 'active' : '' }}">
-                    <span class="menu-text">Ubicaciones de Recepción</span>
+                    <span class="menu-text">Ubicaciones de Recepcion</span>
                 </a>
             </li>
             <li class="side-nav-item">
@@ -453,7 +395,7 @@ $openConfiguration =
             <li class="side-nav-item">
                 <a href="{{ route('approval-levels.index') }}"
                     class="side-nav-link {{ request()->routeIs('approval-levels.*') ? 'active' : '' }}">
-                    <span class="menu-text">Niveles de Autorización</span>
+                    <span class="menu-text">Niveles de Autorizacion</span>
                 </a>
             </li>
             <li class="side-nav-item">
@@ -465,8 +407,9 @@ $openConfiguration =
         </ul>
     </div>
 </li>
+@endmoduleAccess
 
-{{-- Incidentes Reportados — visible to: superadmin --}}
+@moduleAccess('reported_incidents')
 <li class="side-nav-item text-danger">
     <a href="{{ route('incidents.index') }}"
         class="side-nav-link text-danger {{ request()->routeIs('incidents.*') ? 'active' : '' }}">
@@ -474,4 +417,5 @@ $openConfiguration =
         <span class="menu-text">Incidentes Reportados</span>
     </a>
 </li>
-@endhasrole {{-- end CONFIGURACIÓN --}}
+@endmoduleAccess
+@endif

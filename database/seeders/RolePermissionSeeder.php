@@ -83,6 +83,7 @@ class RolePermissionSeeder extends Seeder
             $receiverRole = Role::findOrCreate('receiver', 'web');
             $generalDirectorRole = Role::findOrCreate('general_director', 'web');
             $catalogAdminRole = Role::findOrCreate('catalog_admin', 'web');
+            $departmentHeadRole = Role::findOrCreate('department_head', 'web');
 
             // Asignaciones
             $superAdminRole->syncPermissions(Permission::all());
@@ -198,6 +199,16 @@ class RolePermissionSeeder extends Seeder
                 'view_quotes',
 
                 // Perfil propio
+                'edit_own_profile',
+            ]);
+            $departmentHeadRole->syncPermissions([
+                'view_orders',
+                'view_invoices',
+                'create_invoices',
+                'edit_invoices',
+                'process_payments',
+                'view_purchase_reports',
+                'view_accounting_reports',
                 'edit_own_profile',
             ]);
         });

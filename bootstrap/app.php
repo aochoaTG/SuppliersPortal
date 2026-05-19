@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission'=> \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'lock'              => \App\Http\Middleware\CheckLockScreen::class,
             'api.key'           => \App\Http\Middleware\ApiKeyMiddleware::class,
+            'module.access'     => \App\Http\Middleware\ModuleAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

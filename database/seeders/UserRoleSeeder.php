@@ -29,6 +29,7 @@ class UserRoleSeeder extends Seeder
             ['name' => 'Contabilidad User',   'email' => 'tgcontabilidad@yopmail.com', 'role' => 'accounting'],
             ['name' => 'Proveedor User',      'email' => 'tgproveedor@yopmail.com',   'role' => 'supplier'],
             ['name' => 'Autorizador User',    'email' => 'tgautorizador@yopmail.com', 'role' => 'authorizer'],
+            ['name' => 'Jefe de Departamento User', 'email' => 'tgjefedepartamento@yopmail.com', 'role' => 'department_head'],
         ];
 
         foreach ($initialUsers as $data) {
