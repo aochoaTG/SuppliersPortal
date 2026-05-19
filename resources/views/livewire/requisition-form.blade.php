@@ -415,6 +415,27 @@
         border-right: 0;
     }
 
+    .input-group > .select2-container {
+        flex: 1 1 auto;
+        width: 1% !important;
+    }
+
+    .input-group > .select2-container .select2-selection--single {
+        height: calc(1.5em + 0.75rem + 2px) !important;
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+        border-left: 0 !important;
+    }
+
+    .input-group > .select2-container .select2-selection__rendered {
+        line-height: calc(1.5em + 0.75rem) !important;
+        padding-left: 0.75rem !important;
+    }
+
+    .input-group > .select2-container .select2-selection__arrow {
+        height: calc(1.5em + 0.75rem) !important;
+    }
+
     .form-control:focus+.input-group-text,
     .form-select:focus~.input-group-text {
         border-color: #86b7fe;
@@ -592,6 +613,72 @@ $(function() {
     // VARIABLE GLOBAL
     // =====================================================
     let editingIndex = null;
+    const livewireComponent = @this;
+
+    function initializeSearchableSelect($element, placeholder, options = {}) {
+        if (!$element.length) {
+            return;
+        }
+
+        if ($element.data('select2')) {
+            $element.off('.requisitionSelect2');
+            $element.select2('destroy');
+        }
+
+        $element.select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: placeholder,
+            allowClear: true,
+            language: {
+                noResults: function() { return 'No se encontraron resultados'; },
+                searching: function() { return 'Buscando...'; }
+            },
+            ...options
+        });
+    }
+
+    function initializeHeaderSelects() {
+        const headerSelects = [
+            { selector: '#company_id', property: 'company_id', placeholder: 'Buscar compañía...' },
+            { selector: '#cost_center_id', property: 'cost_center_id', placeholder: 'Buscar centro de costo...' },
+            { selector: '#purchase_type', property: 'purchase_type', placeholder: 'Buscar tipo de compra...' },
+        ];
+
+        headerSelects.forEach(config => {
+            const $select = $(config.selector);
+
+            if (!$select.length) {
+                return;
+            }
+
+            initializeSearchableSelect($select, config.placeholder);
+            $select.on('change.requisitionSelect2', function() {
+                livewireComponent.set(config.property, $(this).val() || '');
+            });
+        });
+    }
+
+    function initializeExpenseCategorySelect() {
+        initializeSearchableSelect($('#modal_expense_category'), 'Buscar categoría de gasto...', {
+            dropdownParent: $('#itemModal')
+        });
+    }
+
+    function initializeRequisitionSelects() {
+        initializeHeaderSelects();
+        initializeExpenseCategorySelect();
+    }
+
+    initializeRequisitionSelects();
+
+    document.addEventListener('livewire:init', () => {
+        Livewire.hook('morph.updated', ({ el }) => {
+            if (el.querySelector?.('#company_id') || el.id === 'company_id' || el.id === 'purchase_type' || el.id === 'cost_center_id') {
+                setTimeout(() => initializeRequisitionSelects(), 0);
+            }
+        });
+    });
 
     // =====================================================
     // LISTENER: Cambio de Centro de Costo
@@ -607,6 +694,7 @@ $(function() {
                 .empty()
                 .append('<option value="">Seleccione primero un Centro de Costo...</option>')
                 .prop('disabled', true);
+            initializeExpenseCategorySelect();
         }
     });
 
@@ -921,6 +1009,7 @@ $(function() {
                 $select.empty()
                     .append('<option value="">Seleccione primero un Centro de Costo...</option>')
                     .prop('disabled', true);
+                initializeExpenseCategorySelect();
                 resolve(false);
                 return;
             }
@@ -928,6 +1017,7 @@ $(function() {
             $select.prop('disabled', true)
                 .empty()
                 .append('<option value="">⏳ Cargando categorías...</option>');
+            initializeExpenseCategorySelect();
 
             $.ajax({
                 url: '{{ route("expense-categories.by-cost-center") }}',
@@ -951,6 +1041,7 @@ $(function() {
                         });
 
                         $select.prop('disabled', false);
+                        initializeExpenseCategorySelect();
 
                         if (response.budget_type === 'FREE_CONSUMPTION') {
                             const Toast = Swal.mixin({
@@ -975,12 +1066,14 @@ $(function() {
                         resolve(true);
                     } else {
                         $select.append('<option value="">⚠️ Sin categorías disponibles</option>');
+                        initializeExpenseCategorySelect();
                         showBudgetError(response);
                         resolve(false);
                     }
                 },
                 error: function(xhr) {
                     $select.empty().append('<option value="">❌ Error al cargar</option>');
+                    initializeExpenseCategorySelect();
                     
                     if (xhr.status === 404 && xhr.responseJSON) {
                         showBudgetError(xhr.responseJSON);

@@ -384,6 +384,27 @@
         border-right: 0;
     }
 
+    .input-group > .select2-container {
+        flex: 1 1 auto;
+        width: 1% !important;
+    }
+
+    .input-group > .select2-container .select2-selection--single {
+        height: calc(1.5em + 0.75rem + 2px) !important;
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+        border-left: 0 !important;
+    }
+
+    .input-group > .select2-container .select2-selection__rendered {
+        line-height: calc(1.5em + 0.75rem) !important;
+        padding-left: 0.75rem !important;
+    }
+
+    .input-group > .select2-container .select2-selection__arrow {
+        height: calc(1.5em + 0.75rem) !important;
+    }
+
     .form-control:focus+.input-group-text,
     .form-select:focus~.input-group-text {
         border-color: #86b7fe;
@@ -422,16 +443,44 @@
         const $company = $('#company_id');
         const $purchaseType = $('#purchase_type');
         const $cc = $('#cost_center_id');
+        const $expenseCategory = $('#modal_expense_category');
+
+        function initSearchableSelect($element, placeholder, options = {}) {
+            if ($element.data('select2')) {
+                $element.select2('destroy');
+            }
+
+            $element.select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                placeholder,
+                allowClear: true,
+                language: {
+                    noResults: function() { return 'No se encontraron resultados'; },
+                    searching: function() { return 'Buscando...'; }
+                },
+                ...options
+            });
+        }
+
+        initSearchableSelect($company, 'Buscar compañía...');
+        initSearchableSelect($purchaseType, 'Buscar tipo de compra...');
+        initSearchableSelect($cc, 'Buscar centro de costo...');
+        initSearchableSelect($expenseCategory, 'Buscar categoría de gasto...', {
+            dropdownParent: $('#itemModal')
+        });
 
         function loadCostCenters(companyId, purchaseType) {
             if (!companyId || !purchaseType) {
                 $cc.prop('disabled', true)
                     .empty()
                     .append('<option value="">Seleccionar compañía y tipo de compra primero</option>');
+                initSearchableSelect($cc, 'Buscar centro de costo...');
                 return;
             }
 
             $cc.prop('disabled', true).empty().append('<option value="">Cargando...</option>');
+            initSearchableSelect($cc, 'Buscar centro de costo...');
 
             const url = $company.data('url-costcenters').replace('__CID__', companyId);
 
@@ -452,7 +501,14 @@
                 .fail(function() {
                     Swal.fire('Error', 'No se pudieron cargar los centros de costo.', 'error');
                 })
-                .always(() => $cc.prop('disabled', false));
+                .always(() => {
+                    $cc.prop('disabled', false);
+                    initSearchableSelect($cc, 'Buscar centro de costo...');
+
+                    if ($cc.val()) {
+                        $cc.trigger('change');
+                    }
+                });
         }
 
         $company.on('change', function() {
@@ -509,7 +565,7 @@
                 setTimeout(() => {
                     $('#modal_product_id').val(item.product_id).trigger('change');
                     $('#modal_quantity').val(item.quantity);
-                    $('#modal_expense_category').val(item.expense_category_id);
+                    $('#modal_expense_category').val(item.expense_category_id).trigger('change');
                     $('#modal_notes').val(item.notes || '');
                 }, 500);
             }
@@ -638,7 +694,10 @@
         function loadExpenseCategories() {
             const costCenterId = $('#cost_center_id').val();
 
-            $('#modal_expense_category').empty().append('<option value="">Cargando...</option>');
+            $expenseCategory.empty().append('<option value="">Cargando...</option>');
+            initSearchableSelect($expenseCategory, 'Buscar categorÃ­a de gasto...', {
+                dropdownParent: $('#itemModal')
+            });
 
             $.getJSON('{{ route("expense-categories.by-budget") }}', {
                     cost_center_id: costCenterId
@@ -648,13 +707,44 @@
 
                     if (data.categories && data.categories.length > 0) {
                         data.categories.forEach(cat => {
-                            $('#modal_expense_category').append($('<option>', {
+                            $expenseCategory.append($('<option>', {
                                 value: cat.id,
                                 text: cat.name,
                                 'data-name': cat.name
                             }));
                         });
                     }
+                });
+        }
+
+        loadExpenseCategories = function() {
+            const costCenterId = $('#cost_center_id').val();
+
+            $expenseCategory.empty().append('<option value="">Cargando...</option>');
+            initSearchableSelect($expenseCategory, 'Buscar categoría de gasto...', {
+                dropdownParent: $('#itemModal')
+            });
+
+            $.getJSON('{{ route("expense-categories.by-budget") }}', {
+                    cost_center_id: costCenterId
+                })
+                .done(function(data) {
+                    $expenseCategory.empty().append('<option value="">Seleccionar categoría...</option>');
+
+                    if (data.categories && data.categories.length > 0) {
+                        data.categories.forEach(cat => {
+                            $expenseCategory.append($('<option>', {
+                                value: cat.id,
+                                text: cat.name,
+                                'data-name': cat.name
+                            }));
+                        });
+                    }
+                })
+                .always(function() {
+                    initSearchableSelect($expenseCategory, 'Buscar categoría de gasto...', {
+                        dropdownParent: $('#itemModal')
+                    });
                 });
         }
 

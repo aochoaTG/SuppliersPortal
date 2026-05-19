@@ -21,6 +21,7 @@ use App\Http\Controllers\FinancialProvisionController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\LockScreenController;
 use App\Http\Controllers\LogViewerController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductServiceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfilePasswordController;
@@ -74,6 +75,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/lock', [LockScreenController::class, 'lock'])->name('lockscreen.lock');
     Route::get('/lock', [LockScreenController::class, 'show'])->name('lockscreen.show');
     Route::post('/unlock', [LockScreenController::class, 'unlock'])->name('lockscreen.unlock');
+
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/{notification}/open', [NotificationController::class, 'open'])->name('open');
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('read');
+        Route::post('/read-all', [NotificationController::class, 'markAllAsRead'])->name('read-all');
+    });
 });
 
 // ============================================================================

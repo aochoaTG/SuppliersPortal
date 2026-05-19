@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Route;
 
 class DirectPurchaseOrderApprovedNotification extends Notification
 {
@@ -37,7 +38,7 @@ class DirectPurchaseOrderApprovedNotification extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $url = route('direct-purchase-orders.show', $this->ocd->id);
+        $url = Route::has('supplier.dashboard') ? route('supplier.dashboard') : route('dashboard');
 
         return (new MailMessage)
             ->subject('✅ Orden de Compra Aprobada - ' . $this->ocd->folio)
@@ -68,7 +69,7 @@ class DirectPurchaseOrderApprovedNotification extends Notification
             'ocd_id' => $this->ocd->id,
             'ocd_folio' => $this->ocd->folio,
             'total' => $this->ocd->total,
-            'url' => route('direct-purchase-orders.show', $this->ocd->id),
+            'url' => Route::has('supplier.dashboard') ? route('supplier.dashboard') : route('dashboard'),
             'message' => 'Orden de Compra ' . $this->ocd->folio . ' ha sido aprobada.',
         ];
     }

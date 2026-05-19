@@ -59,6 +59,113 @@
             </div>
             @endif
 
+            @php
+                $notificationStyles = [
+                    'new_rfq' => ['icon' => 'ti ti-file-invoice', 'color' => 'warning', 'title' => 'Nueva cotización'],
+                    'new_rfq_for_supplier' => ['icon' => 'ti ti-file-invoice', 'color' => 'warning', 'title' => 'Nueva cotización'],
+                    'rfq_cancelled_for_supplier' => ['icon' => 'ti ti-xbox-x', 'color' => 'danger', 'title' => 'Cotización cancelada'],
+                    'rfq_cancelled_for_requester' => ['icon' => 'ti ti-xbox-x', 'color' => 'danger', 'title' => 'RFQ cancelada'],
+                    'rfq_sent_to_suppliers' => ['icon' => 'ti ti-send', 'color' => 'info', 'title' => 'RFQ enviada'],
+                    'requisition_submitted' => ['icon' => 'ti ti-send', 'color' => 'info', 'title' => 'Requisición enviada'],
+                    'requisition_rejected' => ['icon' => 'ti ti-alert-circle', 'color' => 'danger', 'title' => 'Requisición rechazada'],
+                    'requisition_in_quotation' => ['icon' => 'ti ti-shopping-cart', 'color' => 'primary', 'title' => 'Requisición en cotización'],
+                    'requisition_reactivated' => ['icon' => 'ti ti-player-play', 'color' => 'success', 'title' => 'Requisición reactivada'],
+                    'new_requisition_for_purchasing' => ['icon' => 'ti ti-clipboard-list', 'color' => 'primary', 'title' => 'Nueva requisición'],
+                    'new_direct_purchase_order' => ['icon' => 'ti ti-file-dollar', 'color' => 'warning', 'title' => 'Nueva OC directa'],
+                    'direct_purchase_order_approved' => ['icon' => 'ti ti-circle-check', 'color' => 'success', 'title' => 'OC directa aprobada'],
+                    'direct_purchase_order_rejected' => ['icon' => 'ti ti-circle-x', 'color' => 'danger', 'title' => 'OC directa rechazada'],
+                    'direct_purchase_order_returned' => ['icon' => 'ti ti-arrow-back-up', 'color' => 'warning', 'title' => 'OC directa devuelta'],
+                    'direct_purchase_order_inactivity_warning' => ['icon' => 'ti ti-alert-triangle', 'color' => 'warning', 'title' => 'OC directa por vencer'],
+                    'direct_purchase_order_closed' => ['icon' => 'ti ti-lock', 'color' => 'danger', 'title' => 'OC directa cerrada'],
+                    'purchase_order_inactivity_warning' => ['icon' => 'ti ti-alert-triangle', 'color' => 'warning', 'title' => 'Orden por vencer'],
+                    'purchase_order_closed' => ['icon' => 'ti ti-lock', 'color' => 'danger', 'title' => 'Orden cerrada'],
+                    'quotation_approval_request' => ['icon' => 'ti ti-scale', 'color' => 'warning', 'title' => 'Aprobación requerida'],
+                    'quotation_approval_approved' => ['icon' => 'ti ti-circle-check', 'color' => 'success', 'title' => 'Cotización aprobada'],
+                    'quotation_approval_rejected' => ['icon' => 'ti ti-circle-x', 'color' => 'danger', 'title' => 'Cotización rechazada'],
+                    'reception_completed' => ['icon' => 'ti ti-package', 'color' => 'success', 'title' => 'Recepción registrada'],
+                    'supplier_invoice_uploaded' => ['icon' => 'ti ti-file-upload', 'color' => 'info', 'title' => 'Factura cargada'],
+                    'financial_provision_pending_invoice' => ['icon' => 'ti ti-receipt', 'color' => 'warning', 'title' => 'Factura pendiente'],
+                    'financial_provision_discrepancy' => ['icon' => 'ti ti-alert-hexagon', 'color' => 'danger', 'title' => 'Diferencia financiera'],
+                    'new_supplier_registration' => ['icon' => 'ti ti-user-plus', 'color' => 'info', 'title' => 'Nuevo proveedor registrado'],
+                    'staff_welcome' => ['icon' => 'ti ti-user-check', 'color' => 'success', 'title' => 'Bienvenida al portal'],
+                    'new_product_requested' => ['icon' => 'ti ti-package-import', 'color' => 'primary', 'title' => 'Producto solicitado'],
+                ];
+            @endphp
+            <div class="topbar-item">
+                <div class="dropdown">
+                    <button class="topbar-link dropdown-toggle drop-arrow-none" data-bs-toggle="dropdown" data-bs-offset="0,23" type="button" data-bs-auto-close="outside" aria-haspopup="false" aria-expanded="false">
+                        <i class="ti ti-bell fs-24"></i>
+                        @if($unreadNotificationsCount > 0)
+                            <span class="noti-icon-badge badge text-bg-danger">{{ $unreadNotificationsCount > 99 ? '99+' : $unreadNotificationsCount }}</span>
+                        @endif
+                    </button>
+
+                    <div class="dropdown-menu p-0 dropdown-menu-end dropdown-menu-lg fs-13">
+                        <div class="py-2 px-3 border-bottom border-dashed">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <h6 class="m-0 fs-16 fw-semibold">Notificaciones</h6>
+                                    <small class="text-muted">{{ $unreadNotificationsCount }} sin leer</small>
+                                </div>
+                                <div class="col-auto">
+                                    @if($unreadNotificationsCount > 0)
+                                        <form method="POST" action="{{ route('notifications.read-all') }}">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-light">Marcar todas</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-relative z-2 shadow-none rounded-0" style="max-height: 340px;" data-simplebar>
+                            @forelse($recentNotifications as $notification)
+                                @php
+                                    $type = $notification->data['type'] ?? null;
+                                    $style = $notificationStyles[$type] ?? ['icon' => 'ti ti-bell', 'color' => 'secondary', 'title' => 'Notificación'];
+                                    $message = $notification->data['message'] ?? 'Tienes una nueva notificación.';
+                                @endphp
+                                <div class="dropdown-item notification-item py-2 text-wrap {{ $notification->read_at ? '' : 'active' }}">
+                                    <div class="d-flex align-items-start">
+                                        <div class="avatar flex-shrink-0 me-2">
+                                            <span class="avatar-title text-bg-{{ $style['color'] }} rounded-circle fs-22">
+                                                <i class="{{ $style['icon'] }}"></i>
+                                            </span>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <a href="{{ route('notifications.open', $notification->id) }}" class="text-decoration-none d-block">
+                                                <span class="fw-medium text-body">{{ $style['title'] }}</span>
+                                                <span class="d-block text-muted">{{ $message }}</span>
+                                                <span class="fs-12 text-muted">{{ $notification->created_at->diffForHumans() }}</span>
+                                            </a>
+                                        </div>
+                                        @if(! $notification->read_at)
+                                            <div class="ms-2">
+                                                <form method="POST" action="{{ route('notifications.read', $notification->id) }}">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-ghost-secondary rounded-circle btn-sm btn-icon" title="Marcar como leída">
+                                                        <i class="ti ti-check fs-16"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="px-3 py-4 text-center text-muted">
+                                    <i class="ti ti-bell-off fs-28 d-block mb-2"></i>
+                                    No tienes notificaciones recientes.
+                                </div>
+                            @endforelse
+                        </div>
+
+                        <a href="{{ route('notifications.index') }}" class="dropdown-item notification-item text-center text-reset text-decoration-underline link-offset-2 fw-bold notify-item border-top border-light py-2">
+                            Ver todas
+                        </a>
+                    </div>
+                </div>
+            </div>
+            @if(false)
             <!-- Notification Dropdown -->
             <div class="topbar-item">
                 <div class="dropdown">
@@ -186,6 +293,8 @@
                     </div>
                 </div>
             </div>
+
+            @endif
 
             <!-- Button Trigger Customizer Offcanvas -->
             <div class="topbar-item d-none d-sm-flex">
