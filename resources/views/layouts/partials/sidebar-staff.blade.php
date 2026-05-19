@@ -27,6 +27,7 @@
       - COMPRAS         → superadmin, staff, requester, general_director, authorizer, catalog_admin
       - FINANZAS        → superadmin, accounting, general_director
       - PROVEEDORES     → superadmin, staff
+      - HERRAMIENTAS    → superadmin only
       - CONFIGURACIÓN   → superadmin only
 --}}
 
@@ -366,6 +367,21 @@ $openGestionProv = request()->routeIs('cat-suppliers.*')
     </a>
 </li>
 @endhasanyrole {{-- end PROVEEDORES --}}
+
+{{-- ═══════════════════════════════════════════════════
+     HERRAMIENTAS — visible to: superadmin only
+     ═══════════════════════════════════════════════════ --}}
+@hasrole('superadmin')
+<li class="side-nav-title">HERRAMIENTAS</li>
+
+<li class="side-nav-item">
+    <a href="{{ route('tools.cfdi.form') }}"
+        class="side-nav-link {{ request()->routeIs('tools.*') ? 'active' : '' }}">
+        <span class="menu-icon"><i class="ti ti-file-code"></i></span>
+        <span class="menu-text">Generador CFDI</span>
+    </a>
+</li>
+@endhasrole
 
 {{-- ═══════════════════════════════════════════════════
      CONFIGURACIÓN — visible to: superadmin only
