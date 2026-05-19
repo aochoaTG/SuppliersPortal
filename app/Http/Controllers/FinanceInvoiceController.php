@@ -103,6 +103,6 @@ class FinanceInvoiceController extends Controller
                 'label' => "OCD {$order->folio} - {$order->supplier?->company_name}",
             ]);
 
-        return $regular->merge($direct)->values();
+        return collect($regular)->merge($direct)->values();
     }
 }
