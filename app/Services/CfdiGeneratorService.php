@@ -101,20 +101,10 @@ class CfdiGeneratorService
             'Descripcion'   => $data['descripcion'],
             'ValorUnitario' => $valUnit,
             'Importe'       => $subtotal,
+            'ObjetoImp'     => '02',
         ]);
 
         $concImp  = $dom->createElementNS($ns, 'cfdi:Impuestos');
-        $trasladosNode = $dom->createElementNS($ns, 'cfdi:Traslados');
-        $traslado = $dom->createElementNS($ns, 'cfdi:Traslado');
-        $this->setAttrs($traslado, [
-            'Base'       => $subtotal,
-            'Impuesto'   => '002',
-            'TipoFactor' => 'Tasa',
-            'TasaOCuota' => $tasaIVA,
-            'Importe'    => $iva,
-        ]);
-        $trasladosNode->appendChild($traslado);
-        $concImp->appendChild($trasladosNode);
 
         if (!empty($retenciones)) {
             $concRets = $dom->createElementNS($ns, 'cfdi:Retenciones');
@@ -131,6 +121,18 @@ class CfdiGeneratorService
             }
             $concImp->appendChild($concRets);
         }
+
+        $trasladosNode = $dom->createElementNS($ns, 'cfdi:Traslados');
+        $traslado = $dom->createElementNS($ns, 'cfdi:Traslado');
+        $this->setAttrs($traslado, [
+            'Base'       => $subtotal,
+            'Impuesto'   => '002',
+            'TipoFactor' => 'Tasa',
+            'TasaOCuota' => $tasaIVA,
+            'Importe'    => $iva,
+        ]);
+        $trasladosNode->appendChild($traslado);
+        $concImp->appendChild($trasladosNode);
         $concepto->appendChild($concImp);
         $conceptos->appendChild($concepto);
         $comp->appendChild($conceptos);
@@ -140,18 +142,6 @@ class CfdiGeneratorService
         if (!empty($retenciones)) {
             $impNode->setAttribute('TotalImpuestosRetenidos', $totalRetenido);
         }
-
-        $gTraslados = $dom->createElementNS($ns, 'cfdi:Traslados');
-        $gTraslado  = $dom->createElementNS($ns, 'cfdi:Traslado');
-        $this->setAttrs($gTraslado, [
-            'Base'       => $subtotal,
-            'Impuesto'   => '002',
-            'TipoFactor' => 'Tasa',
-            'TasaOCuota' => $tasaIVA,
-            'Importe'    => $iva,
-        ]);
-        $gTraslados->appendChild($gTraslado);
-        $impNode->appendChild($gTraslados);
 
         if (!empty($retenciones)) {
             $gRets   = $dom->createElementNS($ns, 'cfdi:Retenciones');
@@ -168,6 +158,18 @@ class CfdiGeneratorService
             }
             $impNode->appendChild($gRets);
         }
+
+        $gTraslados = $dom->createElementNS($ns, 'cfdi:Traslados');
+        $gTraslado  = $dom->createElementNS($ns, 'cfdi:Traslado');
+        $this->setAttrs($gTraslado, [
+            'Base'       => $subtotal,
+            'Impuesto'   => '002',
+            'TipoFactor' => 'Tasa',
+            'TasaOCuota' => $tasaIVA,
+            'Importe'    => $iva,
+        ]);
+        $gTraslados->appendChild($gTraslado);
+        $impNode->appendChild($gTraslados);
         $comp->appendChild($impNode);
 
         $complemento = $dom->createElementNS($ns, 'cfdi:Complemento');
