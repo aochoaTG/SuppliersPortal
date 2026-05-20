@@ -1,0 +1,11 @@
+﻿"Autenticacion y perfil","tests/Feature/Auth/AuthenticationTest.php, tests/Feature/ProfileTest.php",Parcial
+"Matriz de acceso por roles",tests/Feature/ModuleAccessMatrixTest.php,Parcial
+"Registro de proveedor y notificacion","tests/Feature/SupplierRegistrationNotificationTest.php, tests/Feature/AllowedEmailDomainTest.php",Parcial
+"Presupuesto anual y distribucion","tests/Feature/AnnualBudgetStoreTest.php, tests/Feature/BudgetCedulaDistributionTest.php",Parcial
+"Centros de costo","tests/Feature/CostCenterCrudTest.php, tests/Feature/CostCenterImportTest.php, tests/Feature/CostCenterPurchaseTypeFilterTest.php",Parcial
+Empleados,"tests/Feature/EmployeeCatalogTest.php, tests/Feature/EmployeePromoteTest.php",Parcial
+"EFOS y tipo de cambio","tests/Feature/EfosSyncTest.php, tests/Feature/ExchangeRateSyncTest.php",Parcial
+Recepciones,"tests/Feature/ReceptionFlowTest.php, tests/Unit/OrderReceptionStatusTest.php",Parcial
+"CFDI y XML","tests/Feature/CfdiGeneratorControllerTest.php, tests/Unit/CfdiGeneratorServiceXmlTest.php, tests/Unit/CfdiGeneratorServicePdfTest.php, tests/Unit/CfdiXmlParserTest.php",Parcial
+"Provisiones financieras",tests/Unit/FinancialProvisionServiceTest.php,Parcial
+"Notificaciones de bienvenida",tests/Feature/StaffWelcomeNotificationTest.php,Parcial
