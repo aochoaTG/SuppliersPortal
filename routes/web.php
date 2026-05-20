@@ -523,6 +523,16 @@ Route::middleware(['auth', 'role:supplier'])->prefix('supplier')->name('supplier
     });
 });
 
+
+// ============================================================================
+//  Tools (superadmin)
+// ============================================================================
+Route::middleware(['auth', 'lock', 'role:superadmin'])->prefix('tools')->name('tools.')->group(function () {
+    Route::get('cfdi-generator', [CfdiGeneratorController::class, 'form'])->name('cfdi.form');
+    Route::post('cfdi-generator/xml', [CfdiGeneratorController::class, 'downloadXml'])->name('cfdi.xml');
+    Route::post('cfdi-generator/pdf', [CfdiGeneratorController::class, 'downloadPdf'])->name('cfdi.pdf');
+});
+
 // ============================================================================
 //  Approval Levels & Quotation Approvals (superadmin)
 // ============================================================================
