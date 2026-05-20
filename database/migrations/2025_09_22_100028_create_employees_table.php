@@ -61,12 +61,12 @@ return new class extends Migration {
             $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();
         });
 
-        // FK auto-referencial con NO ACTION (SQL Server no permite SET NULL en ciclos)
-        DB::statement('ALTER TABLE employees ADD CONSTRAINT employees_leader_id_foreign FOREIGN KEY (leader_id) REFERENCES employees (id) ON DELETE NO ACTION ON UPDATE NO ACTION');
+        if (DB::getDriverName() === 'sqlsrv') {
+            // FK auto-referencial con NO ACTION (SQL Server no permite SET NULL en ciclos)
+            DB::statement('ALTER TABLE employees ADD CONSTRAINT employees_leader_id_foreign FOREIGN KEY (leader_id) REFERENCES employees (id) ON DELETE NO ACTION ON UPDATE NO ACTION');
+        }
 
-        // Índices únicos filtrados: SQL Server no permite múltiples (NULL, NULL)
-        // en índices únicos normales, así que se filtra para que solo aplique
-        // cuando los campos tienen valor real.
+        // Índices únicos filtrados (SQLite y SQL Server soportan WHERE en índices)
         DB::statement(
             'CREATE UNIQUE INDEX employees_user_id_unique ON employees (user_id) WHERE user_id IS NOT NULL'
         );

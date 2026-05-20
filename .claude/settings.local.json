@@ -25,7 +25,8 @@
       "Bash(bash *)",
       "Bash(php *)",
       "Bash(git *)",
-      "Bash(grep -n \"xss\\\\|sanitize\\\\|e\\(\\\\$\\\\|htmlspecialchars\" resources/views/sat_retenciones/ -r)"
+      "Bash(grep -n \"xss\\\\|sanitize\\\\|e\\(\\\\$\\\\|htmlspecialchars\" resources/views/sat_retenciones/ -r)",
+      "PowerShell(New-Item *)"
     ]
   }
 }

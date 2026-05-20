@@ -47,6 +47,7 @@ use App\Http\Controllers\SupplierInvoiceController;
 use App\Http\Controllers\SupplierPortalController;
 use App\Http\Controllers\SupplierSirocController;
 use App\Http\Controllers\TaxController;
+use App\Http\Controllers\Tools\CfdiGeneratorController;
 use App\Http\Controllers\UserController;
 use App\Models\Requisition;
 use Illuminate\Support\Facades\Route;
@@ -540,6 +541,15 @@ Route::middleware(['auth', 'lock', 'module.access:catalogs_config'])->group(func
     Route::resource('sat-retenciones', SatRetencionController::class)
         ->except(['show'])
         ->parameters(['sat-retenciones' => 'sat_retencion']);
+});
+
+// ============================================================================
+//  Tools (superadmin)
+// ============================================================================
+Route::middleware(['auth', 'lock', 'role:superadmin'])->prefix('tools')->name('tools.')->group(function () {
+    Route::get('cfdi-generator', [CfdiGeneratorController::class, 'form'])->name('cfdi.form');
+    Route::post('cfdi-generator/xml', [CfdiGeneratorController::class, 'downloadXml'])->name('cfdi.xml');
+    Route::post('cfdi-generator/pdf', [CfdiGeneratorController::class, 'downloadPdf'])->name('cfdi.pdf');
 });
 
 Route::middleware(['auth', 'lock', 'module.access:quotations'])->group(function () {

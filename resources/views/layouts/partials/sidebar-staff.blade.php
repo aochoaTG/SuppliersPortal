@@ -75,6 +75,42 @@
     }
 @endphp
 
+{{--
+    sidebar-staff.blade.php
+    =======================
+    Sidebar for all TotalGas internal staff roles.
+
+    ROLES HANDLED:
+      - superadmin     : full access to all sections
+      - staff          : Compras + Proveedores
+      - accounting     : Finanzas only
+      - general_director : Compras + Finanzas
+      - authorizer     : Compras → Aprobar cotización only
+      - catalog_admin  : Compras → Productos/Servicios only
+      - requester      : Compras → Requisiciones + Órdenes de Compra
+
+    HOW TO ADD A NEW SECTION:
+      1. Add a new section block wrapped with @hasanyrole('role1|role2|...')
+      2. Add a plain comment above the block listing the allowed roles.
+      3. Update the ROLES HANDLED list above if a new role is introduced.
+
+    HOW TO ADD AN ITEM INSIDE AN EXISTING SECTION:
+      1. Add the <li> block in the correct section.
+      2. If it has different role restrictions than the parent section,
+         wrap it with its own @hasanyrole directive and add an inline comment.
+
+    SECTIONS:
+      - INICIO          → all roles
+      - COMPRAS         → superadmin, staff, requester, general_director, authorizer, catalog_admin
+      - FINANZAS        → superadmin, accounting, general_director
+      - PROVEEDORES     → superadmin, staff
+      - HERRAMIENTAS    → superadmin only
+      - CONFIGURACIÓN   → superadmin only
+--}}
+
+{{-- ═══════════════════════════════════════════════════
+     INICIO — visible to: all staff roles
+     ═══════════════════════════════════════════════════ --}}
 <li class="side-nav-title">INICIO</li>
 @moduleAccess('dashboard')
 <li class="side-nav-item">
@@ -324,6 +360,28 @@
 
 @if ($showConfigSection)
 <li class="side-nav-title">CONFIGURACION</li>
+@endhasanyrole {{-- end PROVEEDORES --}}
+
+{{-- ═══════════════════════════════════════════════════
+     HERRAMIENTAS — visible to: superadmin only
+     ═══════════════════════════════════════════════════ --}}
+@hasrole('superadmin')
+<li class="side-nav-title">HERRAMIENTAS</li>
+
+<li class="side-nav-item">
+    <a href="{{ route('tools.cfdi.form') }}"
+        class="side-nav-link {{ request()->routeIs('tools.*') ? 'active' : '' }}">
+        <span class="menu-icon"><i class="ti ti-file-code"></i></span>
+        <span class="menu-text">Generador CFDI</span>
+    </a>
+</li>
+@endhasrole
+
+{{-- ═══════════════════════════════════════════════════
+     CONFIGURACIÓN — visible to: superadmin only
+     ═══════════════════════════════════════════════════ --}}
+@hasrole('superadmin')
+<li class="side-nav-title">CONFIGURACIÓN</li>
 
 @moduleAccess('staff_users')
 <li class="side-nav-item">
