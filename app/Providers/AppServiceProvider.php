@@ -53,7 +53,8 @@ class AppServiceProvider extends ServiceProvider
 
             if (! $user) {
                 $view->with('recentNotifications', collect())
-                    ->with('unreadNotificationsCount', 0);
+                    ->with('unreadNotificationsCount', 0)
+                    ->with('exchangeRate', null);
 
                 return;
             }
@@ -69,20 +70,17 @@ class AppServiceProvider extends ServiceProvider
                 'unreadNotificationsCount',
                 rescue(fn () => $notificationCenter->unreadCountForUser($user), 0)
             );
-        });
 
-        // Compartir siempre la variable para evitar excepciones en vistas que la esperan.
-        View::share('exchangeRate', null);
-
-        // Tipo de cambio USD/MXN solo para pantallas autenticadas que muestran navbar.
-        if (! $this->app->runningInConsole() && request()->user()) {
-            View::share(
+            $view->with(
                 'exchangeRate',
                 rescue(
                     fn () => Cache::remember('exchange_rate_usd_mxn_current', 300, fn () => ExchangeRate::current('USD', 'MXN')),
                     null
                 )
             );
-        }
+        });
+
+        // Compartir siempre la variable para evitar excepciones en vistas que la esperan.
+        View::share('exchangeRate', null);
     }
 }
