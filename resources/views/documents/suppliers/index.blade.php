@@ -7,6 +7,10 @@
 @php
     use Illuminate\Support\Facades\Storage;
 
+    $isSupplierPortal = auth()->user()?->hasRole('supplier');
+    $documentsStoreRoute = $isSupplierPortal ? 'supplier.documents.store' : 'documents.suppliers.store';
+    $documentsDestroyRoute = $isSupplierPortal ? 'supplier.documents.destroy' : 'documents.suppliers.destroy';
+
     // Armar una lista simple de filas con el "último" documento por tipo
     // docsByType: Collection groupedBy('doc_type') que llega desde el controlador
     $rows = [];
@@ -282,7 +286,7 @@
                                                 href="{{ $fileUrl }}" target="_blank" rel="noopener">
                                                     <i class="ti ti-eye me-1"></i> Ver
                                                 </a>
-                                                <button class="btn btn-sm btn-outline-danger js-delete-doc" data-doc-type="{{ $type }}" data-doc-id="{{ $doc->id }}" data-url="{{ route('documents.suppliers.destroy', [$supplier, $doc->id]) }}">
+                                                <button class="btn btn-sm btn-outline-danger js-delete-doc" data-doc-type="{{ $type }}" data-doc-id="{{ $doc->id }}" data-url="{{ route($documentsDestroyRoute, [$supplier, $doc->id]) }}">
                                                     <i class="ti ti-trash me-1"></i> Eliminar
                                                 </button>
                                             </div>
@@ -1079,7 +1083,7 @@
         <div class="modal-dialog modal-md modal-dialog-scrollable">
             <div class="modal-content">
                 <form id="docForm" method="post" enctype="multipart/form-data"
-                      action="{{ route('documents.suppliers.store', $supplier) }}">
+                      action="{{ route($documentsStoreRoute, $supplier) }}">
                     @csrf
                     <div class="modal-header">
                         <h5 class="modal-title" id="docModalTitle">Subir documento</h5>

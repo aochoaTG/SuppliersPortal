@@ -60,7 +60,7 @@
                                 </ul>
                             @endif
 
-                            <a href="{{ route('documents.suppliers.index') }}"
+                            <a href="{{ route('supplier.documents.index') }}"
                                class="btn btn-sm btn-warning">
                                 <i class="ti ti-upload me-1"></i> Completar alta / subir documentos
                             </a>
