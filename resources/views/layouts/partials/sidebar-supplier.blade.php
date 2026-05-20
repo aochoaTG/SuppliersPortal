@@ -4,6 +4,8 @@
     $openFacturacion = request()->routeIs('supplier.invoices.*');
 @endphp
 
+
+
 <li class="side-nav-title">PORTAL DE PROVEEDORES</li>
 
 @moduleAccess('supplier_documents')

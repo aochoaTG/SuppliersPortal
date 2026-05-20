@@ -7,6 +7,8 @@
       - Staff menu     → layouts/partials/sidebar-staff.blade.php
       - Supplier menu  → layouts/partials/sidebar-supplier.blade.php
 
+
+      
     ROUTING LOGIC:
       - Users with role 'supplier' → sidebar-supplier.blade.php
       - All other authenticated users (staff roles) → sidebar-staff.blade.php

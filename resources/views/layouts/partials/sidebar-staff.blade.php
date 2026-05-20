@@ -2,6 +2,7 @@
     $moduleAccess = app(\App\Services\ModuleAccessService::class);
     $user = auth()->user();
 
+    
     $showPurchasingSection = collect([
         'requisitions',
         'quotations',
